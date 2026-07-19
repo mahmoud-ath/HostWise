@@ -1,0 +1,59 @@
+"""
+Auth Module — Models
+
+User & Role models for authentication and authorization.
+"""
+import uuid
+from sqlalchemy import Column, String, Boolean, ForeignKey, Enum as SAEnum
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+import enum
+from app.shared.base_model import BaseModel
+
+
+class UserRole(str, enum.Enum):
+    """Role-based access control."""
+    ADMIN = "admin"
+    OWNER = "owner"
+    MANAGER = "manager"
+    VIEWER = "viewer"
+
+
+class User(BaseModel):
+    """Platform user — can belong to multiple organizations."""
+    __tablename__ = "users"
+
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, nullable=False, index=True
+    )
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # Relationships
+    memberships: Mapped[list["OrganizationMember"]] = relationship(
+        "OrganizationMember", back_populates="user", lazy="selectin"
+    )
+
+
+class OrganizationMember(BaseModel):
+    """Junction between User and Organization with role assignment."""
+    __tablename__ = "organization_members"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[UserRole] = mapped_column(
+        SAEnum(UserRole), default=UserRole.VIEWER, nullable=False
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="memberships")
+    organization: Mapped["Organization"] = relationship(
+        "Organization", back_populates="members"
+    )

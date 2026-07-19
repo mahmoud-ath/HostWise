@@ -1,0 +1,50 @@
+# HostWise Backend Dependencies
+# Python 3.12+
+
+# Web Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Database
+sqlalchemy==2.0.36
+alembic==1.14.1
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+
+# Validation
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+python-multipart==0.0.19
+
+# HTTP
+httpx==0.28.1
+python-dateutil==2.9.0
+
+# File Processing
+python-magic==0.4.27
+openpyxl==3.1.5
+
+# AI / ML (lightweight for MVP)
+scikit-learn==1.6.1
+numpy==2.2.1
+
+# Scheduling
+apscheduler==3.11.0
+
+# Email (future)
+# aiosmtplib==3.0.2
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.2
+httpx==0.28.1
+faker==33.3.1
+
+# Dev
+black==24.10.0
+isort==5.13.2
+ruff==0.8.6

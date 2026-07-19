@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: rgb(255, 255, 255);
+    --foreground: rgb(34, 34, 34);
+    --card: rgb(255, 255, 255);
+    --card-foreground: rgb(34, 34, 34);
+    --popover: rgb(255, 255, 255);
+    --popover-foreground: rgb(34, 34, 34);
+    --primary: rgb(255, 56, 92);
+    --primary-foreground: rgb(255, 255, 255);
+    --secondary: rgb(247, 247, 247);
+    --secondary-foreground: rgb(34, 34, 34);
+    --muted: rgb(247, 247, 247);
+    --muted-foreground: rgb(113, 113, 113);
+    --accent: rgb(247, 247, 247);
+    --accent-foreground: rgb(34, 34, 34);
+    --destructive: rgb(193, 53, 21);
+    --destructive-foreground: rgb(255, 255, 255);
+    --success: rgb(0, 132, 137);
+    --success-foreground: rgb(255, 255, 255);
+    --border: rgb(221, 221, 221);
+    --input: rgb(221, 221, 221);
+    --ring: rgb(34, 34, 34);
+    --radius: 0.75rem;
+    --font-sans: Poppins, ui-sans-serif, sans-serif, system-ui;
+    --font-serif: Merriweather, ui-serif, serif;
+    --font-mono: JetBrains Mono, ui-monospace, monospace;
+  }
+
+  .dark {
+    --background: rgb(18, 18, 18);
+    --foreground: rgb(239, 239, 239);
+    --card: rgb(30, 30, 30);
+    --card-foreground: rgb(239, 239, 239);
+    --popover: rgb(30, 30, 30);
+    --popover-foreground: rgb(239, 239, 239);
+    --primary: rgb(255, 56, 92);
+    --primary-foreground: rgb(255, 255, 255);
+    --secondary: rgb(34, 34, 34);
+    --secondary-foreground: rgb(239, 239, 239);
+    --muted: rgb(34, 34, 34);
+    --muted-foreground: rgb(163, 163, 163);
+    --accent: rgb(34, 34, 34);
+    --accent-foreground: rgb(255, 255, 255);
+    --destructive: rgb(224, 78, 78);
+    --destructive-foreground: rgb(255, 255, 255);
+    --success: rgb(0, 166, 153);
+    --success-foreground: rgb(255, 255, 255);
+    --border: rgb(51, 51, 51);
+    --input: rgb(51, 51, 51);
+    --ring: rgb(255, 56, 92);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
