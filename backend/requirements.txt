@@ -24,6 +24,9 @@ python-multipart==0.0.19
 # HTTP / Testing
 httpx==0.28.1
 
+# Production — structured JSON logging (optional, falls back to plain logging)
+python-json-logger==3.2.1
+
 # Testing (optional — install separately for development)
 # pytest==8.3.4
 # pytest-asyncio==0.25.2

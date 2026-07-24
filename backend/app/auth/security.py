@@ -4,7 +4,7 @@ Auth Module — Security Utilities
 JWT token generation, password hashing, and verification.
 Uses python-jose for JWT and bcrypt directly for hashing.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 import bcrypt
 from app.core.config import get_settings
@@ -26,6 +26,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     )
 
 
+def _utcnow() -> datetime:
+    """Timezone-aware UTC now (replacement for deprecated datetime.utcnow)."""
+    return datetime.now(timezone.utc)
+
+
 def create_access_token(
     user_id: str,
     expires_delta: timedelta | None = None,
@@ -34,10 +39,11 @@ def create_access_token(
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
 
+    now = _utcnow()
     to_encode = {
         "sub": user_id,
-        "exp": datetime.utcnow() + expires_delta,
-        "iat": datetime.utcnow(),
+        "exp": now + expires_delta,
+        "iat": now,
         "type": "access",
     }
     return jwt.encode(
@@ -47,11 +53,12 @@ def create_access_token(
 
 def create_refresh_token(user_id: str) -> str:
     """Create a JWT refresh token (longer-lived)."""
+    now = _utcnow()
     expires_delta = timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = {
         "sub": user_id,
-        "exp": datetime.utcnow() + expires_delta,
-        "iat": datetime.utcnow(),
+        "exp": now + expires_delta,
+        "iat": now,
         "type": "refresh",
     }
     return jwt.encode(

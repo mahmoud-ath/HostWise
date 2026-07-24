@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "HostWise"
     APP_VERSION: str = "0.1.0"
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
+    LOG_LEVEL: str = "info"
 
     # Server
     HOST: str = "0.0.0.0"
@@ -30,25 +31,26 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
     DB_ECHO: bool = False
+    DB_POOL_PRE_PING: bool = True
 
     # JWT Authentication
-    JWT_SECRET_KEY: str = "change-me-in-production-use-a-strong-random-key"
+    JWT_SECRET_KEY: str = "change-me-in-production-use-openssl-rand-hex-64"
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    # CORS
+    # CORS — in production, restrict to your actual domain
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
     # File Uploads
     UPLOAD_DIR: str = "/app/uploads"
     MAX_UPLOAD_SIZE_MB: int = 50
 
-    # AI (future — placeholder for now)
+    # AI (optional)
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
 
-    # Email (future)
+    # Email (optional)
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: Optional[int] = 587
 
@@ -59,6 +61,7 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
+        "extra": "ignore",
     }
 
 

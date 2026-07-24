@@ -2,52 +2,156 @@
 HostWise — Vacation Rental Intelligence Platform
 
 A modular monolith built with FastAPI + Domain-Driven Design.
-The platform is NOT a PMS. It's an analytics & AI layer on top of booking data.
 """
 import os
+import time
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import get_settings
-from app.core.database import engine, Base
+from app.core.database import engine, Base, async_session_factory
+from app.shared.exceptions import AppException
 
 settings = get_settings()
 
-
-import logging
-
+# ── Structured Logging Setup ────────────────────────────
 logger = logging.getLogger("hostwise")
 
 
+def setup_logging() -> None:
+    """Configure structured JSON logging for production, pretty for dev."""
+    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+
+    if settings.ENVIRONMENT == "production":
+        # Structured logging with JSON output
+        try:
+            from pythonjsonlogger import jsonlogger
+
+            handler = logging.StreamHandler()
+            formatter = jsonlogger.JsonFormatter(
+                fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S%z",
+            )
+            handler.setFormatter(formatter)
+            logging.basicConfig(level=log_level, handlers=[handler])
+        except ImportError:
+            # Fallback to plain logging
+            logging.basicConfig(
+                level=log_level,
+                format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+    else:
+        # Dev: human-readable
+        logging.basicConfig(
+            level=log_level,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    logger.info("Logging configured at %s level", settings.LOG_LEVEL)
+
+
+# ── Request ID & Timing Middleware ───────────────────────
+import uuid
+
+
+class RequestLogMiddleware(BaseHTTPMiddleware):
+    """Add request ID and timing to every request."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = str(uuid.uuid4())[:8]
+        request.state.request_id = request_id
+        start = time.perf_counter()
+
+        response = await call_next(request)
+
+        elapsed = time.perf_counter() - start
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Response-Time-Ms"] = str(round(elapsed * 1000))
+
+        # Log every request (skip static files)
+        if not request.url.path.startswith("/static"):
+            logger.info(
+                "%s %s %s [%.0fms] id=%s",
+                request.method,
+                request.url.path,
+                response.status_code,
+                elapsed * 1000,
+                request_id,
+            )
+        return response
+
+
+# ── Lifespan ─────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup/shutdown lifecycle."""
-    # Startup: create tables (MVP — use Alembic migrations in production)
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables created/verified successfully.")
-    except Exception as e:
-        logger.warning(f"Database unavailable — running without persistence: {e}")
+    setup_logging()
+    logger.info(
+        "Starting %s v%s (%s)",
+        settings.APP_NAME,
+        settings.APP_VERSION,
+        settings.ENVIRONMENT,
+    )
+    # Startup: create tables if using SQLite (desktop mode)
+    if settings.DATABASE_TYPE == "sqlite":
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tables verified.")
+        except Exception as e:
+            logger.warning("Database unavailable: %s", e)
     yield
-    # Shutdown: dispose engine
+    # Shutdown
     await engine.dispose()
+    logger.info("Shutdown complete.")
 
 
+# ── Exception Handlers ──────────────────────────────────
+def register_exception_handlers(app: FastAPI) -> None:
+    """Register global exception handlers."""
+
+    @app.exception_handler(AppException)
+    async def app_exception_handler(request: Request, exc: AppException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.exception("Unhandled exception [req=%s]: %s", request_id, exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Internal server error",
+                "request_id": request_id,
+            },
+        )
+
+
+# ── Application Factory ──────────────────────────────────
 def create_app() -> FastAPI:
     """Application factory — creates and configures the FastAPI app."""
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
         description="Vacation Rental Intelligence Platform — Analytics & AI for hosts",
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
-        openapi_url="/api/openapi.json",
+        docs_url="/api/docs" if settings.ENVIRONMENT != "production" else None,
+        redoc_url="/api/redoc" if settings.ENVIRONMENT != "production" else None,
+        openapi_url="/api/openapi.json" if settings.ENVIRONMENT != "production" else None,
         lifespan=lifespan,
     )
 
-    # CORS
+    # Middleware (order matters: outermost first)
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    app.add_middleware(RequestLogMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
@@ -55,6 +159,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    register_exception_handlers(app)
 
     # Register routers
     from app.auth.router import router as auth_router
@@ -75,16 +181,32 @@ def create_app() -> FastAPI:
     app.include_router(reports_router, prefix="/api/v1/reports", tags=["Reports"])
     app.include_router(connectors_router, prefix="/api/v1/connectors", tags=["Connectors"])
 
-    # Health check
+    # Health check with DB status
     @app.get("/api/health")
     async def health_check():
-        return {"status": "healthy", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+        db_status = "unknown"
+        try:
+            async with async_session_factory() as session:
+                await session.execute(
+                    __import__("sqlalchemy").text("SELECT 1")
+                )
+            db_status = "connected"
+        except Exception:
+            db_status = "disconnected"
+
+        return {
+            "status": "healthy" if db_status == "connected" else "degraded",
+            "app": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+            "environment": settings.ENVIRONMENT,
+            "database": db_status,
+        }
 
     # Serve frontend static files (for non-Tauri production mode)
     frontend_dist = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "out")
     if os.path.isdir(frontend_dist):
         app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
-        logger.info(f"Serving frontend from: {frontend_dist}")
+        logger.info("Serving frontend from: %s", frontend_dist)
 
     return app
 

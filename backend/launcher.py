@@ -41,9 +41,10 @@ os.environ.setdefault(
     '["http://localhost:3000","http://127.0.0.1:3000","tauri://localhost","https://tauri.localhost"]',
 )
 
-# Disable docs in production for smaller footprint
+# Production defaults for desktop builds
 if getattr(sys, 'frozen', False):
     os.environ.setdefault("ENVIRONMENT", "production")
+    os.environ.setdefault("LOG_LEVEL", "warn")
 
 import uvicorn
 from app.main import app
@@ -55,7 +56,9 @@ def main():
         app,
         host="127.0.0.1",
         port=8000,
-        log_level="info",
+        log_level=os.environ.get("LOG_LEVEL", "info"),
+        access_log=False,
+        workers=1,
     )
 
 
