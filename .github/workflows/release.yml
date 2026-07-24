@@ -235,10 +235,55 @@ jobs:
           cd frontend
           bun run build
 
+      - name: Install WiX toolset (for MSI bundling)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $wixDir = "$env:ProgramFiles\WiX Toolset v3.14\bin"
+          $wixRoot = "$env:ProgramFiles\WiX Toolset v3.14"
+          $wixZip = "$env:TEMP\wix314.zip"
+          $wixUrl = "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip"
+
+          if (-not (Test-Path "$wixDir\candle.exe")) {
+            Write-Host "Downloading WiX 3.14..."
+            $retries = 0
+            $downloaded = $false
+            while ($retries -lt 3 -and -not $downloaded) {
+              try {
+                Invoke-WebRequest -Uri $wixUrl -OutFile $wixZip -TimeoutSec 180 -UseBasicParsing
+                $downloaded = $true
+              } catch {
+                $retries++
+                Write-Warning "Download failed (attempt $retries/3): $_"
+                Start-Sleep -Seconds 15
+              }
+            }
+            if ($downloaded) {
+              New-Item -ItemType Directory -Force -Path $wixDir | Out-Null
+              Expand-Archive -Path $wixZip -DestinationPath $wixDir -Force
+              Remove-Item $wixZip -Force
+              Write-Host "WiX 3.14 installed to $wixDir"
+            } else {
+              Write-Warning "Failed to download WiX after 3 attempts"
+            }
+          } else {
+            Write-Host "WiX 3.14 already present at $wixDir"
+          }
+          # Add to PATH and set WIX env var so Tauri finds it
+          echo "$wixDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "WIX=$wixRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build Tauri (msi + nsis)
+        shell: pwsh
         run: |
           cd frontend
-          bun run tauri build --bundles msi,nsis
+          if (Get-Command "candle.exe" -ErrorAction SilentlyContinue) {
+            Write-Host "WiX found — building MSI + NSIS"
+            bun run tauri build --bundles msi,nsis
+          } else {
+            Write-Warning "WiX not available, falling back to NSIS only"
+            bun run tauri build --bundles nsis
+          }
 
       - name: List bundle contents
         shell: pwsh
