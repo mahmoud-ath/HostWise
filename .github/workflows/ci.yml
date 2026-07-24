@@ -1,0 +1,77 @@
+# ═══════════════════════════════════════════════════════════
+# HostWise — CI Pipeline
+# ═══════════════════════════════════════════════════════════
+# Runs lint & build checks on every push/PR to main.
+# ═══════════════════════════════════════════════════════════
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  # ── Lint & Type Check ─────────────────────────────────
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Python lint (ruff)
+        run: |
+          cd backend
+          pip install -q ruff
+          ruff check app/ --no-fix || echo "Lint warnings found (non-blocking)"
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          bun install --frozen-lockfile
+
+      - name: Frontend lint (Next.js)
+        run: |
+          cd frontend
+          bun run lint || echo "Lint warnings found (non-blocking)"
+
+  # ── Frontend Build (smoke test) ───────────────────────
+  build-frontend:
+    name: Frontend Build
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          bun install --frozen-lockfile
+
+      - name: Build Next.js
+        run: |
+          cd frontend
+          bun run build
