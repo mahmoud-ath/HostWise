@@ -60,12 +60,24 @@ fn extract_and_spawn() -> Result<(Child, PathBuf), Box<dyn std::error::Error>> {
 
     let exe_name = if cfg!(target_os = "windows") { "backend.exe" } else { "backend" };
     let exe = temp.join(exe_name);
-    let mut f = std::fs::File::create(&exe)?;
-    f.write_all(BACKEND_BYTES)?;
-    f.sync_all()?;
+
+    // Write to a temp file first, then atomically rename.
+    // This avoids "Text file busy (os error 26)" on execve() caused by
+    // filesystem caching races when writing and executing the same inode.
+    let tmp = temp.join(format!(".{}.tmp", exe_name));
+    {
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(BACKEND_BYTES)?;
+        f.sync_all()?;
+    } // File handle dropped before rename
+
+    std::fs::rename(&tmp, &exe)?;
 
     #[cfg(unix)]
-    { use std::os::unix::fs::PermissionsExt; std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755))?; }
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755))?;
+    }
 
     let child = Command::new(&exe).spawn()?;
     println!("Prod backend started (PID: {})", child.id());
