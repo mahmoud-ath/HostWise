@@ -4,9 +4,11 @@ HostWise — Vacation Rental Intelligence Platform
 A modular monolith built with FastAPI + Domain-Driven Design.
 The platform is NOT a PMS. It's an analytics & AI layer on top of booking data.
 """
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.config import get_settings
 from app.core.database import engine, Base
 
@@ -77,6 +79,12 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     async def health_check():
         return {"status": "healthy", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+
+    # Serve frontend static files (for non-Tauri production mode)
+    frontend_dist = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "out")
+    if os.path.isdir(frontend_dist):
+        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+        logger.info(f"Serving frontend from: {frontend_dist}")
 
     return app
 

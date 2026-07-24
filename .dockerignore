@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Build artifacts
+frontend/.next/
+frontend/out/
+frontend/src-tauri/target/
+backend/build/
+backend/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Tauri binaries (cross-platform compiled binaries)
+frontend/src-tauri/binaries/
+frontend/src-tauri/embedded/
+
+# Generated
+frontend/src-tauri/gen/

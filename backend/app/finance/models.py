@@ -7,9 +7,8 @@ Every financial record is linked to a property and organization.
 import uuid
 from datetime import date
 from sqlalchemy import (
-    Column, String, Float, Date, Text, ForeignKey, Enum as SAEnum,
+    Column, String, Float, Date, Text, ForeignKey, Enum as SAEnum, Uuid,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.shared.base_model import BaseModel
@@ -34,24 +33,24 @@ class Revenue(BaseModel):
     __tablename__ = "revenues"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("properties.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     reservation_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("reservations.id", ondelete="SET NULL"),
         nullable=True,
     )
     category_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("revenue_categories.id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -103,19 +102,19 @@ class Expense(BaseModel):
     __tablename__ = "expenses"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("properties.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     category_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("expense_categories.id", ondelete="SET NULL"),
         nullable=True,
     )

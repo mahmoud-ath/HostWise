@@ -5,8 +5,7 @@ Property is the core asset — everything revolves around it.
 A property can have multiple listings across different booking platforms.
 """
 import uuid
-from sqlalchemy import Column, String, Integer, Float, Text, Enum as SAEnum, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Integer, Float, Text, Enum as SAEnum, ForeignKey, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.shared.base_model import BaseModel
@@ -37,7 +36,7 @@ class Property(BaseModel):
     __tablename__ = "properties"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -105,7 +104,7 @@ class Listing(BaseModel):
     __tablename__ = "listings"
 
     property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("properties.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

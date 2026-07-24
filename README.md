@@ -1,6 +1,8 @@
 # HostWise — Vacation Rental Intelligence Platform
 
-> Turn your booking data into a CFO-grade financial intelligence system.
+> **Own your data. Work offline. Sync when you want.**
+>
+> A local-first financial intelligence system for vacation rental hosts.
 
 ---
 
@@ -145,7 +147,7 @@ The CSV importer implements `ConnectorInterface` — the same interface future A
 ### Data Flow
 
 ```
-User uploads CSV  →  Connector normalizes  →  Database
+User uploads CSV  →  Connector normalizes  →  Database (sync_id on every row)
                                                  ↓
 User opens Dashboard  →  Query-computed KPIs  →  Recharts visualization
                                                  ↓
@@ -274,29 +276,76 @@ Or open **http://localhost:3000** and use the UI. An organization is auto-create
 
 ---
 
-## 🔮 Future Improvements
+## 🏗️ Architecture Philosophy
 
-### Phase 2 (3–6 months)
-- [ ] Airbnb iCal & official API connector
-- [ ] LLM-powered AI advisor (OpenAI integration)
+### Local-First, Cloud-Optional
+
+All business logic executes locally. The cloud is an optional enhancement — never a dependency.
+
+```
+UI → Services → Repository Interface → Storage
+                                          ├── Local PostgreSQL (today)
+                                          └── Cloud API (future)
+```
+
+Storage can change without touching the business layer. Every domain communicates through repository interfaces.
+
+### Sync-Ready Database Design
+
+Every table includes `sync_id` (a globally unique UUID) from day one, alongside `created_at`, `updated_at`, and `deleted_at` — making future cloud synchronization trivial without schema changes.
+
+### AI Strategy
+
+```
+Local data → Calculate KPIs → Create compact summary → Send summary to AI API
+                                                              ↓
+Display results ← Receive recommendations ←─────────── (never send raw data)
+```
+
+---
+
+## 🔮 Roadmap
+
+### Phase 1 — Local Beta (Current)
+
+Validate the product. Everything works locally. No internet required.
+
+- [x] Local PostgreSQL database
+- [x] FastAPI backend + Next.js frontend
+- [x] JWT authentication (local)
+- [x] CSV import (connector architecture)
+- [x] Financial dashboard with KPIs
+- [x] Revenue & expense tracking
+- [x] Property portfolio management
+- [x] Portfolio analytics (occupancy, ADR, RevPAR)
+- [x] AI financial advisor (rule-based engine)
+- [x] Monthly & annual reports
+- [x] `sync_id` on all tables (sync-ready schema)
+- [ ] Desktop packaging (Electron/Tauri)
+
+### Phase 2 — Cloud Foundation (After validation)
+
+Cloud acts as an optional service. Users who never connect keep working locally.
+
+- [ ] User accounts & licensing
+- [ ] Cloud backup & restore
+- [ ] User profile sync
 - [ ] Email report delivery
-- [ ] Guest profiles & repeat guest analytics
-- [ ] Advanced pricing recommendations
+- [ ] Airbnb iCal & API connector
+- [ ] LLM-powered AI advisor (OpenAI)
 
-### Phase 3 (6–12 months)
+### Phase 3 — Synchronization (After product-market fit)
+
+The cloud becomes a sync layer, not just storage.
+
+- [ ] Automatic cross-device sync
+- [ ] Mobile application
+- [ ] Remote dashboard access
+- [ ] Team collaboration
 - [ ] Booking.com & Vrbo connectors
-- [ ] Guesty & Hostaway PMS connectors
-- [ ] Market data integration (AirDNA-style comps)
 - [ ] Revenue forecasting engine
 - [ ] Multi-currency support
-
-### Phase 4 (12–24 months)
-- [ ] ClickHouse for analytics at scale
-- [ ] Redis caching layer
-- [ ] Celery for background tasks
-- [ ] White-label reports
 - [ ] Public API for partners
-- [ ] Mobile app
 
 ---
 
@@ -308,10 +357,15 @@ Private — HostWise Platform. All rights reserved.
 
 ## 👨‍💻 Author
 
-Built with the philosophy: *"Simplicity is the ultimate sophistication."* — Leonardo da Vinci
+Built with the philosophy:
+
+> *"Build for the first customer, not the millionth."*
+>
+> The local application is the product. The cloud is a premium enhancement.
+> Product quality and customer value always come before infrastructure complexity.
 
 ---
 
 <p align="center">
-  <b>HostWise</b> — Know your numbers. Grow your portfolio.
+  <b>HostWise</b> — Own your data. Know your numbers. Grow your portfolio.
 </p>

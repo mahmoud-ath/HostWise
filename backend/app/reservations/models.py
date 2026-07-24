@@ -8,9 +8,8 @@ import uuid
 from datetime import date, datetime
 from sqlalchemy import (
     Column, String, Integer, Float, Date, DateTime, Text,
-    Enum as SAEnum, ForeignKey, Boolean,
+    Enum as SAEnum, ForeignKey, Boolean, Uuid,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.shared.base_model import BaseModel
@@ -45,19 +44,19 @@ class Reservation(BaseModel):
     __tablename__ = "reservations"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("properties.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     listing_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("listings.id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -129,7 +128,7 @@ class Guest(BaseModel):
     __tablename__ = "guests"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

@@ -36,6 +36,37 @@ uploads/
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+frontend/.env.local
+
+# Tauri
+frontend/src-tauri/target/
+frontend/src-tauri/binaries/
+frontend/src-tauri/gen/
+frontend/src-tauri/icons/!(icon.png|icon.ico)
+
+# PyInstaller
+backend/build/
+backend/dist/
+backend/*.spec
+backend/hostwise.db
+
+# Generated
+*.pyc
+__pycache__/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
 
 # Logs
 *.log

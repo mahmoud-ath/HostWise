@@ -1,0 +1,91 @@
+reservation_id,property_id,property_name,city,check_in,check_out,nights,guest_country,gross_amount,status
+R0001,P001,Ocean View Apartment,Tangier,2026-01-04,2026-01-06,2,Spain,180,Confirmed
+R0002,P001,Ocean View Apartment,Tangier,2026-01-08,2026-01-11,3,Morocco,204,Confirmed
+R0003,P001,Ocean View Apartment,Tangier,2026-01-03,2026-01-09,6,France,654,Confirmed
+R0004,P001,Ocean View Apartment,Tangier,2026-01-01,2026-01-03,2,Spain,164,Confirmed
+R0005,P001,Ocean View Apartment,Tangier,2026-01-17,2026-01-23,6,Morocco,348,Confirmed
+R0006,P002,Medina Riad,Marrakech,2026-01-14,2026-01-17,3,Morocco,336,Confirmed
+R0007,P002,Medina Riad,Marrakech,2026-01-09,2026-01-11,2,Germany,150,Confirmed
+R0008,P002,Medina Riad,Marrakech,2026-01-11,2026-01-15,4,Spain,296,Confirmed
+R0009,P002,Medina Riad,Marrakech,2026-01-11,2026-01-13,2,Germany,132,Confirmed
+R0010,P002,Medina Riad,Marrakech,2026-01-04,2026-01-08,4,Morocco,396,Confirmed
+R0011,P003,Beach Studio,Agadir,2026-01-15,2026-01-21,6,Germany,420,Confirmed
+R0012,P003,Beach Studio,Agadir,2026-01-03,2026-01-09,6,Morocco,552,Confirmed
+R0013,P003,Beach Studio,Agadir,2026-01-12,2026-01-18,6,France,474,Confirmed
+R0014,P003,Beach Studio,Agadir,2026-01-02,2026-01-09,7,UK,588,Confirmed
+R0015,P003,Beach Studio,Agadir,2026-01-03,2026-01-06,3,Germany,201,Confirmed
+R0016,P001,Ocean View Apartment,Tangier,2026-02-12,2026-02-15,3,UK,306,Confirmed
+R0017,P001,Ocean View Apartment,Tangier,2026-02-07,2026-02-14,7,France,623,Confirmed
+R0018,P001,Ocean View Apartment,Tangier,2026-02-20,2026-02-27,7,Morocco,532,Confirmed
+R0019,P001,Ocean View Apartment,Tangier,2026-02-08,2026-02-11,3,Germany,342,Confirmed
+R0020,P001,Ocean View Apartment,Tangier,2026-02-09,2026-02-16,7,Spain,882,Confirmed
+R0021,P002,Medina Riad,Marrakech,2026-02-08,2026-02-10,2,Germany,190,Confirmed
+R0022,P002,Medina Riad,Marrakech,2026-02-09,2026-02-11,2,Morocco,164,Confirmed
+R0023,P002,Medina Riad,Marrakech,2026-02-11,2026-02-14,3,Germany,414,Confirmed
+R0024,P002,Medina Riad,Marrakech,2026-02-13,2026-02-20,7,Spain,791,Confirmed
+R0025,P002,Medina Riad,Marrakech,2026-02-09,2026-02-12,3,Morocco,258,Confirmed
+R0026,P003,Beach Studio,Agadir,2026-02-19,2026-02-24,5,Spain,505,Confirmed
+R0027,P003,Beach Studio,Agadir,2026-02-05,2026-02-11,6,France,708,Confirmed
+R0028,P003,Beach Studio,Agadir,2026-02-02,2026-02-04,2,Spain,148,Confirmed
+R0029,P003,Beach Studio,Agadir,2026-02-14,2026-02-20,6,Germany,378,Confirmed
+R0030,P003,Beach Studio,Agadir,2026-02-13,2026-02-19,6,Morocco,684,Confirmed
+R0031,P001,Ocean View Apartment,Tangier,2026-03-04,2026-03-11,7,UK,861,Confirmed
+R0032,P001,Ocean View Apartment,Tangier,2026-03-11,2026-03-13,2,Germany,184,Confirmed
+R0033,P001,Ocean View Apartment,Tangier,2026-03-06,2026-03-11,5,UK,275,Confirmed
+R0034,P001,Ocean View Apartment,Tangier,2026-03-17,2026-03-20,3,France,357,Confirmed
+R0035,P001,Ocean View Apartment,Tangier,2026-03-10,2026-03-17,7,Morocco,833,Confirmed
+R0036,P002,Medina Riad,Marrakech,2026-03-12,2026-03-15,3,Morocco,372,Confirmed
+R0037,P002,Medina Riad,Marrakech,2026-03-01,2026-03-07,6,Germany,576,Confirmed
+R0038,P002,Medina Riad,Marrakech,2026-03-01,2026-03-03,2,UK,202,Confirmed
+R0039,P002,Medina Riad,Marrakech,2026-03-08,2026-03-10,2,Morocco,170,Confirmed
+R0040,P002,Medina Riad,Marrakech,2026-03-03,2026-03-05,2,France,234,Confirmed
+R0041,P003,Beach Studio,Agadir,2026-03-16,2026-03-22,6,UK,456,Confirmed
+R0042,P003,Beach Studio,Agadir,2026-03-17,2026-03-23,6,Spain,654,Confirmed
+R0043,P003,Beach Studio,Agadir,2026-03-18,2026-03-25,7,UK,560,Confirmed
+R0044,P003,Beach Studio,Agadir,2026-03-13,2026-03-20,7,UK,966,Confirmed
+R0045,P003,Beach Studio,Agadir,2026-03-15,2026-03-21,6,France,672,Confirmed
+R0046,P001,Ocean View Apartment,Tangier,2026-04-03,2026-04-07,4,Morocco,228,Confirmed
+R0047,P001,Ocean View Apartment,Tangier,2026-04-18,2026-04-21,3,Spain,390,Confirmed
+R0048,P001,Ocean View Apartment,Tangier,2026-04-01,2026-04-03,2,France,270,Confirmed
+R0049,P001,Ocean View Apartment,Tangier,2026-04-08,2026-04-10,2,UK,118,Confirmed
+R0050,P001,Ocean View Apartment,Tangier,2026-04-03,2026-04-09,6,UK,510,Confirmed
+R0051,P002,Medina Riad,Marrakech,2026-04-18,2026-04-21,3,Morocco,384,Confirmed
+R0052,P002,Medina Riad,Marrakech,2026-04-16,2026-04-19,3,Germany,345,Confirmed
+R0053,P002,Medina Riad,Marrakech,2026-04-07,2026-04-09,2,Germany,134,Confirmed
+R0054,P002,Medina Riad,Marrakech,2026-04-12,2026-04-17,5,Germany,535,Confirmed
+R0055,P002,Medina Riad,Marrakech,2026-04-02,2026-04-09,7,France,966,Confirmed
+R0056,P003,Beach Studio,Agadir,2026-04-11,2026-04-13,2,Spain,172,Confirmed
+R0057,P003,Beach Studio,Agadir,2026-04-07,2026-04-13,6,Spain,672,Confirmed
+R0058,P003,Beach Studio,Agadir,2026-04-14,2026-04-17,3,Germany,270,Confirmed
+R0059,P003,Beach Studio,Agadir,2026-04-08,2026-04-10,2,Morocco,222,Confirmed
+R0060,P003,Beach Studio,Agadir,2026-04-04,2026-04-06,2,Morocco,276,Confirmed
+R0061,P001,Ocean View Apartment,Tangier,2026-05-08,2026-05-11,3,Germany,321,Confirmed
+R0062,P001,Ocean View Apartment,Tangier,2026-05-16,2026-05-19,3,France,318,Confirmed
+R0063,P001,Ocean View Apartment,Tangier,2026-05-06,2026-05-11,5,Germany,275,Confirmed
+R0064,P001,Ocean View Apartment,Tangier,2026-05-09,2026-05-14,5,Germany,455,Confirmed
+R0065,P001,Ocean View Apartment,Tangier,2026-05-18,2026-05-25,7,Spain,819,Confirmed
+R0066,P002,Medina Riad,Marrakech,2026-05-07,2026-05-09,2,Morocco,258,Confirmed
+R0067,P002,Medina Riad,Marrakech,2026-05-02,2026-05-09,7,France,665,Confirmed
+R0068,P002,Medina Riad,Marrakech,2026-05-02,2026-05-08,6,Morocco,696,Confirmed
+R0069,P002,Medina Riad,Marrakech,2026-05-17,2026-05-20,3,Morocco,186,Confirmed
+R0070,P002,Medina Riad,Marrakech,2026-05-03,2026-05-06,3,Morocco,189,Confirmed
+R0071,P003,Beach Studio,Agadir,2026-05-13,2026-05-15,2,Spain,254,Confirmed
+R0072,P003,Beach Studio,Agadir,2026-05-19,2026-05-25,6,Morocco,360,Confirmed
+R0073,P003,Beach Studio,Agadir,2026-05-03,2026-05-08,5,Morocco,695,Confirmed
+R0074,P003,Beach Studio,Agadir,2026-05-19,2026-05-25,6,UK,570,Confirmed
+R0075,P003,Beach Studio,Agadir,2026-05-07,2026-05-14,7,Spain,665,Confirmed
+R0076,P001,Ocean View Apartment,Tangier,2026-06-05,2026-06-12,7,UK,959,Confirmed
+R0077,P001,Ocean View Apartment,Tangier,2026-06-15,2026-06-19,4,France,256,Confirmed
+R0078,P001,Ocean View Apartment,Tangier,2026-06-15,2026-06-21,6,France,762,Confirmed
+R0079,P001,Ocean View Apartment,Tangier,2026-06-03,2026-06-09,6,Morocco,492,Confirmed
+R0080,P001,Ocean View Apartment,Tangier,2026-06-09,2026-06-12,3,France,297,Confirmed
+R0081,P002,Medina Riad,Marrakech,2026-06-10,2026-06-13,3,Morocco,333,Confirmed
+R0082,P002,Medina Riad,Marrakech,2026-06-10,2026-06-16,6,Morocco,828,Confirmed
+R0083,P002,Medina Riad,Marrakech,2026-06-01,2026-06-08,7,UK,875,Confirmed
+R0084,P002,Medina Riad,Marrakech,2026-06-04,2026-06-07,3,France,264,Confirmed
+R0085,P002,Medina Riad,Marrakech,2026-06-04,2026-06-11,7,Spain,875,Confirmed
+R0086,P003,Beach Studio,Agadir,2026-06-20,2026-06-23,3,Spain,294,Confirmed
+R0087,P003,Beach Studio,Agadir,2026-06-09,2026-06-15,6,UK,702,Confirmed
+R0088,P003,Beach Studio,Agadir,2026-06-02,2026-06-04,2,Germany,272,Confirmed
+R0089,P003,Beach Studio,Agadir,2026-06-09,2026-06-11,2,UK,110,Confirmed
+R0090,P003,Beach Studio,Agadir,2026-06-05,2026-06-12,7,Spain,616,Confirmed

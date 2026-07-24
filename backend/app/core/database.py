@@ -1,7 +1,8 @@
 """
 Database Engine & Session Configuration
 
-Uses async SQLAlchemy 2.0 with asyncpg for PostgreSQL.
+Supports both PostgreSQL (via asyncpg) and SQLite (via aiosqlite).
+Set DATABASE_TYPE in config to switch. SQLite is used for standalone desktop builds.
 Session management via dependency injection.
 """
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -10,13 +11,33 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# Async engine for FastAPI
+
+def _build_db_url() -> str:
+    """Build the appropriate database URL based on DATABASE_TYPE."""
+    if settings.DATABASE_TYPE == "sqlite":
+        return f"sqlite+aiosqlite:///{settings.SQLITE_PATH}"
+    return settings.DATABASE_URL
+
+
+def _build_engine_kwargs() -> dict:
+    """Build engine kwargs based on database type."""
+    if settings.DATABASE_TYPE == "sqlite":
+        return {
+            "echo": settings.DB_ECHO,
+            "future": True,
+        }
+    return {
+        "pool_size": settings.DB_POOL_SIZE,
+        "max_overflow": settings.DB_MAX_OVERFLOW,
+        "echo": settings.DB_ECHO,
+        "future": True,
+    }
+
+
+# Async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    echo=settings.DB_ECHO,
-    future=True,
+    _build_db_url(),
+    **_build_engine_kwargs(),
 )
 
 # Session factory

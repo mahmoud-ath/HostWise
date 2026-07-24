@@ -58,10 +58,13 @@ function CSVUploadSection() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
 
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
+    setImportResult(null);
     const formData = new FormData();
     formData.append("file", file);
     try {
@@ -79,6 +82,27 @@ function CSVUploadSection() {
     }
   };
 
+  const handleImport = async () => {
+    if (!preview?.filename) return;
+    setImporting(true);
+    try {
+      const result = await fetch(
+        `http://localhost:8000/api/v1/connectors/csv/import?filename=${encodeURIComponent(preview.filename)}&import_type=auto`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem("hostwise_access_token")}` },
+        }
+      );
+      const data = await result.json();
+      setImportResult(data);
+    } catch (e) {
+      console.error(e);
+      setImportResult({ error: "Import failed" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="border-2 border-dashed rounded-lg p-6 text-center">
@@ -93,18 +117,37 @@ function CSVUploadSection() {
         </div>
       )}
       {preview && (
-        <div className="mt-4 p-3 rounded-lg bg-muted/50">
-          <p className="text-xs font-medium mb-2">Preview — {preview.columns?.length || 0} columns detected</p>
-          <div className="overflow-x-auto">
-            <table className="text-xs w-full">
-              <thead><tr>{preview.columns?.map((c: string) => <th key={c} className="text-left p-1">{c}</th>)}</tr></thead>
-              <tbody>
-                {preview.preview_rows?.map((row: any, i: number) => (
-                  <tr key={i}>{preview.columns?.map((c: string) => <td key={c} className="p-1">{row[c]}</td>)}</tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="mt-4 space-y-3">
+          <div className="p-3 rounded-lg bg-muted/50">
+            <p className="text-xs font-medium mb-2">Preview — {preview.columns?.length || 0} columns detected</p>
+            <div className="overflow-x-auto">
+              <table className="text-xs w-full">
+                <thead><tr>{preview.columns?.map((c: string) => <th key={c} className="text-left p-1">{c}</th>)}</tr></thead>
+                <tbody>
+                  {preview.preview_rows?.map((row: any, i: number) => (
+                    <tr key={i}>{preview.columns?.map((c: string) => <td key={c} className="p-1">{row[c]}</td>)}</tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+          <Button onClick={handleImport} disabled={importing} className="w-full">
+            {importing ? "Importing..." : "Import into Database"}
+          </Button>
+          {importResult && (
+            <div className={`p-3 rounded-lg text-sm ${importResult.error ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+              {importResult.error
+                ? importResult.error
+                : `✅ Imported ${importResult.imported} ${importResult.import_type} rows` +
+                  (importResult.properties_created ? ` (${importResult.properties_created} new properties created)` : "")}
+              {importResult.errors?.length > 0 && (
+                <details className="mt-1 text-xs">
+                  <summary>{importResult.errors.length} errors</summary>
+                  {importResult.errors.map((e: string, i: number) => <div key={i}>• {e}</div>)}
+                </details>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

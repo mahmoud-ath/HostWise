@@ -5,8 +5,7 @@ Organization is the tenant boundary. Every entity belongs to an organization.
 Supports: Individual Host, Property Manager, Agency, Investment Company.
 """
 import uuid
-from sqlalchemy import Column, String, Text, Float, Enum as SAEnum, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Text, Float, Enum as SAEnum, ForeignKey, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.shared.base_model import BaseModel
@@ -67,7 +66,7 @@ class RevenueCategory(BaseModel):
     __tablename__ = "revenue_categories"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -83,7 +82,7 @@ class ExpenseCategory(BaseModel):
     __tablename__ = "expense_categories"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

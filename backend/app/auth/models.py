@@ -4,8 +4,7 @@ Auth Module — Models
 User & Role models for authentication and authorization.
 """
 import uuid
-from sqlalchemy import Column, String, Boolean, ForeignKey, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Boolean, ForeignKey, Enum as SAEnum, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.shared.base_model import BaseModel
@@ -43,10 +42,10 @@ class OrganizationMember(BaseModel):
     __tablename__ = "organization_members"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+        Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
     role: Mapped[UserRole] = mapped_column(
         SAEnum(UserRole), default=UserRole.VIEWER, nullable=False
