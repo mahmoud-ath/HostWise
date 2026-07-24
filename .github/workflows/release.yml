@@ -30,15 +30,12 @@ jobs:
   build-linux:
     name: Build Linux
     runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        arch: [x86_64]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install system dependencies (Tauri)
+      - name: Install system dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
@@ -52,7 +49,8 @@ jobs:
             libjavascriptcoregtk-4.1-dev \
             libsoup-3.0-dev \
             patchelf \
-            file
+            file \
+            rpm
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -120,8 +118,7 @@ jobs:
           bundle = cfg.setdefault('bundle', {})
           bundle['externalBin'] = ['binaries/hostwise-backend']
           bundle['resources'] = ['binaries/*']
-          # Disable updater artifacts for CI
-          cfg['bundle']['createUpdaterArtifacts'] = False
+          bundle['createUpdaterArtifacts'] = False
           with open('frontend/src-tauri/tauri.conf.json', 'w') as f:
               json.dump(cfg, f, indent=2)
           "
@@ -136,20 +133,22 @@ jobs:
           cd frontend
           bun run build
 
-      - name: Build Tauri
+      - name: Build Tauri (deb + appimage + rpm)
         run: |
           cd frontend
-          bun run tauri build
+          bun run tauri build --bundles deb,appimage,rpm
+
+      - name: List bundle contents
+        run: |
+          echo "=== Linux Bundle ==="
+          find frontend/src-tauri/target/release/bundle -type f -ls 2>/dev/null || echo "No bundle files found"
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-linux
-          path: |
-            frontend/src-tauri/target/release/bundle/**/*.deb
-            frontend/src-tauri/target/release/bundle/**/*.rpm
-            frontend/src-tauri/target/release/bundle/**/*.AppImage
-          if-no-files-found: warn
+          path: frontend/src-tauri/target/release/bundle/
+          if-no-files-found: error
 
   # ── Windows Build ──────────────────────────────────────
   build-windows:
@@ -236,19 +235,23 @@ jobs:
           cd frontend
           bun run build
 
-      - name: Build Tauri
+      - name: Build Tauri (msi + nsis)
         run: |
           cd frontend
-          bun run tauri build
+          bun run tauri build --bundles msi,nsis
+
+      - name: List bundle contents
+        shell: pwsh
+        run: |
+          echo "=== Windows Bundle ==="
+          Get-ChildItem -Recurse -Path frontend\src-tauri\target\release\bundle -ErrorAction SilentlyContinue | Select-Object FullName, Length
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-windows
-          path: |
-            frontend/src-tauri/target/release/bundle/**/*.exe
-            frontend/src-tauri/target/release/bundle/**/*.msi
-          if-no-files-found: warn
+          path: frontend/src-tauri/target/release/bundle/
+          if-no-files-found: error
 
   # ── macOS Build ────────────────────────────────────────
   build-macos:
@@ -329,7 +332,7 @@ jobs:
           bundle = cfg.setdefault('bundle', {})
           bundle['externalBin'] = ['binaries/hostwise-backend']
           bundle['resources'] = ['binaries/*']
-          cfg['bundle']['createUpdaterArtifacts'] = False
+          bundle['createUpdaterArtifacts'] = False
           with open('frontend/src-tauri/tauri.conf.json', 'w') as f:
               json.dump(cfg, f, indent=2)
           "
@@ -344,19 +347,22 @@ jobs:
           cd frontend
           bun run build
 
-      - name: Build Tauri (${{ matrix.target }})
+      - name: Build Tauri (dmg)
         run: |
           cd frontend
-          bun run tauri build --target ${{ matrix.target }}
+          bun run tauri build --bundles dmg --target ${{ matrix.target }}
+
+      - name: List bundle contents
+        run: |
+          echo "=== macOS Bundle ==="
+          find "frontend/src-tauri/target/${{ matrix.target }}/release/bundle" -type f -ls 2>/dev/null || echo "No bundle files found"
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-macos-${{ matrix.target }}
-          path: |
-            frontend/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
-            frontend/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app
-          if-no-files-found: warn
+          path: frontend/src-tauri/target/${{ matrix.target }}/release/bundle/
+          if-no-files-found: error
 
   # ── GitHub Release ─────────────────────────────────────
   release:
@@ -372,47 +378,42 @@ jobs:
         with:
           path: artifacts
 
+      - name: Show downloaded structure
+        run: find artifacts -type f | sort
+
       - name: Generate release notes
         id: notes
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          cat > release-notes.md << EOF
-          ## HostWise v${VERSION}
+          NOTES="release-notes.md"
 
-          ### 📦 Downloads
+          printf "## HostWise v%s\n\n### 📦 Downloads\n\n" "$VERSION" > "$NOTES"
 
-          EOF
-
-          echo "### Linux" >> release-notes.md
-          for f in artifacts/hostwise-linux/*; do
-            [ -f "$f" ] || continue
+          printf "### Linux\n" >> "$NOTES"
+          find artifacts/hostwise-linux -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) | sort | while read -r f; do
             name=$(basename "$f")
             size=$(du -h "$f" | cut -f1)
-            echo "- \`${name}\` (${size})" >> release-notes.md
+            printf -- "- \`%s\` (%s)\n" "$name" "$size" >> "$NOTES"
           done
 
-          echo "" >> release-notes.md
-          echo "### Windows" >> release-notes.md
-          for f in artifacts/hostwise-windows/*; do
-            [ -f "$f" ] || continue
+          printf "\n### Windows\n" >> "$NOTES"
+          find artifacts/hostwise-windows -type f \( -name '*.msi' -o -name '*.exe' \) | sort | while read -r f; do
             name=$(basename "$f")
             size=$(du -h "$f" | cut -f1)
-            echo "- \`${name}\` (${size})" >> release-notes.md
+            printf -- "- \`%s\` (%s)\n" "$name" "$size" >> "$NOTES"
           done
 
-          echo "" >> release-notes.md
-          echo "### macOS" >> release-notes.md
+          printf "\n### macOS\n" >> "$NOTES"
           for d in artifacts/hostwise-macos-*; do
-            for f in "$d"/*; do
-              [ -f "$f" ] || continue
+            find "$d" -type f \( -name '*.dmg' -o -name '*.app' \) | sort | while read -r f; do
               name=$(basename "$f")
               size=$(du -h "$f" | cut -f1)
-              echo "- \`${name}\` (${size})" >> release-notes.md
+              printf -- "- \`%s\` (%s)\n" "$name" "$size" >> "$NOTES"
             done
           done
 
-          echo "notes_file=release-notes.md" >> "$GITHUB_OUTPUT"
+          echo "notes_file=$NOTES" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -423,7 +424,10 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            artifacts/hostwise-linux/*
-            artifacts/hostwise-windows/*
-            artifacts/hostwise-macos-*/*
+            artifacts/hostwise-linux/deb/*.deb
+            artifacts/hostwise-linux/appimage/*.AppImage
+            artifacts/hostwise-linux/rpm/*.rpm
+            artifacts/hostwise-windows/msi/*.msi
+            artifacts/hostwise-windows/nsis/*.exe
+            artifacts/hostwise-macos-*/dmg/*.dmg
           fail_on_unmatched_files: false
