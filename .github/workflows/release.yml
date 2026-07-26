@@ -108,6 +108,10 @@ jobs:
           mkdir -p frontend/src-tauri/binaries
           cp backend/dist/hostwise-backend "frontend/src-tauri/binaries/hostwise-backend-${TARGET_TRIPLE}"
           chmod +x "frontend/src-tauri/binaries/hostwise-backend-${TARGET_TRIPLE}"
+          # Also copy to embedded/ so include_bytes! in lib.rs gets the fresh binary
+          mkdir -p frontend/src-tauri/embedded
+          cp backend/dist/hostwise-backend frontend/src-tauri/embedded/hostwise-backend.bin
+          chmod +x frontend/src-tauri/embedded/hostwise-backend.bin
 
       - name: Configure Tauri for production
         run: |
@@ -215,6 +219,9 @@ jobs:
           $TargetTriple = (rustc -vV | Select-String "host:" | ForEach-Object { $_ -replace "host:\s+", "" }).Trim()
           New-Item -ItemType Directory -Force -Path frontend\src-tauri\binaries | Out-Null
           Copy-Item backend\dist\hostwise-backend.exe "frontend\src-tauri\binaries\hostwise-backend-${TargetTriple}.exe"
+          # Also copy to embedded/ so include_bytes! in lib.rs gets the fresh binary
+          New-Item -ItemType Directory -Force -Path frontend\src-tauri\embedded | Out-Null
+          Copy-Item backend\dist\hostwise-backend.exe frontend\src-tauri\embedded\hostwise-backend.bin
 
       - name: Configure Tauri for production
         shell: pwsh

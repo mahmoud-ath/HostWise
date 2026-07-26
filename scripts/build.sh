@@ -113,7 +113,16 @@ else
     chmod +x "$BINARIES_DIR/$BACKEND_BIN"
     echo -e "${GREEN}   Backend: $BINARIES_DIR/$BACKEND_BIN${NC}"
 fi
-
+# Also copy to embedded/ so include_bytes! in lib.rs gets the fresh binary
+EMBEDDED_DIR="$TAURI_DIR/embedded"
+mkdir -p "$EMBEDDED_DIR"
+if [ -f "dist/hostwise-backend.exe" ]; then
+    cp "dist/hostwise-backend.exe" "$EMBEDDED_DIR/hostwise-backend.bin"
+else
+    cp "dist/hostwise-backend" "$EMBEDDED_DIR/hostwise-backend.bin"
+fi
+chmod +x "$EMBEDDED_DIR/hostwise-backend.bin"
+echo -e "${GREEN}   Embedded: $EMBEDDED_DIR/hostwise-backend.bin${NC}"
 # ── 3. Inject externalBin into tauri.conf.json ───────────
 echo ""
 echo -e "${YELLOW}[2/4] Configuring Tauri for production...${NC}"
