@@ -5,7 +5,8 @@
  * All API calls go through this module.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on Windows
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 
 class ApiClient {
   private baseUrl: string;

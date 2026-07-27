@@ -38,7 +38,7 @@ os.environ.setdefault("SQLITE_PATH", _get_db_path())
 # Allow frontend to connect (CORS for dev and prod origins)
 os.environ.setdefault(
     "CORS_ORIGINS",
-    '["http://localhost:3000","http://127.0.0.1:3000"]',
+    '["http://localhost:3000","http://127.0.0.1:3000","tauri://localhost","https://tauri.localhost"]',
 )
 
 # Production defaults for desktop builds
