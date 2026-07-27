@@ -439,3 +439,76 @@ jobs:
             artifacts/hostwise-windows/nsis/*.exe
             artifacts/hostwise-macos-*/dmg/*.dmg
           fail_on_unmatched_files: false
+
+  # ── AUR Package (Arch Linux) ──────────────────────────
+  publish-aur:
+    name: Publish AUR Package
+    runs-on: ubuntu-22.04
+    needs: [release]
+    if: github.repository == 'mahmoud-ath/HostWise'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Setup SSH for AUR
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "$AUR_SSH_KEY" ]; then
+            echo "No AUR SSH key found — skipping AUR publish"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          echo "$AUR_SSH_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null
+          echo "Host aur.archlinux.org" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/aur" >> ~/.ssh/config
+          echo "  User aur" >> ~/.ssh/config
+
+      - name: Clone AUR repository
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "$AUR_SSH_KEY" ]; then exit 0; fi
+          git clone ssh://aur@aur.archlinux.org/hostwise-bin.git aur-repo
+
+      - name: Update PKGBUILD with new version
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "$AUR_SSH_KEY" ]; then exit 0; fi
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          APPIMAGE_URL="https://github.com/mahmoud-ath/HostWise/releases/download/v${VERSION}/HostWise-x86_64.AppImage"
+
+          cd aur-repo
+
+          # Update PKGBUILD version
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
+
+          # Update source URL
+          sed -i "s|^source=.*|source=(\"hostwise-bin-${VERSION}.AppImage::${APPIMAGE_URL}\")|" PKGBUILD
+
+          # Compute SHA256 of the AppImage
+          echo "Downloading AppImage to compute checksum..."
+          wget -q "$APPIMAGE_URL" -O "hostwise-bin-${VERSION}.AppImage"
+          SHA256=$(sha256sum "hostwise-bin-${VERSION}.AppImage" | cut -d' ' -f1)
+          sed -i "s/^sha256sums=.*/sha256sums=('${SHA256}')/" PKGBUILD
+          rm "hostwise-bin-${VERSION}.AppImage"
+
+          # Generate .SRCINFO
+          makepkg --printsrcinfo > .SRCINFO
+
+          # Commit and push
+          git config user.name "HostWise Release Bot"
+          git config user.email "bot@hostwise.app"
+          git add -A
+          git commit -m "chore: bump to v${VERSION}"
+          git push origin master
