@@ -1,0 +1,76 @@
+# Maintainer: HostWise <mahmoud-ath@github>
+# Contributor: HostWise Team
+
+pkgname=hostwise-bin
+pkgver=0.4.0
+pkgrel=1
+pkgdesc="HostWise — Vacation Rental Intelligence Platform (AppImage bundle)"
+arch=('x86_64')
+url="https://github.com/mahmoud-ath/HostWise"
+license=('custom: commercial')
+depends=(
+  'glibc'
+  'gcc-libs'
+  'zlib'
+  'libxkbcommon'
+  'libxcb'
+  'dbus'
+  'libdatrie'
+  'libthai'
+  'libpulse'
+  'nss'
+  'nspr'
+  'libcups'
+  'libxcursor'
+  'libxrandr'
+  'libxdamage'
+  'libxfixes'
+  'libxcomposite'
+  'libxinerama'
+  'libxi'
+  'libxrender'
+  'libxext'
+  'libxss'
+  'libxtst'
+  'at-spi2-core'
+  'libdrm'
+  'mesa'
+  'wayland'
+)
+optdepends=(
+  'fuse2: required to run AppImage directly'
+)
+provides=('hostwise')
+conflicts=('hostwise')
+source=("${pkgname}-${pkgver}.AppImage::https://github.com/mahmoud-ath/HostWise/releases/download/v${pkgver}/HostWise-x86_64.AppImage")
+sha256sums=('SKIP')
+validpgpkeys=()
+
+package() {
+  # Extract AppImage
+  cd "${srcdir}"
+  APPIMAGE_EXTRACT_AND_RUN=1 "./${pkgname}-${pkgver}.AppImage" --appimage-extract 1>/dev/null
+
+  # Install main binary
+  install -Dm755 squashfs-root/usr/bin/hostwise "${pkgdir}/usr/bin/hostwise"
+
+  # Install backend binary (PyInstaller bundle)
+  install -Dm755 squashfs-root/usr/bin/hostwise-backend "${pkgdir}/usr/lib/hostwise/hostwise-backend"
+
+  # Install desktop file
+  install -Dm644 squashfs-root/HostWise.desktop "${pkgdir}/usr/share/applications/hostwise.desktop"
+
+  # Install icons
+  for size in 32x32 128x128 256x256@2 512x512; do
+    install -Dm644 "squashfs-root/usr/share/icons/hicolor/${size}/apps/hostwise.png" \
+      "${pkgdir}/usr/share/icons/hicolor/${size}/apps/hostwise.png"
+  done
+
+  # Install AppStream metadata (optional)
+  install -Dm644 "squashfs-root/usr/share/metainfo/hostwise.appdata.xml" \
+    "${pkgdir}/usr/share/metainfo/hostwise.appdata.xml" 2>/dev/null || true
+
+  # Create symlink for AppImage in case user wants to run it directly
+  install -Dm755 "${pkgname}-${pkgver}.AppImage" "${pkgdir}/opt/hostwise/HostWise.AppImage"
+  ln -sf "/opt/hostwise/HostWise.AppImage" "${pkgdir}/usr/bin/hostwise-appimage"
+}
