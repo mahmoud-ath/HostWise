@@ -4,7 +4,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Disable trailing slash for Tauri compatibility
   trailingSlash: false,
 };
 

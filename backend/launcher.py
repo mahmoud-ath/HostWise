@@ -35,16 +35,16 @@ def _get_db_path() -> str:
 os.environ.setdefault("DATABASE_TYPE", "sqlite")
 os.environ.setdefault("SQLITE_PATH", _get_db_path())
 
-# Allow Tauri's webview to connect (CORS for both dev and prod origins)
+# Allow frontend to connect (CORS for dev and prod origins)
 os.environ.setdefault(
     "CORS_ORIGINS",
-    '["http://localhost:3000","http://127.0.0.1:3000","tauri://localhost","https://tauri.localhost"]',
+    '["http://localhost:3000","http://127.0.0.1:3000"]',
 )
 
 # Production defaults for desktop builds
 if getattr(sys, 'frozen', False):
     os.environ.setdefault("ENVIRONMENT", "production")
-    os.environ.setdefault("LOG_LEVEL", "warn")
+    os.environ.setdefault("LOG_LEVEL", "warning")
 
 import uvicorn
 from app.main import app

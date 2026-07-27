@@ -202,7 +202,7 @@ def create_app() -> FastAPI:
             "database": db_status,
         }
 
-    # Serve frontend static files (for non-Tauri production mode)
+    # Serve frontend static files (for standalone production mode)
     frontend_dist = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "out")
     if os.path.isdir(frontend_dist):
         app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")

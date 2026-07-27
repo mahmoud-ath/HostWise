@@ -321,7 +321,7 @@ Validate the product. Everything works locally. No internet required.
 - [x] AI financial advisor (rule-based engine)
 - [x] Monthly & annual reports
 - [x] `sync_id` on all tables (sync-ready schema)
-- [ ] Desktop packaging (Electron/Tauri)
+- [x] Docker Compose deployment (db + backend + frontend)
 
 ### Phase 2 — Cloud Foundation (After validation)
 

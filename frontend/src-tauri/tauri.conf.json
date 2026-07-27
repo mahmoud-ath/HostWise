@@ -1,50 +1,72 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicedoc/schemas/main/tauri/config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/config.schema.json",
   "productName": "HostWise",
   "version": "0.3.0",
-  "identifier": "app.hostwise.desktop",
+  "identifier": "com.hostwise.desktop",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "bun run dev",
-    "beforeBuildCommand": "bun run build"
+    "beforeDevCommand": "cd .. && bun run dev",
+    "beforeBuildCommand": ""
   },
   "app": {
     "windows": [
       {
-        "title": "HostWise",
+        "label": "main",
+        "title": "HostWise — Vacation Rental Intelligence",
         "width": 1280,
-        "height": 800,
-        "minWidth": 900,
-        "minHeight": 600,
+        "height": 820,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "center": true,
+        "visible": false,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://localhost:8000 http://127.0.0.1:8000; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-eval'; connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 ws://127.0.0.1:8000 ws://localhost:8000; img-src 'self' data: blob:"
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/256x256.png",
+      "icons/icon.icns",
       "icons/icon.ico",
       "icons/icon.png"
     ],
+    "targets": "all",
+    "externalBin": ["binaries/hostwise-backend"],
+    "resources": ["embedded/*"],
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico"
+      }
+    },
     "linux": {
       "deb": {
         "depends": []
+      },
+      "rpm": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": true
       }
-    }
-  },
-  "plugins": {
-    "shell": {
-      "open": true
+    },
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "entitlements": null,
+      "frameworks": []
     }
   }
 }
