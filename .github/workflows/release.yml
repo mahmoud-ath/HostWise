@@ -100,6 +100,9 @@ jobs:
             --hidden-import=pydantic_settings \
             --collect-all app \
             --collect-all aiosqlite \
+            --noconsole \
+            --noupx \
+            --strip \
             launcher.py
 
       - name: Prepare backend binary for Tauri
@@ -193,6 +196,8 @@ jobs:
             --collect-all app `
             --collect-all aiosqlite `
             --noconsole `
+            --noupx `
+            --strip `
             launcher.py
 
       - name: Prepare backend binary for Tauri
@@ -250,6 +255,30 @@ jobs:
           echo "$wixDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "WIX=$wixRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Code sign the backend binary (optional)
+        shell: pwsh
+        continue-on-error: true
+        env:
+          CODESIGN_PFX: ${{ secrets.WINDOWS_CODESIGN_PFX }}
+          CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+        run: |
+          if (-not $env:CODESIGN_PFX) {
+            Write-Host "No code signing certificate found — skipping (Windows Defender may flag the app)"
+            exit 0
+          }
+          $pfxPath = "$env:TEMP\cert.pfx"
+          $bytes = [Convert]::FromBase64String($env:CODESIGN_PFX)
+          [IO.File]::WriteAllBytes($pfxPath, $bytes)
+          $exes = @(
+            "frontend\src-tauri\target\release\hostwise.exe"
+          )
+          foreach ($exe in $exes) {
+            if (Test-Path $exe) {
+              & "signtool" sign /fd SHA256 /a /f $pfxPath /p $env:CODESIGN_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $exe
+              Write-Host "Signed: $exe"
+            }
+          }
+
       - name: Build Tauri (msi + nsis)
         shell: pwsh
         run: |
@@ -260,6 +289,23 @@ jobs:
           } else {
             Write-Warning "WiX not available, falling back to NSIS only"
             bun run tauri build --bundles nsis
+          }
+
+      - name: Code sign the installer (optional)
+        shell: pwsh
+        continue-on-error: true
+        env:
+          CODESIGN_PFX: ${{ secrets.WINDOWS_CODESIGN_PFX }}
+          CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+        run: |
+          if (-not $env:CODESIGN_PFX) { exit 0 }
+          $pfxPath = "$env:TEMP\cert.pfx"
+          $bytes = [Convert]::FromBase64String($env:CODESIGN_PFX)
+          [IO.File]::WriteAllBytes($pfxPath, $bytes)
+          $installers = Get-ChildItem -Path frontend\src-tauri\target\release\bundle -Recurse -Include *.msi,*.exe
+          foreach ($installer in $installers) {
+            & "signtool" sign /fd SHA256 /a /f $pfxPath /p $env:CODESIGN_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $installer.FullName
+            Write-Host "Signed: $($installer.FullName)"
           }
 
       - name: List bundle contents
@@ -337,6 +383,9 @@ jobs:
             --hidden-import=pydantic_settings \
             --collect-all app \
             --collect-all aiosqlite \
+            --noconsole \
+            --noupx \
+            --strip \
             launcher.py
 
       - name: Prepare backend binary for Tauri

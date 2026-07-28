@@ -66,6 +66,8 @@ pyinstaller --onefile --name hostwise-backend `
     --collect-all app `
     --collect-all aiosqlite `
     --noconsole `
+    --noupx `
+    --strip `
     launcher.py
 
 if (-not (Test-Path "dist\hostwise-backend.exe")) { throw "PyInstaller build failed" }

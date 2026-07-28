@@ -87,6 +87,9 @@ pyinstaller \
     --hidden-import=pydantic_settings \
     --collect-all app \
     --collect-all aiosqlite \
+    --noconsole \
+    --noupx \
+    --strip \
     launcher.py
 
 # Detect the binary name (with or without .exe)
