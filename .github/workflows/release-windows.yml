@@ -203,15 +203,7 @@ jobs:
         run: |
           $version = $env:GITHUB_REF_NAME -replace '-win$', ''
           $notes = "release-notes.md"
-          @"
-## HostWise Windows $version
-
-### 📦 Downloads
-
-### Windows
-- MSI Installer (in artifacts)
-- NSIS Setup (in artifacts)
-"@ | Out-File -FilePath $notes
+          "# HostWise Windows $version`n`n### Downloads`n`n### Windows`n- MSI Installer (in artifacts)`n- NSIS Setup (in artifacts)" | Out-File -FilePath $notes
           echo "notes_file=$notes" >> $env:GITHUB_OUTPUT
           echo "version=$version" >> $env:GITHUB_OUTPUT
 
