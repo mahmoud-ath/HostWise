@@ -69,7 +69,6 @@ pyinstaller --onefile --name hostwise-backend `
     --noupx `
     --strip `
     --clean `
-    --runtime-tmpdir "%APPDATA%\hostwise\runtime" `
     launcher.py
 
 if (-not (Test-Path "dist\hostwise-backend.exe")) { throw "PyInstaller build failed" }

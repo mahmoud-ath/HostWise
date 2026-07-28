@@ -84,7 +84,6 @@ jobs:
             --noupx `
             --strip `
             --clean `
-            --runtime-tmpdir "%APPDATA%\hostwise\runtime" `
             launcher.py
 
       - name: Prepare backend binary for Tauri
