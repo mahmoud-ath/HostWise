@@ -162,13 +162,31 @@ async fn spawn_backend(app: &tauri::AppHandle) -> Result<tauri_plugin_shell::pro
 
     // In dev mode, the binary may not exist yet — try to find it
     // or provide a helpful error.
-    let sidecar = app.shell().sidecar("hostwise-backend").map_err(|e| {
+    let mut sidecar = app.shell().sidecar("hostwise-backend").map_err(|e| {
         format!(
             "Failed to create sidecar command: {e}. \
              Make sure the backend binary exists at frontend/src-tauri/binaries/ \
              or build it first with: cd backend && pyinstaller launcher.spec"
         )
     })?;
+
+    // Explicitly pass environment variables to the sidecar.
+    // Tauri's shell plugin may sanitize the inherited environment,
+    // so std::env::set_var in setup_backend_env() is not sufficient.
+    let data_dir = get_data_dir();
+    let runtime_dir = data_dir.join("runtime");
+    let runtime_path = runtime_dir.to_string_lossy().to_string();
+    sidecar = sidecar.env("TMP", &runtime_path);
+    sidecar = sidecar.env("TEMP", &runtime_path);
+    sidecar = sidecar.env("PYINSTALLER_TMPDIR", &runtime_path);
+    sidecar = sidecar.env("DATABASE_TYPE", "sqlite");
+    sidecar = sidecar.env("HOST", BACKEND_HOST);
+    sidecar = sidecar.env("PORT", &BACKEND_PORT.to_string());
+    sidecar = sidecar.env("CORS_ORIGINS", r#"["http://localhost:3000","http://127.0.0.1:3000","tauri://localhost","https://tauri.localhost"]"#);
+    sidecar = sidecar.env("ENVIRONMENT", "production");
+    sidecar = sidecar.env("LOG_LEVEL", "warning");
+    sidecar = sidecar.env("SQLITE_PATH", data_dir.join("hostwise.db").to_string_lossy().as_ref());
+    sidecar = sidecar.env("UPLOAD_DIR", data_dir.join("uploads").to_string_lossy().as_ref());
 
     let (mut rx, child) = sidecar.spawn().map_err(|e| {
         format!("Failed to spawn backend sidecar: {e}")
