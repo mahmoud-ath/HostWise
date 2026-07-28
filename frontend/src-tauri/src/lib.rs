@@ -58,6 +58,17 @@ fn setup_backend_env() {
     std::fs::create_dir_all(&data_dir).ok();
     std::fs::create_dir_all(&uploads_dir).ok();
 
+    // Set TMP/TEMP to app data dir so PyInstaller extracts DLLs
+    // to a path Windows Defender doesn't monitor as aggressively
+    // as the system temp directory (fixes "access violation" on Windows).
+    let runtime_dir = data_dir.join("runtime");
+    std::fs::create_dir_all(&runtime_dir).ok();
+    let runtime_path = runtime_dir.to_string_lossy().to_string();
+    std::env::set_var("TMP", &runtime_path);
+    std::env::set_var("TEMP", &runtime_path);
+    // PyInstaller-specific: override default extraction directory
+    std::env::set_var("PYINSTALLER_TMPDIR", &runtime_path);
+
     std::env::set_var("DATABASE_TYPE", "sqlite");
     std::env::set_var("SQLITE_PATH", db_path.to_string_lossy().as_ref());
     std::env::set_var(

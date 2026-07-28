@@ -35,6 +35,13 @@ def _get_db_path() -> str:
 os.environ.setdefault("DATABASE_TYPE", "sqlite")
 os.environ.setdefault("SQLITE_PATH", _get_db_path())
 
+# Redirect PyInstaller temp extraction to app data dir (avoids Defender false positives)
+_runtime_dir = os.path.join(os.path.dirname(_get_db_path()), "runtime")
+os.makedirs(_runtime_dir, exist_ok=True)
+os.environ.setdefault("TMP", _runtime_dir)
+os.environ.setdefault("TEMP", _runtime_dir)
+os.environ.setdefault("PYINSTALLER_TMPDIR", _runtime_dir)
+
 # Allow frontend to connect (CORS for dev and prod origins)
 os.environ.setdefault(
     "CORS_ORIGINS",
