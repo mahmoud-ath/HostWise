@@ -54,10 +54,10 @@ jobs:
         with:
           workspaces: frontend/src-tauri
 
-      - name: Setup Python
+      - name: Setup Python (3.11 — PyInstaller needs this version on Windows)
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
           cache: "pip"
           cache-dependency-path: backend/requirements.txt
 
@@ -67,7 +67,7 @@ jobs:
           cd backend
           python -m venv .venv
           .\.venv\Scripts\Activate.ps1
-          pip install -q -r requirements.txt pyinstaller
+          pip install -q -r requirements.txt "pyinstaller>=6.10,<7"
           pyinstaller --onefile --name hostwise-backend `
             --add-data "app;app" `
             --hidden-import=uvicorn.logging `
