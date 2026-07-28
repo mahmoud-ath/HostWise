@@ -67,23 +67,23 @@ jobs:
           cd backend
           python -m venv .venv
           .\.venv\Scripts\Activate.ps1
-          pip install -q -r requirements.txt "pyinstaller>=6.10,<7"
-          pyinstaller --onefile --name hostwise-backend `
-            --add-data "app;app" `
-            --hidden-import=uvicorn.logging `
-            --hidden-import=uvicorn.loops.auto `
-            --hidden-import=uvicorn.protocols.http.auto `
-            --hidden-import=aiosqlite `
-            --hidden-import=sqlalchemy.dialects.sqlite `
-            --hidden-import=sqlalchemy.dialects.sqlite.aiosqlite `
-            --hidden-import=pydantic `
-            --hidden-import=pydantic_settings `
-            --collect-all app `
-            --collect-all aiosqlite `
-            --noconsole `
-            --noupx `
-            --strip `
-            --clean `
+          pip install -q -r requirements.txt nuitka
+          python -m nuitka --standalone --onefile `
+            --output-dir=dist `
+            --output-name=hostwise-backend `
+            --enable-plugin=multiprocessing `
+            --include-package=app `
+            --include-module=uvicorn.logging `
+            --include-module=uvicorn.loops.auto `
+            --include-module=uvicorn.protocols.http.auto `
+            --include-module=aiosqlite `
+            --include-module=sqlalchemy.dialects.sqlite `
+            --include-module=sqlalchemy.dialects.sqlite.aiosqlite `
+            --include-module=pydantic `
+            --include-module=pydantic_settings `
+            --msvc=latest `
+            --disable-console `
+            --remove-output `
             launcher.py
 
       - name: Prepare backend binary for Tauri
