@@ -1,0 +1,167 @@
+# ═══════════════════════════════════════════════════════════
+# HostWise — macOS Release Pipeline
+# ═══════════════════════════════════════════════════════════
+# Builds the Tauri desktop app for macOS only.
+# Triggered by tags: v*-macos
+# ═══════════════════════════════════════════════════════════
+
+name: Release (macOS)
+
+on:
+  push:
+    tags:
+      - "v*-macos"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build-macos:
+    name: Build macOS (${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            frontend/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('frontend/bun.lock') }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Build Python backend (PyInstaller)
+        run: |
+          cd backend
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -q -r requirements.txt "pyinstaller>=6.10,<7"
+          pyinstaller \
+            --onefile \
+            --name "hostwise-backend" \
+            --add-data "app:app" \
+            --hidden-import=uvicorn.logging \
+            --hidden-import=uvicorn.loops.auto \
+            --hidden-import=uvicorn.protocols.http.auto \
+            --hidden-import=aiosqlite \
+            --hidden-import=sqlalchemy.dialects.sqlite \
+            --hidden-import=sqlalchemy.dialects.sqlite.aiosqlite \
+            --hidden-import=pydantic \
+            --hidden-import=pydantic_settings \
+            --collect-all app \
+            --collect-all aiosqlite \
+            --noconsole \
+            --noupx \
+            --strip \
+            launcher.py
+
+      - name: Prepare backend binary for Tauri
+        run: |
+          mkdir -p frontend/src-tauri/binaries
+          cp backend/dist/hostwise-backend "frontend/src-tauri/binaries/hostwise-backend-${{ matrix.target }}"
+          chmod +x "frontend/src-tauri/binaries/hostwise-backend-${{ matrix.target }}"
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          bun install --frozen-lockfile
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          bun run build
+
+      - name: Build Tauri (dmg)
+        run: |
+          cd frontend
+          bun run tauri build --bundles dmg --target ${{ matrix.target }}
+
+      - name: List bundle contents
+        run: |
+          echo "=== macOS Bundle ==="
+          find "frontend/src-tauri/target/${{ matrix.target }}/release/bundle" -type f -ls 2>/dev/null || echo "No bundle files found"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hostwise-macos-${{ matrix.target }}
+          path: frontend/src-tauri/target/${{ matrix.target }}/release/bundle/
+          if-no-files-found: error
+
+  # ── GitHub Release ─────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-22.04
+    needs: [build-macos]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME%%-macos}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          NOTES="release-notes.md"
+          printf "## HostWise macOS ${VERSION}\n\n### Downloads\n\n### macOS\n" > "$NOTES"
+          for d in artifacts/hostwise-macos-*; do
+            find "$d" -type f \( -name '*.dmg' -o -name '*.app' \) | while read -r f; do
+              name=$(basename "$f")
+              size=$(du -h "$f" | cut -f1)
+              echo "- \`${name}\` (${size})" >> "$NOTES"
+            done
+          done
+          echo "notes_file=$NOTES" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: HostWise macOS ${{ steps.notes.outputs.version }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/hostwise-macos-*/dmg/*.dmg
+          fail_on_unmatched_files: false
