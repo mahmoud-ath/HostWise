@@ -98,10 +98,10 @@ jobs:
           Copy-Item backend\dist\hostwise-backend.exe "frontend\src-tauri\binaries\hostwise-backend-${TargetTriple}.exe"
 
       - name: Clear bun cache (avoid tarball extraction issues)
+        shell: pwsh
         run: |
-          rm -rf ~/.bun/install/cache
-          cd frontend
-          rm -rf node_modules
+          Remove-Item -Recurse -Force -Path "$env:USERPROFILE\.bun\install\cache" -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force -Path "frontend\node_modules" -ErrorAction SilentlyContinue
 
       - name: Install frontend dependencies
         run: |
