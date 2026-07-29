@@ -69,10 +69,9 @@ jobs:
           python -m venv .venv
           .\.venv\Scripts\Activate.ps1
           pip install -q -r requirements.txt nuitka
-          python -m nuitka --standalone --onefile `
+          python -m nuitka --mode=onefile `
             --output-dir=dist `
             --output-filename=hostwise-backend `
-            --enable-plugin=multiprocessing `
             --include-package=app `
             --include-module=uvicorn.logging `
             --include-module=uvicorn.loops.auto `
@@ -83,8 +82,9 @@ jobs:
             --include-module=pydantic `
             --include-module=pydantic_settings `
             --msvc=latest `
-            --disable-console `
+            --windows-console-mode=disable `
             --remove-output `
+            --assume-yes-for-downloads `
             launcher.py
 
       - name: Prepare backend binary for Tauri
