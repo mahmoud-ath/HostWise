@@ -8,6 +8,7 @@
 name: Release (macOS)
 
 on:
+  workflow_call:
   push:
     tags:
       - "v*-macos"
