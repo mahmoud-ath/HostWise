@@ -1,12 +1,13 @@
 """
 Connectors Module — Router
 """
-from fastapi import APIRouter, Depends, UploadFile, File, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
-from app.core.database import get_db
 from app.connectors.base import ConnectorRegistry
+from app.core.database import get_db
 
 router = APIRouter()
 
@@ -29,6 +30,7 @@ async def upload_csv(
     import csv
     import io
     import os
+
     from app.core.config import get_settings
 
     settings = get_settings()
@@ -37,8 +39,12 @@ async def upload_csv(
     content = await file.read()
     file_path = os.path.join(settings.UPLOAD_DIR, file.filename)
 
-    with open(file_path, "wb") as f:
-        f.write(content)
+    import asyncio
+
+    def _write_file():
+        with open(file_path, "wb") as f:
+            f.write(content)
+    await asyncio.to_thread(_write_file)
 
     # Parse preview
     text = content.decode("utf-8")
@@ -71,10 +77,15 @@ async def import_csv_data(
     import os
     import uuid as _uuid
     from datetime import datetime
+
     from app.core.config import get_settings
+    from app.finance.models import Expense, Revenue, RevenueSource
     from app.properties.models import Property, PropertyType
-    from app.reservations.models import Reservation, ReservationStatus, ReservationSource
-    from app.finance.models import Revenue, RevenueSource, Expense
+    from app.reservations.models import (
+        Reservation,
+        ReservationSource,
+        ReservationStatus,
+    )
 
     settings = get_settings()
     file_path = os.path.join(settings.UPLOAD_DIR, filename)
@@ -82,10 +93,14 @@ async def import_csv_data(
     if not os.path.exists(file_path):
         return {"error": f"File '{filename}' not found. Upload it first.", "imported": 0}
 
-    with open(file_path, "r") as f:
-        reader = csv.DictReader(f)
-        columns = [c.lower().strip() for c in (reader.fieldnames or [])]
-        rows = list(reader)
+    import asyncio
+
+    def _read_csv():
+        with open(file_path) as f:
+            reader = csv.DictReader(f)
+            return [c.lower().strip() for c in (reader.fieldnames or [])], list(reader)
+
+    columns, rows = await asyncio.to_thread(_read_csv)
 
     if not rows:
         return {"error": "CSV file is empty.", "imported": 0}

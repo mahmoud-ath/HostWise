@@ -2,19 +2,21 @@
 Properties Module — Repository
 """
 import uuid
-from typing import Optional, Sequence
-from sqlalchemy import select, func
+from collections.abc import Sequence
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from app.properties.models import Listing, Property
 from app.shared.base_repository import BaseRepository
-from app.properties.models import Property, Listing
 
 
 class PropertyRepository(BaseRepository[Property]):
     def __init__(self, session: AsyncSession):
         super().__init__(Property, session)
 
-    async def get_by_id_with_listings(self, id: uuid.UUID) -> Optional[Property]:
+    async def get_by_id_with_listings(self, id: uuid.UUID) -> Property | None:
         result = await self.session.execute(
             select(Property)
             .options(selectinload(Property.listings))

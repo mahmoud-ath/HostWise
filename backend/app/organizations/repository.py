@@ -2,22 +2,24 @@
 Organization Module — Repository
 """
 import uuid
-from typing import Optional, Sequence
+from collections.abc import Sequence
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.shared.base_repository import BaseRepository
+
 from app.organizations.models import (
+    ExpenseCategory,
     Organization,
     RevenueCategory,
-    ExpenseCategory,
 )
+from app.shared.base_repository import BaseRepository
 
 
 class OrganizationRepository(BaseRepository[Organization]):
     def __init__(self, session: AsyncSession):
         super().__init__(Organization, session)
 
-    async def get_by_slug(self, slug: str) -> Optional[Organization]:
+    async def get_by_slug(self, slug: str) -> Organization | None:
         result = await self.session.execute(
             select(Organization).where(
                 Organization.slug == slug,

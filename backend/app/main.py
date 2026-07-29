@@ -3,18 +3,20 @@ HostWise — Vacation Rental Intelligence Platform
 
 A modular monolith built with FastAPI + Domain-Driven Design.
 """
+import logging
 import os
 import time
-import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
+
 from app.core.config import get_settings
-from app.core.database import engine, Base, async_session_factory
+from app.core.database import Base, async_session_factory, engine
 from app.shared.exceptions import AppException
 
 settings = get_settings()
@@ -163,14 +165,14 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     # Register routers
+    from app.ai.router import router as ai_router
+    from app.analytics.router import router as analytics_router
     from app.auth.router import router as auth_router
+    from app.connectors.router import router as connectors_router
+    from app.finance.router import router as finance_router
     from app.organizations.router import router as org_router
     from app.properties.router import router as property_router
-    from app.finance.router import router as finance_router
-    from app.analytics.router import router as analytics_router
-    from app.ai.router import router as ai_router
     from app.reports.router import router as reports_router
-    from app.connectors.router import router as connectors_router
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(org_router, prefix="/api/v1/organizations", tags=["Organizations"])

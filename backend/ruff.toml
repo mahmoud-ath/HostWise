@@ -1,0 +1,33 @@
+# ruff configuration for HostWise backend
+# See https://docs.astral.sh/ruff/settings/
+
+target-version = "py311"
+
+[lint]
+# Focus on bug-risk and code-quality rules, skip style/docstring:
+# - B008: FastAPI's Depends() is designed to be called in argument defaults
+# - BLE001: CSV import per-row error handling and JWT validation catch broadly
+# - DTZ007/DTZ011: Desktop app with date-only operations, no timezone concerns
+ignore = [
+    "B008",
+    "BLE001",
+    "DTZ007",
+    "DTZ011",
+    "E501",
+    "ASYNC240",
+]
+select = [
+    "F",   # pyflakes (bugs)
+    "W",   # pycodestyle (warnings)
+    "UP",  # pyupgrade
+    "ASYNC",  # async best practices
+    "RUF", # ruff-specific
+    "I",   # isort
+    "N",   # pep8-naming
+]
+
+exclude = [
+    ".venv",
+    "alembic/versions",
+    "build",
+]

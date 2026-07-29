@@ -6,8 +6,10 @@ Provides UUID primary keys, timestamps, and soft-delete support.
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, DateTime, Boolean, String, Uuid
+
+from sqlalchemy import Boolean, DateTime, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 
 
@@ -43,7 +45,7 @@ class SoftDeleteMixin:
 class BaseModel(Base, TimestampMixin, SoftDeleteMixin):
     """
     Every domain entity inherits from this.
-    Provides UUID PK, sync_id (for future cloud sync), timestamps, and soft-delete.
+    Provides UUID PK, timestamps, and soft-delete.
     """
     __abstract__ = True
 
@@ -52,12 +54,4 @@ class BaseModel(Base, TimestampMixin, SoftDeleteMixin):
         primary_key=True,
         default=uuid.uuid4,
         nullable=False,
-    )
-
-    sync_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        default=uuid.uuid4,
-        nullable=False,
-        unique=True,
-        comment="Global sync identifier — survives across database instances",
     )

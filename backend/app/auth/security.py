@@ -4,9 +4,11 @@ Auth Module — Security Utilities
 JWT token generation, password hashing, and verification.
 Uses python-jose for JWT and bcrypt directly for hashing.
 """
-from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
+from datetime import UTC, datetime, timedelta
+
 import bcrypt
+from jose import jwt
+
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -28,7 +30,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def _utcnow() -> datetime:
     """Timezone-aware UTC now (replacement for deprecated datetime.utcnow)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def create_access_token(

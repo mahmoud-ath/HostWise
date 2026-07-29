@@ -2,9 +2,9 @@
 AI Module — Router
 """
 import uuid
+
 from fastapi import APIRouter, Depends
-from app.auth.dependencies import get_current_user
-from app.auth.models import User
+
 from app.ai.service import AIAdvisorService, get_ai_advisor_service
 
 router = APIRouter()

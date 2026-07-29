@@ -4,18 +4,30 @@ Reservations Module — Models
 A Reservation is a guest booking. Linked to property, listing, and revenue.
 The core domain event that drives all analytics.
 """
+import enum
 import uuid
 from datetime import date, datetime
+
 from sqlalchemy import (
-    Column, String, Integer, Float, Date, DateTime, Text,
-    Enum as SAEnum, ForeignKey, Boolean, Uuid,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Uuid,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-import enum
+
 from app.shared.base_model import BaseModel
 
 
-class ReservationStatus(str, enum.Enum):
+class ReservationStatus(enum.StrEnum):
     """
     Normalized reservation status — provider-agnostic.
     Airbnb 'confirmed' and Booking 'reserved' both map to CONFIRMED.
@@ -28,7 +40,7 @@ class ReservationStatus(str, enum.Enum):
     BLOCKED = "blocked"
 
 
-class ReservationSource(str, enum.Enum):
+class ReservationSource(enum.StrEnum):
     """Source of the reservation data."""
     AIRBNB = "airbnb"
     BOOKING = "booking"
@@ -150,5 +162,5 @@ class Guest(BaseModel):
 
 
 # Lazy imports
-from app.properties.models import Property, Listing
 from app.finance.models import Revenue
+from app.properties.models import Listing, Property

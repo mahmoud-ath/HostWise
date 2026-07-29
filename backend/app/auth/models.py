@@ -3,14 +3,21 @@ Auth Module — Models
 
 User & Role models for authentication and authorization.
 """
-import uuid
-from sqlalchemy import Column, String, Boolean, ForeignKey, Enum as SAEnum, Uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
+import typing
+import uuid
+
+from sqlalchemy import Boolean, ForeignKey, String, Uuid
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.shared.base_model import BaseModel
 
+if typing.TYPE_CHECKING:
+    from app.organizations.models import Organization
 
-class UserRole(str, enum.Enum):
+
+class UserRole(enum.StrEnum):
     """Role-based access control."""
     ADMIN = "admin"
     OWNER = "owner"

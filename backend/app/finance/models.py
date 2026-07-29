@@ -4,17 +4,27 @@ Finance Module — Models
 Revenue and Expense records that drive the financial intelligence engine.
 Every financial record is linked to a property and organization.
 """
+import enum
 import uuid
 from datetime import date
+
 from sqlalchemy import (
-    Column, String, Float, Date, Text, ForeignKey, Enum as SAEnum, Uuid,
+    Date,
+    Float,
+    ForeignKey,
+    String,
+    Text,
+    Uuid,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-import enum
+
 from app.shared.base_model import BaseModel
 
 
-class RevenueSource(str, enum.Enum):
+class RevenueSource(enum.StrEnum):
     """Where the revenue record originated."""
     MANUAL = "manual"
     CSV = "csv"
@@ -85,7 +95,7 @@ class Revenue(BaseModel):
     category: Mapped["RevenueCategory | None"] = relationship("RevenueCategory")
 
 
-class PaymentMethod(str, enum.Enum):
+class PaymentMethod(enum.StrEnum):
     CASH = "cash"
     CREDIT_CARD = "credit_card"
     DEBIT_CARD = "debit_card"
@@ -142,6 +152,6 @@ class Expense(BaseModel):
 
 
 # Lazy imports
+from app.organizations.models import ExpenseCategory, RevenueCategory
 from app.properties.models import Property
 from app.reservations.models import Reservation
-from app.organizations.models import RevenueCategory, ExpenseCategory

@@ -9,9 +9,10 @@ The interface stays the same — swap the implementation.
 """
 import uuid
 from datetime import date
-from typing import Optional
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
 
 
@@ -38,8 +39,8 @@ class AIAdvisorService:
             - List of recommendations with confidence scores
             - Supporting metrics
         """
-        from app.finance.service import FinancialReportingService
         from app.analytics.service import AnalyticsService
+        from app.finance.service import FinancialReportingService
 
         report_service = FinancialReportingService(self.session)
         analytics_service = AnalyticsService(self.session)

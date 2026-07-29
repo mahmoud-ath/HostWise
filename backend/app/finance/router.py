@@ -5,27 +5,28 @@ Endpoints for revenue, expenses, financial dashboard, and reports.
 """
 import uuid
 from datetime import date
-from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
+
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.finance.schemas import (
-    RevenueCreateRequest,
-    RevenueUpdateRequest,
-    RevenueResponse,
+    AnnualReport,
     ExpenseCreateRequest,
     ExpenseResponse,
     FinancialSummary,
     MonthlyReport,
-    AnnualReport,
+    RevenueCreateRequest,
+    RevenueResponse,
+    RevenueUpdateRequest,
 )
 from app.finance.service import (
-    RevenueService,
     ExpenseService,
     FinancialReportingService,
-    get_revenue_service,
+    RevenueService,
     get_expense_service,
     get_reporting_service,
+    get_revenue_service,
 )
 
 router = APIRouter()
@@ -47,10 +48,10 @@ async def create_revenue(
 @router.get("/{org_id}/revenue", response_model=list[RevenueResponse])
 async def list_revenue(
     org_id: str,
-    property_id: Optional[str] = None,
-    category_id: Optional[str] = None,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    property_id: str | None = None,
+    category_id: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     service: RevenueService = Depends(get_revenue_service),
@@ -100,10 +101,10 @@ async def create_expense(
 @router.get("/{org_id}/expense", response_model=list[ExpenseResponse])
 async def list_expenses(
     org_id: str,
-    property_id: Optional[str] = None,
-    category_id: Optional[str] = None,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    property_id: str | None = None,
+    category_id: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     service: ExpenseService = Depends(get_expense_service),
@@ -133,8 +134,8 @@ async def get_expense(
 @router.get("/{org_id}/summary", response_model=FinancialSummary)
 async def get_financial_summary(
     org_id: str,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     service: FinancialReportingService = Depends(get_reporting_service),
 ):
     """Get the financial dashboard summary (KPIs)."""

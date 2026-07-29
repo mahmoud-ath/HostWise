@@ -4,9 +4,9 @@ HostWise Core Configuration
 All settings are loaded from environment variables with sensible defaults.
 Never hardcode secrets. Use .env files for local development.
 """
-from pydantic_settings import BaseSettings
-from typing import Optional
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -47,12 +47,12 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 50
 
     # AI (optional)
-    OPENAI_API_KEY: Optional[str] = None
-    ANTHROPIC_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
 
     # Email (optional)
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: Optional[int] = 587
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int | None = 587
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     }
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Cached settings singleton — use this everywhere."""
     return Settings()

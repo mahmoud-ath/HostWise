@@ -5,13 +5,14 @@ Data access for revenue, expense, and aggregation queries.
 All financial calculations happen via SQL for performance.
 """
 import uuid
+from collections.abc import Sequence
 from datetime import date
-from typing import Optional, Sequence
-from sqlalchemy import select, func, and_, extract, case
+
+from sqlalchemy import extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+
+from app.finance.models import Expense, Revenue
 from app.shared.base_repository import BaseRepository
-from app.finance.models import Revenue, Expense, RevenueSource
 
 
 class RevenueRepository(BaseRepository[Revenue]):
@@ -21,10 +22,10 @@ class RevenueRepository(BaseRepository[Revenue]):
     async def get_by_organization(
         self,
         organization_id: uuid.UUID,
-        property_id: Optional[uuid.UUID] = None,
-        category_id: Optional[uuid.UUID] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        property_id: uuid.UUID | None = None,
+        category_id: uuid.UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[Revenue]:
@@ -51,9 +52,9 @@ class RevenueRepository(BaseRepository[Revenue]):
     async def get_total_revenue(
         self,
         organization_id: uuid.UUID,
-        property_id: Optional[uuid.UUID] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        property_id: uuid.UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> dict:
         """Get aggregated revenue totals."""
         stmt = (
@@ -88,7 +89,7 @@ class RevenueRepository(BaseRepository[Revenue]):
         self,
         organization_id: uuid.UUID,
         year: int,
-        property_id: Optional[uuid.UUID] = None,
+        property_id: uuid.UUID | None = None,
     ) -> list[dict]:
         """Revenue aggregated by month for a year."""
         stmt = (
@@ -125,8 +126,8 @@ class RevenueRepository(BaseRepository[Revenue]):
     async def get_revenue_by_category(
         self,
         organization_id: uuid.UUID,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> list[dict]:
         """Revenue grouped by category."""
         from app.organizations.models import RevenueCategory
@@ -165,8 +166,8 @@ class RevenueRepository(BaseRepository[Revenue]):
     async def get_revenue_by_property(
         self,
         organization_id: uuid.UUID,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> list[dict]:
         """Revenue grouped by property."""
         from app.properties.models import Property
@@ -212,10 +213,10 @@ class ExpenseRepository(BaseRepository[Expense]):
     async def get_by_organization(
         self,
         organization_id: uuid.UUID,
-        property_id: Optional[uuid.UUID] = None,
-        category_id: Optional[uuid.UUID] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        property_id: uuid.UUID | None = None,
+        category_id: uuid.UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[Expense]:
@@ -242,9 +243,9 @@ class ExpenseRepository(BaseRepository[Expense]):
     async def get_total_expenses(
         self,
         organization_id: uuid.UUID,
-        property_id: Optional[uuid.UUID] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        property_id: uuid.UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> dict:
         stmt = (
             select(
@@ -271,7 +272,7 @@ class ExpenseRepository(BaseRepository[Expense]):
         self,
         organization_id: uuid.UUID,
         year: int,
-        property_id: Optional[uuid.UUID] = None,
+        property_id: uuid.UUID | None = None,
     ) -> list[dict]:
         stmt = (
             select(
@@ -299,8 +300,8 @@ class ExpenseRepository(BaseRepository[Expense]):
     async def get_expenses_by_category(
         self,
         organization_id: uuid.UUID,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> list[dict]:
         from app.organizations.models import ExpenseCategory
         stmt = (
@@ -338,8 +339,8 @@ class ExpenseRepository(BaseRepository[Expense]):
     async def get_expenses_by_property(
         self,
         organization_id: uuid.UUID,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> list[dict]:
         from app.properties.models import Property
         stmt = (

@@ -85,7 +85,8 @@ pyinstaller \
     --hidden-import=sqlalchemy.dialects.sqlite.aiosqlite \
     --hidden-import=pydantic \
     --hidden-import=pydantic_settings \
-    --collect-all app \
+    --hidden-import=bcrypt \
+    --hidden-import=jose \
     --collect-all aiosqlite \
     --noconsole \
     --noupx \

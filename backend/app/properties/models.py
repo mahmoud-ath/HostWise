@@ -4,14 +4,17 @@ Properties Module — Models
 Property is the core asset — everything revolves around it.
 A property can have multiple listings across different booking platforms.
 """
-import uuid
-from sqlalchemy import Column, String, Integer, Float, Text, Enum as SAEnum, ForeignKey, Uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
+import uuid
+
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import Float, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.shared.base_model import BaseModel
 
 
-class PropertyType(str, enum.Enum):
+class PropertyType(enum.StrEnum):
     APARTMENT = "apartment"
     HOUSE = "house"
     CONDO = "condo"
@@ -24,7 +27,7 @@ class PropertyType(str, enum.Enum):
     OTHER = "other"
 
 
-class PropertyStatus(str, enum.Enum):
+class PropertyStatus(enum.StrEnum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     UNDER_MAINTENANCE = "under_maintenance"
@@ -91,7 +94,7 @@ class Property(BaseModel):
     )
 
 
-class ListingPlatform(str, enum.Enum):
+class ListingPlatform(enum.StrEnum):
     AIRBNB = "airbnb"
     BOOKING = "booking"
     VRBO = "vrbo"
@@ -129,6 +132,6 @@ class Listing(BaseModel):
 
 
 # Lazy imports
+from app.finance.models import Expense, Revenue
 from app.organizations.models import Organization
 from app.reservations.models import Reservation
-from app.finance.models import Revenue, Expense

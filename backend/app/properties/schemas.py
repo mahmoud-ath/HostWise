@@ -1,57 +1,58 @@
 """
 Properties Module — Schemas
 """
-from pydantic import BaseModel, Field
-from typing import Optional
+
+from pydantic import BaseModel, field
+
+from app.properties.models import ListingPlatform, PropertyStatus, PropertyType
 from app.shared.schemas import BaseResponse
-from app.properties.models import PropertyType, PropertyStatus, ListingPlatform
 
 
 class PropertyCreateRequest(BaseModel):
     name: str
     type: PropertyType = PropertyType.OTHER
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    country: Optional[str] = None
-    postal_code: Optional[str] = None
+    address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
+    postal_code: str | None = None
     bedrooms: int = 1
     bathrooms: float = 1.0
     max_guests: int = 2
-    square_meters: Optional[float] = None
-    acquisition_cost: Optional[float] = None
-    monthly_mortgage: Optional[float] = None
-    target_occupancy: Optional[float] = None
-    target_annual_revenue: Optional[float] = None
-    notes: Optional[str] = None
+    square_meters: float | None = None
+    acquisition_cost: float | None = None
+    monthly_mortgage: float | None = None
+    target_occupancy: float | None = None
+    target_annual_revenue: float | None = None
+    notes: str | None = None
 
 
 class PropertyUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    type: Optional[PropertyType] = None
-    status: Optional[PropertyStatus] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    country: Optional[str] = None
-    postal_code: Optional[str] = None
-    bedrooms: Optional[int] = None
-    bathrooms: Optional[float] = None
-    max_guests: Optional[int] = None
-    square_meters: Optional[float] = None
-    acquisition_cost: Optional[float] = None
-    monthly_mortgage: Optional[float] = None
-    target_occupancy: Optional[float] = None
-    target_annual_revenue: Optional[float] = None
-    notes: Optional[str] = None
+    name: str | None = None
+    type: PropertyType | None = None
+    status: PropertyStatus | None = None
+    address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
+    postal_code: str | None = None
+    bedrooms: int | None = None
+    bathrooms: float | None = None
+    max_guests: int | None = None
+    square_meters: float | None = None
+    acquisition_cost: float | None = None
+    monthly_mortgage: float | None = None
+    target_occupancy: float | None = None
+    target_annual_revenue: float | None = None
+    notes: str | None = None
 
 
 class ListingResponse(BaseResponse):
     platform: ListingPlatform
-    external_id: Optional[str] = None
-    listing_url: Optional[str] = None
+    external_id: str | None = None
+    listing_url: str | None = None
     is_active: bool
-    base_price: Optional[float] = None
+    base_price: float | None = None
     currency: str
 
 
@@ -59,25 +60,25 @@ class PropertyResponse(BaseResponse):
     name: str
     type: PropertyType
     status: PropertyStatus
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    country: Optional[str] = None
-    postal_code: Optional[str] = None
+    address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
+    postal_code: str | None = None
     bedrooms: int
     bathrooms: float
     max_guests: int
-    square_meters: Optional[float] = None
-    acquisition_cost: Optional[float] = None
-    monthly_mortgage: Optional[float] = None
-    target_occupancy: Optional[float] = None
-    target_annual_revenue: Optional[float] = None
-    notes: Optional[str] = None
+    square_meters: float | None = None
+    acquisition_cost: float | None = None
+    monthly_mortgage: float | None = None
+    target_occupancy: float | None = None
+    target_annual_revenue: float | None = None
+    notes: str | None = None
 
 
 class PropertyDetailResponse(PropertyResponse):
     """Full property response with listings (eagerly loaded)."""
-    listings: list[ListingResponse] = []
+    listings: list[ListingResponse] = field(default_factory=list)
 
 
 class PropertySummaryResponse(BaseResponse):
@@ -85,8 +86,8 @@ class PropertySummaryResponse(BaseResponse):
     name: str
     type: PropertyType
     status: PropertyStatus
-    city: Optional[str] = None
-    country: Optional[str] = None
+    city: str | None = None
+    country: str | None = None
     bedrooms: int
     max_guests: int
     listing_count: int = 0
@@ -94,9 +95,9 @@ class PropertySummaryResponse(BaseResponse):
 
 class ListingCreateRequest(BaseModel):
     platform: ListingPlatform
-    external_id: Optional[str] = None
-    listing_url: Optional[str] = None
-    base_price: Optional[float] = None
+    external_id: str | None = None
+    listing_url: str | None = None
+    base_price: float | None = None
     currency: str = "USD"
     minimum_nights: int = 1
-    maximum_nights: Optional[int] = None
+    maximum_nights: int | None = None

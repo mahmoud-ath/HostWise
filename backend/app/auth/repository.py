@@ -4,11 +4,12 @@ Auth Module — Repository
 Data access for User and OrganizationMember entities.
 """
 import uuid
-from typing import Optional
-from sqlalchemy import select, and_
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth.models import OrganizationMember, User
 from app.shared.base_repository import BaseRepository
-from app.auth.models import User, OrganizationMember
 
 
 class UserRepository(BaseRepository[User]):
@@ -17,7 +18,7 @@ class UserRepository(BaseRepository[User]):
     def __init__(self, session: AsyncSession):
         super().__init__(User, session)
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         """Find user by email (case-insensitive)."""
         result = await self.session.execute(
             select(User).where(
@@ -41,7 +42,7 @@ class OrganizationMemberRepository(BaseRepository[OrganizationMember]):
 
     async def get_membership(
         self, user_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> Optional[OrganizationMember]:
+    ) -> OrganizationMember | None:
         """Get a user's membership in a specific organization."""
         result = await self.session.execute(
             select(OrganizationMember).where(

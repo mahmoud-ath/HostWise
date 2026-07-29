@@ -7,6 +7,7 @@ Session management via dependency injection.
 """
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -55,7 +56,6 @@ async_session_factory = async_sessionmaker(
 
 class Base(DeclarativeBase):
     """Base class for all database models."""
-    pass
 
 
 async def get_db() -> AsyncSession:

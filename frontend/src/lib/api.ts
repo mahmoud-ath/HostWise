@@ -22,7 +22,8 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retries: number = 3,
   ): Promise<T> {
     const token = this.getToken();
     const headers: Record<string, string> = {
@@ -34,17 +35,37 @@ class ApiClient {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          ...options,
+          headers,
+        });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "Request failed" }));
-      throw new Error(error.detail || `HTTP ${response.status}`);
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ detail: "Request failed" }));
+          // Only retry on 5xx — client errors (4xx) are not transient
+          if (response.status >= 500 && attempt < retries - 1) {
+            const delay = Math.min(1000 * 2 ** attempt, 4000);
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+          throw new Error(error.detail || `HTTP ${response.status}`);
+        }
+
+        return response.json();
+      } catch (err) {
+        if (attempt < retries - 1 && err instanceof TypeError) {
+          // Network error (fetch failed) — retry with backoff
+          const delay = Math.min(1000 * 2 ** attempt, 4000);
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        throw err;
+      }
     }
 
-    return response.json();
+    throw new Error("Request failed after retries");
   }
 
   async get<T>(endpoint: string): Promise<T> {

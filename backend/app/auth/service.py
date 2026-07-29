@@ -3,22 +3,27 @@ Auth Module — Service Layer
 
 Business logic for authentication: registration, login, token refresh.
 """
-import uuid
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.shared.exceptions import UnauthorizedException, ValidationException
-from app.auth.models import User, OrganizationMember, UserRole
-from app.auth.schemas import UserRegisterRequest, UserLoginRequest, TokenResponse, UserResponse
+
+from app.auth.models import OrganizationMember, User, UserRole
 from app.auth.repository import UserRepository
+from app.auth.schemas import (
+    TokenResponse,
+    UserLoginRequest,
+    UserRegisterRequest,
+    UserResponse,
+)
 from app.auth.security import (
-    hash_password,
-    verify_password,
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
+    verify_password,
 )
+from app.core.database import get_db
 from app.organizations.models import Organization
+from app.shared.exceptions import UnauthorizedException, ValidationException
 
 
 class AuthService:

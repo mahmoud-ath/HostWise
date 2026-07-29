@@ -4,14 +4,17 @@ Organization Module — Models
 Organization is the tenant boundary. Every entity belongs to an organization.
 Supports: Individual Host, Property Manager, Agency, Investment Company.
 """
-import uuid
-from sqlalchemy import Column, String, Text, Float, Enum as SAEnum, ForeignKey, Uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
+import uuid
+
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import Float, ForeignKey, String, Text, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.shared.base_model import BaseModel
 
 
-class OrganizationType(str, enum.Enum):
+class OrganizationType(enum.StrEnum):
     """Types of organizations using the platform."""
     INDIVIDUAL_HOST = "individual_host"
     PROFESSIONAL_HOST = "professional_host"

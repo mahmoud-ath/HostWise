@@ -6,12 +6,13 @@ executive summaries, and owner reports.
 """
 import uuid
 from datetime import date, timedelta
-from calendar import monthrange
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ai.service import AIAdvisorService
 from app.core.database import get_db
 from app.finance.service import FinancialReportingService
-from app.ai.service import AIAdvisorService
 
 
 class ReportGenerationService:

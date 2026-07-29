@@ -2,24 +2,25 @@
 Organization Module — Router
 """
 from fastapi import APIRouter, Depends
+
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.organizations.schemas import (
-    OrganizationCreateRequest,
-    OrganizationUpdateRequest,
-    OrganizationResponse,
-    RevenueCategoryCreate,
-    RevenueCategoryResponse,
     ExpenseCategoryCreate,
     ExpenseCategoryResponse,
+    OrganizationCreateRequest,
+    OrganizationResponse,
+    OrganizationUpdateRequest,
+    RevenueCategoryCreate,
+    RevenueCategoryResponse,
 )
 from app.organizations.service import (
+    ExpenseCategoryService,
     OrganizationService,
     RevenueCategoryService,
-    ExpenseCategoryService,
+    get_exp_cat_service,
     get_org_service,
     get_rev_cat_service,
-    get_exp_cat_service,
 )
 
 router = APIRouter()

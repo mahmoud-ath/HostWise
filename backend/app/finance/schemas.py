@@ -3,49 +3,49 @@ Finance Module — Schemas
 
 Request/Response schemas for revenue, expense, and financial KPIs.
 """
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional
 from datetime import date
 from uuid import UUID
-from app.shared.schemas import BaseResponse
-from app.finance.models import RevenueSource, PaymentMethod
 
+from pydantic import BaseModel, Field, field_validator
+
+from app.finance.models import PaymentMethod, RevenueSource
+from app.shared.schemas import BaseResponse
 
 # ── Revenue ──────────────────────────────────────────────
 
 class RevenueCreateRequest(BaseModel):
     property_id: str
-    reservation_id: Optional[str] = None
-    category_id: Optional[str] = None
+    reservation_id: str | None = None
+    category_id: str | None = None
     date: date
     gross_amount: float = Field(..., ge=0, description="Total revenue before commission")
     commission_amount: float = Field(0.0, ge=0, description="Management/concierge commission")
     source: RevenueSource = RevenueSource.MANUAL
     currency: str = "USD"
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    description: str | None = None
+    notes: str | None = None
 
 
 class RevenueUpdateRequest(BaseModel):
-    category_id: Optional[str] = None
-    gross_amount: Optional[float] = None
-    commission_amount: Optional[float] = None
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    category_id: str | None = None
+    gross_amount: float | None = None
+    commission_amount: float | None = None
+    description: str | None = None
+    notes: str | None = None
 
 
 class RevenueResponse(BaseResponse):
     property_id: str
-    reservation_id: Optional[str] = None
-    category_id: Optional[str] = None
+    reservation_id: str | None = None
+    category_id: str | None = None
     date: date
     gross_amount: float
     commission_amount: float
     net_amount: float
     source: RevenueSource
     currency: str
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    description: str | None = None
+    notes: str | None = None
 
     @field_validator("property_id", "reservation_id", "category_id", mode="before")
     @classmethod
@@ -57,26 +57,26 @@ class RevenueResponse(BaseResponse):
 
 class ExpenseCreateRequest(BaseModel):
     property_id: str
-    category_id: Optional[str] = None
+    category_id: str | None = None
     date: date
     amount: float = Field(..., ge=0)
     currency: str = "USD"
-    vendor: Optional[str] = None
-    payment_method: Optional[PaymentMethod] = None
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    vendor: str | None = None
+    payment_method: PaymentMethod | None = None
+    description: str | None = None
+    notes: str | None = None
     is_recurring: bool = False
 
 
 class ExpenseResponse(BaseResponse):
     property_id: str
-    category_id: Optional[str] = None
+    category_id: str | None = None
     date: date
     amount: float
     currency: str
-    vendor: Optional[str] = None
-    payment_method: Optional[PaymentMethod] = None
-    description: Optional[str] = None
+    vendor: str | None = None
+    payment_method: PaymentMethod | None = None
+    description: str | None = None
     is_recurring: bool
 
     @field_validator("property_id", "category_id", mode="before")

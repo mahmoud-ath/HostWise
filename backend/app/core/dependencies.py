@@ -5,13 +5,10 @@ Centralized dependency management. Every dependency is resolved here.
 This is deliberately simple for MVP — no need for a DI framework yet.
 When the app grows, replace with dependency-injector or similar.
 """
-from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends
 from app.core.database import get_db
 
 # Re-export for convenience
-__all__ = ["get_db", "get_current_user"]
+__all__ = ["get_current_user", "get_db"]
 
 
 # Auth dependency — imported lazily to avoid circular imports

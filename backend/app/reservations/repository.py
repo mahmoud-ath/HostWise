@@ -2,12 +2,14 @@
 Reservations Module — Repository
 """
 import uuid
+from collections.abc import Sequence
 from datetime import date
-from typing import Optional, Sequence
-from sqlalchemy import select, func, and_, extract
+
+from sqlalchemy import extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.shared.base_repository import BaseRepository
+
 from app.reservations.models import Reservation, ReservationStatus
+from app.shared.base_repository import BaseRepository
 
 
 class ReservationRepository(BaseRepository[Reservation]):
@@ -17,10 +19,10 @@ class ReservationRepository(BaseRepository[Reservation]):
     async def get_by_organization(
         self,
         organization_id: uuid.UUID,
-        property_id: Optional[uuid.UUID] = None,
-        status: Optional[ReservationStatus] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        property_id: uuid.UUID | None = None,
+        status: ReservationStatus | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[Reservation]:
@@ -66,7 +68,7 @@ class ReservationRepository(BaseRepository[Reservation]):
         self,
         organization_id: uuid.UUID,
         year: int,
-        property_id: Optional[uuid.UUID] = None,
+        property_id: uuid.UUID | None = None,
     ) -> list[dict]:
         """Aggregate revenue by month for a given year."""
         stmt = (

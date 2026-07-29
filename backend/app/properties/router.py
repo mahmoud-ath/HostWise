@@ -2,22 +2,24 @@
 Properties Module — Router
 """
 import uuid
+
 from fastapi import APIRouter, Depends, Query
+
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.properties.schemas import (
-    PropertyCreateRequest,
-    PropertyUpdateRequest,
-    PropertyResponse,
-    PropertyDetailResponse,
     ListingCreateRequest,
     ListingResponse,
+    PropertyCreateRequest,
+    PropertyDetailResponse,
+    PropertyResponse,
+    PropertyUpdateRequest,
 )
 from app.properties.service import (
-    PropertyService,
     ListingService,
-    get_property_service,
+    PropertyService,
     get_listing_service,
+    get_property_service,
 )
 
 router = APIRouter()

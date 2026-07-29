@@ -4,16 +4,17 @@ Auth Module — Router
 Authentication endpoints: register, login, refresh, profile.
 """
 from fastapi import APIRouter, Depends
+
+from app.auth.dependencies import get_current_user, get_current_user_response
+from app.auth.models import User
 from app.auth.schemas import (
-    UserRegisterRequest,
-    UserLoginRequest,
     TokenResponse,
+    UserLoginRequest,
+    UserRegisterRequest,
     UserResponse,
     UserUpdateRequest,
 )
 from app.auth.service import AuthService, get_auth_service
-from app.auth.dependencies import get_current_user, get_current_user_response
-from app.auth.models import User
 
 router = APIRouter()
 

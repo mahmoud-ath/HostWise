@@ -36,13 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganizationState] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);  // start true — check for existing token
-  const [isRestoring, setIsRestoring] = useState(true);
 
   // Restore session on mount — check for existing JWT token
   useEffect(() => {
     const restoreSession = async () => {
       if (!api.isAuthenticated()) {
-        setIsRestoring(false);
         setIsLoading(false);
         return;
       }
@@ -61,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Token expired or invalid — clear it
         api.clearToken();
       } finally {
-        setIsRestoring(false);
         setIsLoading(false);
       }
     };

@@ -2,9 +2,9 @@
 Reports Module — Router
 """
 import uuid
+
 from fastapi import APIRouter, Depends, Query
-from app.auth.dependencies import get_current_user
-from app.auth.models import User
+
 from app.reports.service import ReportGenerationService, get_report_service
 
 router = APIRouter()

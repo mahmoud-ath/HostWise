@@ -2,26 +2,32 @@
 Organization Module — Service Layer
 """
 import uuid
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.shared.exceptions import NotFoundException, ValidationException
-from app.organizations.models import Organization, OrganizationMember, RevenueCategory, ExpenseCategory
+
 from app.auth.models import UserRole
-from app.organizations.schemas import (
-    OrganizationCreateRequest,
-    OrganizationUpdateRequest,
-    OrganizationResponse,
-    RevenueCategoryCreate,
-    RevenueCategoryResponse,
-    ExpenseCategoryCreate,
-    ExpenseCategoryResponse,
+from app.core.database import get_db
+from app.organizations.models import (
+    ExpenseCategory,
+    Organization,
+    RevenueCategory,
 )
 from app.organizations.repository import (
+    ExpenseCategoryRepository,
     OrganizationRepository,
     RevenueCategoryRepository,
-    ExpenseCategoryRepository,
 )
+from app.organizations.schemas import (
+    ExpenseCategoryCreate,
+    ExpenseCategoryResponse,
+    OrganizationCreateRequest,
+    OrganizationResponse,
+    OrganizationUpdateRequest,
+    RevenueCategoryCreate,
+    RevenueCategoryResponse,
+)
+from app.shared.exceptions import NotFoundException
 
 
 def _generate_slug(name: str) -> str:
@@ -125,9 +131,6 @@ class OrganizationService:
             ("Marketing", "Advertising & marketing"),
             ("Other", "Miscellaneous expenses"),
         ]
-
-        rc_repo = RevenueCategoryRepository(self.session)
-        ec_repo = ExpenseCategoryRepository(self.session)
 
         for idx, (name, desc) in enumerate(default_revenue):
             cat = RevenueCategory(

@@ -2,8 +2,9 @@
 Reservations Module — Router
 """
 import uuid
+
 from fastapi import APIRouter, Depends, Query
-from typing import Optional
+
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.reservations.schemas import ReservationCreateRequest, ReservationResponse
@@ -25,7 +26,7 @@ async def create_reservation(
 @router.get("/{org_id}", response_model=list[ReservationResponse])
 async def list_reservations(
     org_id: str,
-    property_id: Optional[str] = None,
+    property_id: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     service: ReservationService = Depends(get_reservation_service),

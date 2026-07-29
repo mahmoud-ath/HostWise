@@ -5,9 +5,12 @@ Generic CRUD operations. Every domain repository extends this.
 Never depend on a specific ORM implementation outside repositories.
 """
 import uuid
-from typing import Generic, TypeVar, Optional, Sequence
-from sqlalchemy import select, func, delete as sa_delete
+from collections.abc import Sequence
+from typing import Generic, TypeVar
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.shared.base_model import BaseModel
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
@@ -27,7 +30,7 @@ class BaseRepository(Generic[ModelType]):
         self.model = model
         self.session = session
 
-    async def get_by_id(self, id: uuid.UUID) -> Optional[ModelType]:
+    async def get_by_id(self, id: uuid.UUID) -> ModelType | None:
         result = await self.session.execute(
             select(self.model).where(
                 self.model.id == id,
@@ -40,7 +43,7 @@ class BaseRepository(Generic[ModelType]):
         self,
         skip: int = 0,
         limit: int = 100,
-        organization_id: Optional[uuid.UUID] = None,
+        organization_id: uuid.UUID | None = None,
     ) -> Sequence[ModelType]:
         stmt = select(self.model).where(self.model.is_deleted == False)
         if organization_id and hasattr(self.model, "organization_id"):
@@ -58,25 +61,16 @@ class BaseRepository(Generic[ModelType]):
         await self.session.flush()
         return obj
 
-    async def soft_delete(self, id: uuid.UUID) -> bool:
+    async def hard_delete(self, id: uuid.UUID) -> bool:
         result = await self.session.execute(
-            select(self.model).where(self.model.id == id)
+            select(self.model).where(
+                self.model.id == id,
+                self.model.is_deleted == False,
+            )
         )
         obj = result.scalar_one_or_none()
         if obj:
-            obj.is_deleted = True
-            obj.deleted_at = func.now()
+            await self.session.delete(obj)
             await self.session.flush()
             return True
         return False
-
-    async def count(
-        self, organization_id: Optional[uuid.UUID] = None
-    ) -> int:
-        stmt = select(func.count()).select_from(self.model).where(
-            self.model.is_deleted == False
-        )
-        if organization_id and hasattr(self.model, "organization_id"):
-            stmt = stmt.where(self.model.organization_id == organization_id)
-        result = await self.session.execute(stmt)
-        return result.scalar() or 0

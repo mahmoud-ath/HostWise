@@ -4,10 +4,11 @@ Shared Pydantic Schemas
 Base schemas for request/response patterns.
 Every domain defines its own schemas extending these patterns.
 """
-from pydantic import BaseModel, ConfigDict
-from datetime import datetime
-from typing import Optional, Generic, TypeVar
 import uuid
+from datetime import datetime
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel, ConfigDict
 
 
 class BaseSchema(BaseModel):
@@ -41,4 +42,4 @@ class PaginatedResponse(BaseSchema, Generic[T]):
 class ErrorResponse(BaseSchema):
     """Standard error response."""
     detail: str
-    error_code: Optional[str] = None
+    error_code: str | None = None

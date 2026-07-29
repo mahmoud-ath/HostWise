@@ -2,13 +2,15 @@
 Reservations Module — Service Layer
 """
 import uuid
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
-from app.shared.exceptions import NotFoundException
 from app.reservations.models import Reservation
-from app.reservations.schemas import ReservationCreateRequest, ReservationResponse
 from app.reservations.repository import ReservationRepository
+from app.reservations.schemas import ReservationCreateRequest, ReservationResponse
+from app.shared.exceptions import NotFoundException
 
 
 class ReservationService:
@@ -40,7 +42,7 @@ class ReservationService:
     async def list_organization(
         self,
         organization_id: uuid.UUID,
-        property_id: Optional[uuid.UUID] = None,
+        property_id: uuid.UUID | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> list[ReservationResponse]:

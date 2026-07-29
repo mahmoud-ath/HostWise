@@ -2,21 +2,22 @@
 Properties Module — Service Layer
 """
 import uuid
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
-from app.shared.exceptions import NotFoundException
-from app.properties.models import Property, Listing
+from app.properties.models import Listing, Property
+from app.properties.repository import ListingRepository, PropertyRepository
 from app.properties.schemas import (
-    PropertyCreateRequest,
-    PropertyUpdateRequest,
-    PropertyResponse,
-    PropertyDetailResponse,
-    PropertySummaryResponse,
     ListingCreateRequest,
     ListingResponse,
+    PropertyCreateRequest,
+    PropertyDetailResponse,
+    PropertyResponse,
+    PropertyUpdateRequest,
 )
-from app.properties.repository import PropertyRepository, ListingRepository
+from app.shared.exceptions import NotFoundException
 
 
 class PropertyService:

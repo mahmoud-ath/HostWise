@@ -3,9 +3,9 @@ Auth Module — Schemas
 
 Request/Response schemas for authentication endpoints.
 """
-from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
-import uuid
+
+from pydantic import BaseModel, field_validator
+
 from app.shared.schemas import BaseResponse
 
 
@@ -50,10 +50,10 @@ class UserResponse(BaseResponse):
     full_name: str
     is_active: bool
     is_verified: bool
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
 
 
 class UserUpdateRequest(BaseModel):
     """Fields the user can update on their profile."""
-    full_name: Optional[str] = None
-    avatar_url: Optional[str] = None
+    full_name: str | None = None
+    avatar_url: str | None = None

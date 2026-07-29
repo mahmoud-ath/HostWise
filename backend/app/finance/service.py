@@ -5,27 +5,29 @@ Business logic for revenue, expenses, cashflow, and financial reporting.
 All KPI calculations happen here — never in the router.
 """
 import uuid
-from datetime import date
 from calendar import monthrange
+from datetime import date
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
-from app.shared.exceptions import NotFoundException, ValidationException
-from app.finance.models import Revenue, Expense
+from app.finance.models import Expense, Revenue
+from app.finance.repository import ExpenseRepository, RevenueRepository
 from app.finance.schemas import (
-    RevenueCreateRequest,
-    RevenueUpdateRequest,
-    RevenueResponse,
+    AnnualReport,
+    CategoryBreakdown,
     ExpenseCreateRequest,
     ExpenseResponse,
     FinancialSummary,
     MonthlyBreakdown,
-    CategoryBreakdown,
-    PropertyFinancialSummary,
     MonthlyReport,
-    AnnualReport,
+    PropertyFinancialSummary,
+    RevenueCreateRequest,
+    RevenueResponse,
+    RevenueUpdateRequest,
 )
-from app.finance.repository import RevenueRepository, ExpenseRepository
+from app.shared.exceptions import NotFoundException
 
 
 class RevenueService:

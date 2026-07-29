@@ -6,14 +6,15 @@ Never stores calculated metrics — generates them on demand.
 CID (Computed Intelligence on Demand).
 """
 import uuid
-from datetime import date, timedelta
-from typing import Optional
+from datetime import date
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
-from app.finance.repository import RevenueRepository, ExpenseRepository
-from app.reservations.repository import ReservationRepository
+from app.finance.repository import ExpenseRepository, RevenueRepository
 from app.reservations.models import ReservationStatus
+from app.reservations.repository import ReservationRepository
 
 
 class AnalyticsService:
@@ -47,8 +48,9 @@ class AnalyticsService:
         )
 
         # Reservations
+        from sqlalchemy import func, select
+
         from app.reservations.models import Reservation
-        from sqlalchemy import select, func
         res_stmt = (
             select(
                 func.count(Reservation.id).label("total"),

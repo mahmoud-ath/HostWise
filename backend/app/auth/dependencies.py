@@ -5,14 +5,16 @@ FastAPI dependency injection for authentication.
 Every protected endpoint uses get_current_user.
 """
 import uuid
+
 from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.shared.exceptions import UnauthorizedException, ForbiddenException
-from app.auth.security import decode_token
+
+from app.auth.models import User
 from app.auth.repository import UserRepository
-from app.auth.models import User, UserRole, OrganizationMember
 from app.auth.schemas import UserResponse
+from app.auth.security import decode_token
+from app.core.database import get_db
+from app.shared.exceptions import UnauthorizedException
 
 
 async def get_current_user(
@@ -53,14 +55,3 @@ async def get_current_user_response(
 ) -> UserResponse:
     """Return the current user as a response schema."""
     return UserResponse.model_validate(current_user)
-
-
-def require_role(*roles: UserRole):
-    """
-    Dependency factory — restricts endpoint to specific roles.
-    Usage: @router.get("/admin", dependencies=[Depends(require_role(UserRole.ADMIN))])
-    """
-    async def role_checker(current_user: User = Depends(get_current_user)):
-        # For organization-scoped checks, the caller should use organization context
-        pass  # Role is checked at the organization membership level
-    return role_checker

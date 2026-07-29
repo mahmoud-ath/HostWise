@@ -4,9 +4,9 @@ Connectors Module — Base Interface & CSV Connector
 Every data source connector must implement this interface.
 The rest of the application never depends on a specific provider.
 """
-from abc import ABC, abstractmethod
 import uuid
-from typing import Protocol
+from abc import ABC, abstractmethod
+from typing import ClassVar
 
 
 class ConnectorInterface(ABC):
@@ -55,13 +55,17 @@ class CSVConnector(ConnectorInterface):
 
     async def import_reservations(self, organization_id: uuid.UUID) -> list[dict]:
         """Parse reservations from CSV."""
+        import asyncio
         import csv
         reservations = []
-        with open(self.file_path, "r") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # Normalize: map CSV columns to internal Reservation model
-                reservations.append(self._normalize_reservation(row, organization_id))
+
+        def _read_csv():
+            with open(self.file_path) as f:
+                return list(csv.DictReader(f))
+
+        rows = await asyncio.to_thread(_read_csv)
+        for row in rows:
+            reservations.append(self._normalize_reservation(row, organization_id))
         return reservations
 
     async def import_revenue(self, organization_id: uuid.UUID) -> list[dict]:
@@ -75,7 +79,6 @@ class CSVConnector(ConnectorInterface):
         Normalize CSV row to internal schema.
         Maps provider-specific column names to our domain model.
         """
-        from datetime import datetime
         return {
             "organization_id": str(org_id),
             "confirmation_code": row.get("confirmation_code", row.get("Confirmation Code", "")),
@@ -96,7 +99,7 @@ class ConnectorRegistry:
     Add new connectors here as they're built.
     """
 
-    _connectors: dict[str, type[ConnectorInterface]] = {
+    _connectors: ClassVar[dict[str, type[ConnectorInterface]]] = {
         "csv": CSVConnector,
         # Future:
         # "airbnb": AirbnbConnector,
