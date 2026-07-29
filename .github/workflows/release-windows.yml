@@ -69,7 +69,7 @@ jobs:
           python -m venv .venv
           .\.venv\Scripts\Activate.ps1
           pip install -q -r requirements.txt "pyinstaller>=6.10,<7"
-          pyinstaller `
+          pyinstaller --clean `
             --onefile `
             --name "hostwise-backend" `
             --add-data "app;app" `
@@ -84,7 +84,6 @@ jobs:
             --hidden-import=bcrypt `
             --hidden-import=jose `
             --hidden-import=multipart `
-            --collect-all app `
             --collect-all aiosqlite `
             --noconsole `
             --noupx `
@@ -97,6 +96,12 @@ jobs:
           $TargetTriple = (rustc -vV | Select-String "host:" | ForEach-Object { $_ -replace "host:\s+", "" }).Trim()
           New-Item -ItemType Directory -Force -Path frontend\src-tauri\binaries | Out-Null
           Copy-Item backend\dist\hostwise-backend.exe "frontend\src-tauri\binaries\hostwise-backend-${TargetTriple}.exe"
+
+      - name: Clear bun cache (avoid tarball extraction issues)
+        run: |
+          rm -rf ~/.bun/install/cache
+          cd frontend
+          rm -rf node_modules
 
       - name: Install frontend dependencies
         run: |
