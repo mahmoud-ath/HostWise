@@ -15,7 +15,10 @@ settings = get_settings()
 def _build_db_url() -> str:
     """Build the appropriate database URL based on DATABASE_TYPE."""
     if settings.DATABASE_TYPE == "sqlite":
-        return f"sqlite+aiosqlite:///{settings.SQLITE_PATH}"
+        path = settings.SQLITE_PATH
+        # Normalize Windows backslashes to forward slashes for SQLAlchemy URL
+        path = path.replace("\\", "/")
+        return f"sqlite+aiosqlite:///{path}"
     return settings.DATABASE_URL
 
 
