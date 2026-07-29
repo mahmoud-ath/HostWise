@@ -81,6 +81,13 @@ jobs:
             --include-module=sqlalchemy.dialects.sqlite.aiosqlite `
             --include-module=pydantic `
             --include-module=pydantic_settings `
+            --include-module=bcrypt `
+            --include-module=jose `
+            --include-module=uvicorn `
+            --include-module=fastapi `
+            --include-module=starlette `
+            --include-module=multipart `
+            --include-module=httpx `
             --msvc=latest `
             --windows-console-mode=disable `
             --remove-output `
