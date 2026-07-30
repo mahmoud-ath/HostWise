@@ -109,6 +109,8 @@ fn setup_backend_env(port: u16) {
 }
 
 /// Poll the backend health endpoint until it responds or times out.
+/// On failure after the poll, waits 2s and retries once (to let Windows Defender
+/// finish scanning PyInstaller's _MEI* extraction before giving up).
 async fn wait_for_backend(port: u16) -> Result<(), String> {
     let health_url = format!("http://127.0.0.1:{}/api/health", port);
     let client = reqwest::Client::builder()
@@ -121,10 +123,23 @@ async fn wait_for_backend(port: u16) -> Result<(), String> {
 
     loop {
         if attempts >= max_attempts {
-            return Err(format!(
-                "Backend did not start within {} seconds",
-                HEALTH_CHECK_TIMEOUT_SECS
-            ));
+            // Give Windows Defender time to finish scanning the _MEI* extraction,
+            // then retry once before giving up.
+            log::warn!("Backend health check timed out, waiting 2s and retrying once...");
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            // One final attempt
+            match client.get(&health_url).send().await {
+                Ok(resp) if resp.status().is_success() => {
+                    log::info!("Backend recovered after delay (Defender scan likely finished)");
+                    return Ok(());
+                }
+                _ => {
+                    return Err(format!(
+                        "Backend did not start within {} seconds",
+                        HEALTH_CHECK_TIMEOUT_SECS + 2
+                    ));
+                }
+            }
         }
 
         match client.get(&health_url).send().await {
@@ -224,6 +239,10 @@ async fn spawn_backend(
 
     setup_backend_env(port);
     cleanup_stale_backend(port);
+
+    // Brief delay to let the OS release any stale file locks from previous
+    // PyInstaller _MEI* extractions (Windows Defender scan contention).
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Store port in app state
     *app.state::<AppState>().backend_port.lock().unwrap() = port;

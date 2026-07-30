@@ -92,15 +92,41 @@ from app.main import app
 
 def main():
     """Start the FastAPI server for desktop use."""
-    log.info("Starting HostWise backend on 127.0.0.1:8000 ...")
-    uvicorn.run(
-        app,
-        host="127.0.0.1",
-        port=8000,
-        log_level=os.environ.get("LOG_LEVEL", "info"),
-        access_log=False,
-        workers=1,
-    )
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "8000"))
+    log_level = os.environ.get("LOG_LEVEL", "info")
+
+    # Defensive retry: on Windows, Windows Defender may still be scanning
+    # .pyd files in the _MEI* temp dir, causing transient import errors.
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            log.info(
+                "Starting HostWise backend on %s:%s (attempt %d/%d)...",
+                host, port, attempt + 1, max_retries,
+            )
+            uvicorn.run(
+                app,
+                host=host,
+                port=port,
+                log_level=log_level,
+                access_log=False,
+                workers=1,
+            )
+            return  # Normal exit — uvicorn.run blocks until shutdown
+        except Exception as e:
+            log.error(
+                "Backend startup failed (attempt %d/%d): %s",
+                attempt + 1, max_retries, e,
+            )
+            if attempt < max_retries - 1:
+                import time
+                delay = 2 ** attempt  # 1s, 2s
+                log.info("Waiting %ds before retry...", delay)
+                time.sleep(delay)
+            else:
+                log.critical("All startup attempts failed, giving up")
+                raise
 
 
 if __name__ == "__main__":
