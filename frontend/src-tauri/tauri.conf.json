@@ -40,7 +40,9 @@
       "icons/icon.png"
     ],
     "targets": "all",
-    "resources": ["embedded/**"],
+    "resources": {
+  "embedded/hostwise-backend": "."
+},
     "windows": {
       "wix": {
         "language": "en-US"

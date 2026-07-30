@@ -57,3 +57,4 @@ logs/
 
 # Alembic
 backend/alembic/versions/*.pyc
+frontend/src-tauri/embedded/hostwise-backend/

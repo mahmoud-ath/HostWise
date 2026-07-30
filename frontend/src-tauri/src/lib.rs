@@ -332,64 +332,78 @@ fn get_app_data_dir() -> String {
 async fn restart_backend(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Restarting backend...");
 
-    // Mark as not ready immediately
     let state = app.state::<AppState>();
     state.backend_ready.store(false, Ordering::SeqCst);
 
-    // Kill existing child (scope the lock so MutexGuard drops before await)
+    // Kill existing child
     let child_to_kill = {
         let mut guard = state.backend_child.lock().unwrap();
         guard.take()
     };
-    if let Some(child) = child_to_kill {
+    if let Some(mut child) = child_to_kill {
         log::info!("Killing existing backend process");
-        let _ = child.kill();
-        // Give it a moment to release resources
+        let _ = child.kill().await;
+        let _ = child.wait().await;
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
-    // Emit restarting event
-    let _ = app.emit(
-        "backend-status",
-        serde_json::json!({"status": "restarting"}),
-    );
+    let _ = app.emit("backend-status", serde_json::json!({"status": "restarting"}));
 
-    // Spawn new backend
-    match spawn_backend(&app).await {
-        Ok(child) => {
-            log::info!("New backend process started, waiting for health check...");
-            let port = *app.state::<AppState>().backend_port.lock().unwrap();
+    // Find backend exe
+    let exe_path = find_backend_exe(&app)?;
+    let backend_dir = exe_path.parent().unwrap().to_path_buf();
+    let runtime_dir = prepare_runtime_dir();
+    let runtime_path = runtime_dir.to_string_lossy().to_string();
 
-            match wait_for_backend(port).await {
-                Ok(()) => {
-                    log::info!("Backend restart complete — healthy");
-                    let state = app.state::<AppState>();
-                    state.backend_ready.store(true, Ordering::SeqCst);
-                    *state.backend_child.lock().unwrap() = Some(child);
-                    let _ = app.emit(
-                        "backend-status",
-                        serde_json::json!({"status": "healthy"}),
-                    );
-                    Ok(())
-                }
-                Err(e) => {
-                    log::error!("Backend restart failed: {e}");
-                    let _ = child.kill();
-                    let _ = app.emit(
-                        "backend-status",
-                        serde_json::json!({"status": "failed", "error": e}),
-                    );
-                    Err(format!("Backend failed to start after restart: {e}"))
-                }
-            }
+    // Find new port
+    let port = find_available_port()?;
+    *app.state::<AppState>().backend_port.lock().unwrap() = port;
+    cleanup_stale_backend(port);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let data_dir = get_data_dir();
+    let db_path = data_dir.join("hostwise.db");
+    let uploads_dir = data_dir.join("uploads");
+    let cors_origins = r#"["http://localhost:3000","http://127.0.0.1:3000","tauri://localhost","https://tauri.localhost"]"#;
+    let environment = if cfg!(debug_assertions) { "development" } else { "production" };
+    let log_level = if cfg!(debug_assertions) { "info" } else { "warning" };
+
+    let child = tokio::process::Command::new(&exe_path)
+        .env("TMP", &runtime_path)
+        .env("TEMP", &runtime_path)
+        .env("PYINSTALLER_TMPDIR", &runtime_path)
+        .env("DATABASE_TYPE", "sqlite")
+        .env("SQLITE_PATH", db_path.to_string_lossy().as_ref())
+        .env("HOST", "127.0.0.1")
+        .env("PORT", port.to_string())
+        .env("CORS_ORIGINS", cors_origins)
+        .env("UPLOAD_DIR", uploads_dir.to_string_lossy().as_ref())
+        .env("ENVIRONMENT", environment)
+        .env("LOG_LEVEL", log_level)
+        .current_dir(&backend_dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn backend: {e}"))?;
+
+    log::info!("New backend process started, waiting for health check...");
+
+    // Start monitoring output
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(monitor_backend_output(child, app_clone));
+
+    match wait_for_backend(port).await {
+        Ok(()) => {
+            log::info!("Backend restart complete — healthy");
+            let state = app.state::<AppState>();
+            state.backend_ready.store(true, Ordering::SeqCst);
+            let _ = app.emit("backend-status", serde_json::json!({"status": "healthy"}));
+            Ok(())
         }
         Err(e) => {
-            log::error!("Failed to spawn backend on restart: {e}");
-            let _ = app.emit(
-                "backend-status",
-                serde_json::json!({"status": "failed", "error": e}),
-            );
-            Err(e)
+            log::error!("Backend restart failed: {e}");
+            let _ = app.emit("backend-status", serde_json::json!({"status": "failed", "error": e}));
+            Err(format!("Backend failed to start after restart: {e}"))
         }
     }
 }
@@ -534,7 +548,8 @@ pub fn run() {
                 let app_monitor = handle.clone();
                 tauri::async_runtime::spawn(async move {
                     let child = {
-                        let mut guard = app_monitor.state::<AppState>().backend_child.lock().unwrap();
+                        let app_state = app_monitor.state::<AppState>();
+                        let mut guard = app_state.backend_child.lock().unwrap();
                         guard.take()
                     };
                     if let Some(child) = child {
