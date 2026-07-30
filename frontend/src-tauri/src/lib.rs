@@ -67,6 +67,21 @@ fn setup_backend_env(port: u16) {
     // as the system temp directory (fixes "access violation" on Windows).
     let runtime_dir = data_dir.join("runtime");
     std::fs::create_dir_all(&runtime_dir).ok();
+
+    // Clean up stale _MEI* temp dirs from previous runs (PyInstaller
+    // leaves them behind on crash, and they accumulate + confuse Defender).
+    if let Ok(entries) = std::fs::read_dir(&runtime_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with("_MEI") && path.is_dir() {
+                    let _ = std::fs::remove_dir_all(&path);
+                    log::info!("Cleaned stale PyInstaller temp: {:?}", path);
+                }
+            }
+        }
+    }
+
     let runtime_path = runtime_dir.to_string_lossy().to_string();
     std::env::set_var("TMP", &runtime_path);
     std::env::set_var("TEMP", &runtime_path);

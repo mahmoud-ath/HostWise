@@ -56,6 +56,18 @@ log.debug("SQLITE_PATH=%s", os.environ.get("SQLITE_PATH"))
 # Runtime temp dir for PyInstaller extraction (avoids Windows Defender issues)
 _runtime_dir = os.path.join(_data_dir, "runtime")
 os.makedirs(_runtime_dir, exist_ok=True)
+
+# Clean up stale _MEI* temp dirs from previous crashed runs
+for entry in os.listdir(_runtime_dir):
+    entry_path = os.path.join(_runtime_dir, entry)
+    if entry.startswith("_MEI") and os.path.isdir(entry_path):
+        try:
+            import shutil
+            shutil.rmtree(entry_path, ignore_errors=True)
+            log.debug("Cleaned stale PyInstaller temp: %s", entry_path)
+        except Exception:
+            pass
+
 os.environ.setdefault("TMP", _runtime_dir)
 os.environ.setdefault("TEMP", _runtime_dir)
 log.debug("TEMP=%s", os.environ.get("TEMP"))
