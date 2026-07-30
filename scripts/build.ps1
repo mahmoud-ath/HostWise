@@ -53,7 +53,7 @@ if (-not (Test-Path ".venv")) { python -m venv .venv }
 .\.venv\Scripts\Activate.ps1
 pip install -q -r requirements.txt pyinstaller
 
-pyinstaller --onefile --name hostwise-backend `
+pyinstaller --onedir --name hostwise-backend `
     --add-data "app;app" `
     --hidden-import=uvicorn.logging `
     --hidden-import=uvicorn.loops.auto `
@@ -72,18 +72,18 @@ pyinstaller --onefile --name hostwise-backend `
     --clean `
     launcher.py
 
-if (-not (Test-Path "dist\hostwise-backend.exe")) { throw "PyInstaller build failed" }
+if (-not (Test-Path "dist\hostwise-backend\hostwise-backend.exe")) { throw "PyInstaller build failed" }
 Pop-Location
-Write-Host "   Backend: $BackendDir\dist\hostwise-backend.exe" -ForegroundColor Green
+Write-Host "   Backend: $BackendDir\dist\hostwise-backend\" -ForegroundColor Green
 
-# ── 2. Copy backend binary for Tauri sidecar ──────────────
-Write-Host "`n[2/3] Copying backend binary to Tauri sidecar location..." -ForegroundColor Yellow
+# ── 2. Copy backend directory for Tauri resources ─────────
+Write-Host "`n[2/3] Copying backend to Tauri embedded resources..." -ForegroundColor Yellow
 
-# Detect Rust target triple
-$TargetTriple = (rustc -vV | Select-String "host:" | ForEach-Object { $_ -replace "host:\s+", "" }).Trim()
-New-Item -ItemType Directory -Force -Path "$TauriDir\binaries" | Out-Null
-Copy-Item "$BackendDir\dist\hostwise-backend.exe" "$TauriDir\binaries\hostwise-backend-${TargetTriple}.exe" -Force
-Write-Host "   Sidecar: $TauriDir\binaries\hostwise-backend-${TargetTriple}.exe" -ForegroundColor Green
+$EmbedDir = "$TauriDir\embedded\hostwise-backend"
+New-Item -ItemType Directory -Force -Path $EmbedDir | Out-Null
+Remove-Item -Recurse -Force -Path "$EmbedDir\*" -ErrorAction SilentlyContinue
+Copy-Item -Recurse "$BackendDir\dist\hostwise-backend\*" "$EmbedDir\" -Force
+Write-Host "   Embedded: $EmbedDir" -ForegroundColor Green
 
 # ── 3. Frontend + Tauri ───────────────────────────────────
 Write-Host "`n[3/3] Building Next.js frontend and Tauri desktop app..." -ForegroundColor Yellow

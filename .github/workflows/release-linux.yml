@@ -86,7 +86,7 @@ jobs:
           source .venv/bin/activate
           pip install -q -r requirements.txt "pyinstaller>=6.10,<7"
           pyinstaller \
-            --onefile \
+            --onedir \
             --name "hostwise-backend" \
             --add-data "app:app" \
             --hidden-import=uvicorn.logging \
@@ -104,12 +104,12 @@ jobs:
             --strip \
             launcher.py
 
-      - name: Prepare backend binary for Tauri
+      - name: Prepare backend directory for Tauri
         run: |
-          TARGET_TRIPLE="x86_64-unknown-linux-gnu"
-          mkdir -p frontend/src-tauri/binaries
-          cp backend/dist/hostwise-backend "frontend/src-tauri/binaries/hostwise-backend-${TARGET_TRIPLE}"
-          chmod +x "frontend/src-tauri/binaries/hostwise-backend-${TARGET_TRIPLE}"
+          EMBED_DIR="frontend/src-tauri/embedded/hostwise-backend"
+          mkdir -p "$EMBED_DIR"
+          cp -R backend/dist/hostwise-backend/* "$EMBED_DIR/"
+          chmod +x "$EMBED_DIR/hostwise-backend"
 
       - name: Install frontend dependencies
         run: |

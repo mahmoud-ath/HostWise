@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-use tauri_plugin_shell::ShellExt;
 
 const BASE_PORT: u16 = 18000;
 const MAX_PORT_ATTEMPTS: u16 = 100;
@@ -13,11 +12,12 @@ const HEALTH_CHECK_TIMEOUT_SECS: u64 = 30;
 const HEALTH_CHECK_POLL_MS: u64 = 250;
 const HEALTH_MONITOR_INTERVAL_SECS: u64 = 10;
 const APP_NAME: &str = "hostwise";
+const BACKEND_EXE_NAME: &str = "hostwise-backend";
 
 // ── Shared application state ─────────────────────────────
 pub struct AppState {
     pub backend_ready: AtomicBool,
-    pub backend_child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
+    pub backend_child: Mutex<Option<tokio::process::Child>>,
     pub backend_port: Mutex<u16>,
 }
 
@@ -52,24 +52,42 @@ fn get_data_dir() -> std::path::PathBuf {
     }
 }
 
-/// Set environment variables that the Python backend will read.
-fn setup_backend_env(port: u16) {
+/// Find the bundled backend executable in the app's resource directory.
+fn find_backend_exe(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to resolve resource directory: {e}"))?;
+
+    let backend_dir = resource_dir.join("embedded").join("hostwise-backend");
+
+    let exe_name = if cfg!(target_os = "windows") {
+        format!("{}.exe", BACKEND_EXE_NAME)
+    } else {
+        BACKEND_EXE_NAME.to_string()
+    };
+
+    let exe_path = backend_dir.join(&exe_name);
+
+    if !exe_path.exists() {
+        return Err(format!(
+            "Backend executable not found at: {}. \
+             Make sure the backend is built with PyInstaller --onedir \
+             and placed in frontend/src-tauri/embedded/hostwise-backend/",
+            exe_path.display()
+        ));
+    }
+
+    log::info!("Backend executable: {}", exe_path.display());
+    Ok(exe_path)
+}
+
+/// Prepare the runtime directory and clean stale _MEI* dirs.
+fn prepare_runtime_dir() -> std::path::PathBuf {
     let data_dir = get_data_dir();
-    let db_path = data_dir.join("hostwise.db");
-    let uploads_dir = data_dir.join("uploads");
-
-    // Ensure directories exist
-    std::fs::create_dir_all(&data_dir).ok();
-    std::fs::create_dir_all(&uploads_dir).ok();
-
-    // Set TMP/TEMP to app data dir so PyInstaller extracts DLLs
-    // to a path Windows Defender doesn't monitor as aggressively
-    // as the system temp directory (fixes "access violation" on Windows).
     let runtime_dir = data_dir.join("runtime");
     std::fs::create_dir_all(&runtime_dir).ok();
 
-    // Clean up stale _MEI* temp dirs from previous runs (PyInstaller
-    // leaves them behind on crash, and they accumulate + confuse Defender).
     if let Ok(entries) = std::fs::read_dir(&runtime_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -82,35 +100,11 @@ fn setup_backend_env(port: u16) {
         }
     }
 
-    let runtime_path = runtime_dir.to_string_lossy().to_string();
-    std::env::set_var("TMP", &runtime_path);
-    std::env::set_var("TEMP", &runtime_path);
-    // PyInstaller-specific: override default extraction directory
-    std::env::set_var("PYINSTALLER_TMPDIR", &runtime_path);
-
-    std::env::set_var("DATABASE_TYPE", "sqlite");
-    std::env::set_var("SQLITE_PATH", db_path.to_string_lossy().as_ref());
-    std::env::set_var(
-        "CORS_ORIGINS",
-        r#"["http://localhost:3000","http://127.0.0.1:3000","tauri://localhost","https://tauri.localhost"]"#,
-    );
-    std::env::set_var("HOST", "127.0.0.1");
-    std::env::set_var("PORT", port.to_string());
-    std::env::set_var("UPLOAD_DIR", uploads_dir.to_string_lossy().as_ref());
-    std::env::set_var("ENVIRONMENT", "production");
-    std::env::set_var("LOG_LEVEL", "warning");
-
-    #[cfg(debug_assertions)]
-    {
-        // In dev mode, keep more verbose logging so we can debug
-        std::env::set_var("ENVIRONMENT", "development");
-        std::env::set_var("LOG_LEVEL", "info");
-    }
+    runtime_dir
 }
 
 /// Poll the backend health endpoint until it responds or times out.
-/// On failure after the poll, waits 2s and retries once (to let Windows Defender
-/// finish scanning PyInstaller's _MEI* extraction before giving up).
+/// On failure, waits 2s and retries once (Windows Defender scan mitigation).
 async fn wait_for_backend(port: u16) -> Result<(), String> {
     let health_url = format!("http://127.0.0.1:{}/api/health", port);
     let client = reqwest::Client::builder()
@@ -123,11 +117,8 @@ async fn wait_for_backend(port: u16) -> Result<(), String> {
 
     loop {
         if attempts >= max_attempts {
-            // Give Windows Defender time to finish scanning the _MEI* extraction,
-            // then retry once before giving up.
             log::warn!("Backend health check timed out, waiting 2s and retrying once...");
             tokio::time::sleep(Duration::from_secs(2)).await;
-            // One final attempt
             match client.get(&health_url).send().await {
                 Ok(resp) if resp.status().is_success() => {
                     log::info!("Backend recovered after delay (Defender scan likely finished)");
@@ -144,7 +135,6 @@ async fn wait_for_backend(port: u16) -> Result<(), String> {
 
         match client.get(&health_url).send().await {
             Ok(resp) if resp.status().is_success() => {
-                // Backend is ready!
                 log::info!(
                     "Backend health check passed after ~{}ms",
                     attempts * HEALTH_CHECK_POLL_MS
@@ -152,7 +142,6 @@ async fn wait_for_backend(port: u16) -> Result<(), String> {
                 return Ok(());
             }
             _ => {
-                // Not ready yet — wait and retry
                 tokio::time::sleep(Duration::from_millis(HEALTH_CHECK_POLL_MS)).await;
                 attempts += 1;
             }
@@ -178,7 +167,6 @@ fn find_available_port() -> Result<u16, String> {
 /// Kill any stale process holding our backend port.
 fn cleanup_stale_backend(port: u16) {
     if TcpListener::bind(("127.0.0.1", port)).is_ok() {
-        // Port is already free — nothing to clean up
         return;
     }
 
@@ -229,129 +217,111 @@ fn cleanup_stale_backend(port: u16) {
     std::thread::sleep(Duration::from_millis(500));
 }
 
-/// Spawn the Python backend as a Tauri sidecar process.
-async fn spawn_backend(
-    app: &tauri::AppHandle,
-) -> Result<tauri_plugin_shell::process::CommandChild, String> {
-    // Find an available port
-    let port = find_available_port()?;
-    log::info!("Backend will listen on port {}", port);
+/// Run stdout/stderr logging for a child process and detect termination.
+async fn monitor_backend_output(mut child: tokio::process::Child, app: tauri::AppHandle) {
+    use tokio::io::{AsyncBufReadExt, BufReader};
 
-    setup_backend_env(port);
-    cleanup_stale_backend(port);
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
 
-    // Brief delay to let the OS release any stale file locks from previous
-    // PyInstaller _MEI* extractions (Windows Defender scan contention).
-    tokio::time::sleep(Duration::from_millis(200)).await;
-
-    // Store port in app state
-    *app.state::<AppState>().backend_port.lock().unwrap() = port;
-
-    // In dev mode, the binary may not exist yet — try to find it
-    // or provide a helpful error.
-    let mut sidecar = app.shell().sidecar("hostwise-backend").map_err(|e| {
-        format!(
-            "Failed to create sidecar command: {e}. \
-             Make sure the backend binary exists at frontend/src-tauri/binaries/ \
-             or build it first with: cd backend && pyinstaller hostwise-backend.spec"
-        )
-    })?;
-
-    // Explicitly pass environment variables to the sidecar.
-    // Tauri's shell plugin may sanitize the inherited environment,
-    // so std::env::set_var in setup_backend_env() is not sufficient.
-    let data_dir = get_data_dir();
-    let runtime_dir = data_dir.join("runtime");
-    let runtime_path = runtime_dir.to_string_lossy().to_string();
-    sidecar = sidecar.env("TMP", &runtime_path);
-    sidecar = sidecar.env("TEMP", &runtime_path);
-    sidecar = sidecar.env("PYINSTALLER_TMPDIR", &runtime_path);
-    sidecar = sidecar.env("DATABASE_TYPE", "sqlite");
-    sidecar = sidecar.env("HOST", "127.0.0.1");
-    sidecar = sidecar.env("PORT", &port.to_string());
-    sidecar = sidecar.env(
-        "CORS_ORIGINS",
-        r#"["http://localhost:3000","http://127.0.0.1:3000","tauri://localhost","https://tauri.localhost"]"#,
-    );
-    sidecar = sidecar.env("ENVIRONMENT", "production");
-    sidecar = sidecar.env("LOG_LEVEL", "warning");
-    sidecar = sidecar.env(
-        "SQLITE_PATH",
-        data_dir.join("hostwise.db").to_string_lossy().as_ref(),
-    );
-    sidecar = sidecar.env(
-        "UPLOAD_DIR",
-        data_dir.join("uploads").to_string_lossy().as_ref(),
-    );
-
-    let (mut rx, child) = sidecar
-        .spawn()
-        .map_err(|e| format!("Failed to spawn backend sidecar: {e}"))?;
-
-    // Spawn a task to log the sidecar output
-    tauri::async_runtime::spawn({
-        let app_handle = app.clone();
-        async move {
-            use tauri_plugin_shell::process::CommandEvent;
-            while let Some(event) = rx.recv().await {
-                match event {
-                    CommandEvent::Stdout(line) => {
-                        let text = String::from_utf8_lossy(&line);
-                        log::info!("[backend] {}", text.trim());
-                    }
-                    CommandEvent::Stderr(line) => {
-                        let text = String::from_utf8_lossy(&line);
-                        log::warn!("[backend] {}", text.trim());
-                    }
-                    CommandEvent::Terminated(payload) => {
-                        log::error!(
-                            "Backend process terminated unexpectedly: exit={:?} signal={:?}",
-                            payload.code,
-                            payload.signal
-                        );
-                        // Notify frontend that backend crashed
-                        let state = app_handle.state::<AppState>();
-                        state.backend_ready.store(false, Ordering::SeqCst);
-                        let _ = app_handle.emit("backend-status", serde_json::json!({
-                            "status": "crashed",
-                            "code": payload.code,
-                            "signal": payload.signal,
-                        }));
-                    }
-                    _ => {}
-                }
+    if let Some(stdout) = stdout {
+        tauri::async_runtime::spawn(async move {
+            let reader = BufReader::new(stdout);
+            let mut lines = reader.lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                log::info!("[backend] {}", line.trim());
             }
-        }
-    });
+        });
+    }
 
-    log::info!("Backend sidecar spawned, PID: {:?}", child.pid());
-    Ok(child)
+    if let Some(stderr) = stderr {
+        tauri::async_runtime::spawn(async move {
+            let reader = BufReader::new(stderr);
+            let mut lines = reader.lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                log::warn!("[backend] {}", line.trim());
+            }
+        });
+    }
+
+    let status = child.wait().await;
+    match status {
+        Ok(exit_status) => {
+            log::error!(
+                "Backend process terminated unexpectedly: code={:?}",
+                exit_status.code(),
+            );
+        }
+        Err(e) => {
+            log::error!("Failed to wait for backend process: {e}");
+        }
+    }
+
+    let state = app.state::<AppState>();
+    state.backend_ready.store(false, Ordering::SeqCst);
+    let _ = app.emit(
+        "backend-status",
+        serde_json::json!({"status": "crashed"}),
+    );
+}
+
+/// Background health monitor — polls backend periodically and emits status events.
+async fn start_health_monitor(app: tauri::AppHandle) {
+    let port = *app.state::<AppState>().backend_port.lock().unwrap();
+    let health_url = format!("http://127.0.0.1:{}/api/health", port);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("Failed to create HTTP client for health monitor");
+
+    let mut was_healthy = true;
+
+    loop {
+        tokio::time::sleep(Duration::from_secs(HEALTH_MONITOR_INTERVAL_SECS)).await;
+
+        let state = app.state::<AppState>();
+        let is_healthy = client.get(&health_url).send().await.is_ok();
+
+        if is_healthy && !was_healthy {
+            log::info!("Backend health restored");
+            state.backend_ready.store(true, Ordering::SeqCst);
+            let _ = app.emit(
+                "backend-status",
+                serde_json::json!({"status": "healthy"}),
+            );
+        } else if !is_healthy && was_healthy {
+            log::warn!("Backend health check failed — backend may have crashed");
+            state.backend_ready.store(false, Ordering::SeqCst);
+            let _ = app.emit(
+                "backend-status",
+                serde_json::json!({"status": "unreachable"}),
+            );
+        }
+
+        was_healthy = is_healthy;
+    }
 }
 
 // ── Tauri Commands ───────────────────────────────────────
 
-/// Check if the backend is ready (called from the frontend).
 #[tauri::command]
 fn is_backend_ready(state: tauri::State<'_, AppState>) -> bool {
     state.backend_ready.load(Ordering::SeqCst)
 }
 
-/// Get the backend base URL for API calls from the frontend.
-/// Uses the dynamically assigned port.
 #[tauri::command]
 fn get_backend_url(state: tauri::State<'_, AppState>) -> String {
     let port = *state.backend_port.lock().unwrap();
     format!("http://127.0.0.1:{}/api/v1", port)
 }
 
-/// Get the backend health endpoint URL (for frontend health checks).
 #[tauri::command]
 fn get_backend_health_url(state: tauri::State<'_, AppState>) -> String {
     let port = *state.backend_port.lock().unwrap();
     format!("http://127.0.0.1:{}/api/health", port)
 }
 
-/// Get the app data directory path (for diagnostics).
 #[tauri::command]
 fn get_app_data_dir() -> String {
     get_data_dir().to_string_lossy().to_string()
@@ -424,46 +394,6 @@ async fn restart_backend(app: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
-/// Background health monitor — polls backend periodically and emits status events.
-async fn start_health_monitor(app: tauri::AppHandle) {
-    let port = *app.state::<AppState>().backend_port.lock().unwrap();
-    let health_url = format!("http://127.0.0.1:{}/api/health", port);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .expect("Failed to create HTTP client for health monitor");
-
-    let mut was_healthy = true;
-
-    loop {
-        tokio::time::sleep(Duration::from_secs(HEALTH_MONITOR_INTERVAL_SECS)).await;
-
-        let state = app.state::<AppState>();
-        let is_healthy = client.get(&health_url).send().await.is_ok();
-
-        if is_healthy && !was_healthy {
-            // Backend recovered
-            log::info!("Backend health restored");
-            state.backend_ready.store(true, Ordering::SeqCst);
-            let _ = app.emit(
-                "backend-status",
-                serde_json::json!({"status": "healthy"}),
-            );
-        } else if !is_healthy && was_healthy {
-            // Backend just went down
-            log::warn!("Backend health check failed — backend may have crashed");
-            state.backend_ready.store(false, Ordering::SeqCst);
-            let _ = app.emit(
-                "backend-status",
-                serde_json::json!({"status": "unreachable"}),
-            );
-        }
-
-        was_healthy = is_healthy;
-    }
-}
-
 // ── Application Entry Point ──────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -481,7 +411,6 @@ pub fn run() {
     }
 
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             backend_ready: AtomicBool::new(false),
@@ -498,68 +427,20 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
 
-            // Spawn the backend in a background task
             tauri::async_runtime::spawn(async move {
-                log::info!("Starting backend sidecar...");
+                log::info!("Starting backend...");
 
-                match spawn_backend(&handle).await {
-                    Ok(child) => {
-                        log::info!("Backend process started, waiting for health check...");
-
-                        let port = *handle.state::<AppState>().backend_port.lock().unwrap();
-
-                        match wait_for_backend(port).await {
-                            Ok(()) => {
-                                log::info!("Backend is ready!");
-                                let state = handle.state::<AppState>();
-                                state.backend_ready.store(true, Ordering::SeqCst);
-                                *state.backend_child.lock().unwrap() = Some(child);
-
-                                // Emit healthy event for the frontend
-                                let _ = handle.emit(
-                                    "backend-status",
-                                    serde_json::json!({"status": "healthy"}),
-                                );
-
-                                // Show the main window (it starts hidden)
-                                if let Some(window) = handle.get_webview_window("main") {
-                                    let _ = window.show();
-                                    let _ = window.set_focus();
-                                }
-
-                                // Start background health monitor
-                                tauri::async_runtime::spawn(start_health_monitor(handle.clone()));
-                            }
-                            Err(e) => {
-                                log::error!("Backend health check failed: {e}");
-                                let _ = child.kill();
-                                let _ = handle.emit(
-                                    "backend-status",
-                                    serde_json::json!({"status": "failed", "error": e}),
-                                );
-                                // Show error dialog
-                                handle.dialog()
-                                    .message(format!(
-                                        "Failed to start the HostWise backend.\n\n{0}\n\n\
-                                         Please try reinstalling the application.",
-                                        e
-                                    ))
-                                    .title("Backend Error")
-                                    .kind(MessageDialogKind::Error)
-                                    .blocking_show();
-                            }
-                        }
-                    }
+                // Find the backend executable
+                let exe_path = match find_backend_exe(&handle) {
+                    Ok(p) => p,
                     Err(e) => {
-                        log::error!("Failed to spawn backend: {e}");
-
-                        // In dev mode, the binary may not exist — show a helpful message
+                        log::error!("{e}");
                         #[cfg(debug_assertions)]
                         {
                             handle.dialog()
                                 .message(format!(
-                                    "Backend binary not found.\n\n{0}\n\n\
-                                     To start the backend manually:\n\
+                                    "Backend not found.\n\n{0}\n\n\
+                                     To start manually:\n\
                                      cd backend && source .venv/bin/activate && uvicorn app.main:app --reload\n\n\
                                      The app will continue without the backend.",
                                     e
@@ -568,12 +449,11 @@ pub fn run() {
                                 .kind(MessageDialogKind::Info)
                                 .blocking_show();
                         }
-
                         #[cfg(not(debug_assertions))]
                         {
                             handle.dialog()
                                 .message(format!(
-                                    "Failed to start the HostWise backend.\n\n{0}\n\n\
+                                    "Failed to find backend.\n\n{0}\n\n\
                                      Please try reinstalling the application.",
                                     e
                                 ))
@@ -581,6 +461,118 @@ pub fn run() {
                                 .kind(MessageDialogKind::Error)
                                 .blocking_show();
                         }
+                        return;
+                    }
+                };
+
+                // Find available port
+                let port = match find_available_port() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        log::error!("{e}");
+                        handle.dialog()
+                            .message(format!("{e}"))
+                            .title("Port Error")
+                            .kind(MessageDialogKind::Error)
+                            .blocking_show();
+                        return;
+                    }
+                };
+                *handle.state::<AppState>().backend_port.lock().unwrap() = port;
+
+                let backend_dir = exe_path.parent().unwrap().to_path_buf();
+                let runtime_dir = prepare_runtime_dir();
+                let runtime_path = runtime_dir.to_string_lossy().to_string();
+
+                cleanup_stale_backend(port);
+                tokio::time::sleep(Duration::from_millis(200)).await;
+
+                let data_dir = get_data_dir();
+                let db_path = data_dir.join("hostwise.db");
+                let uploads_dir = data_dir.join("uploads");
+                std::fs::create_dir_all(&data_dir).ok();
+                std::fs::create_dir_all(&uploads_dir).ok();
+
+                let cors_origins = r#"["http://localhost:3000","http://127.0.0.1:3000","tauri://localhost","https://tauri.localhost"]"#;
+                let environment = if cfg!(debug_assertions) { "development" } else { "production" };
+                let log_level = if cfg!(debug_assertions) { "info" } else { "warning" };
+
+                let child = match tokio::process::Command::new(&exe_path)
+                    .env("TMP", &runtime_path)
+                    .env("TEMP", &runtime_path)
+                    .env("PYINSTALLER_TMPDIR", &runtime_path)
+                    .env("DATABASE_TYPE", "sqlite")
+                    .env("SQLITE_PATH", db_path.to_string_lossy().as_ref())
+                    .env("HOST", "127.0.0.1")
+                    .env("PORT", port.to_string())
+                    .env("CORS_ORIGINS", cors_origins)
+                    .env("UPLOAD_DIR", uploads_dir.to_string_lossy().as_ref())
+                    .env("ENVIRONMENT", environment)
+                    .env("LOG_LEVEL", log_level)
+                    .current_dir(&backend_dir)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped())
+                    .spawn()
+                {
+                    Ok(c) => c,
+                    Err(e) => {
+                        log::error!("Failed to spawn backend: {e}");
+                        handle.dialog()
+                            .message(format!("Failed to start backend: {e}"))
+                            .title("Backend Error")
+                            .kind(MessageDialogKind::Error)
+                            .blocking_show();
+                        return;
+                    }
+                };
+
+                log::info!("Backend process spawned");
+
+                // Store child and start monitoring output
+                *handle.state::<AppState>().backend_child.lock().unwrap() = Some(child);
+
+                let app_monitor = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    let child = {
+                        let mut guard = app_monitor.state::<AppState>().backend_child.lock().unwrap();
+                        guard.take()
+                    };
+                    if let Some(child) = child {
+                        monitor_backend_output(child, app_monitor).await;
+                    }
+                });
+
+                log::info!("Waiting for backend health check...");
+                match wait_for_backend(port).await {
+                    Ok(()) => {
+                        log::info!("Backend is ready!");
+                        let state = handle.state::<AppState>();
+                        state.backend_ready.store(true, Ordering::SeqCst);
+                        let _ = handle.emit(
+                            "backend-status",
+                            serde_json::json!({"status": "healthy"}),
+                        );
+                        if let Some(window) = handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                        tauri::async_runtime::spawn(start_health_monitor(handle.clone()));
+                    }
+                    Err(e) => {
+                        log::error!("Backend health check failed: {e}");
+                        let _ = handle.emit(
+                            "backend-status",
+                            serde_json::json!({"status": "failed", "error": e}),
+                        );
+                        handle.dialog()
+                            .message(format!(
+                                "Failed to start the HostWise backend.\n\n{0}\n\n\
+                                 Please try reinstalling the application.",
+                                e
+                            ))
+                            .title("Backend Error")
+                            .kind(MessageDialogKind::Error)
+                            .blocking_show();
                     }
                 }
             });
@@ -593,8 +585,6 @@ pub fn run() {
     app.run(|_app_handle, event| {
         if let tauri::RunEvent::ExitRequested { .. } = event {
             log::info!("Shutting down backend...");
-            // The sidecar child is killed automatically when the app exits
-            // because Tauri manages the process lifecycle.
         }
     });
 }

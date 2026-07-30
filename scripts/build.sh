@@ -74,7 +74,7 @@ pip install -q -r requirements.txt
 pip install -q pyinstaller
 
 pyinstaller \
-    --onefile \
+    --onedir \
     --name "hostwise-backend" \
     --add-data "app:app" \
     --hidden-import=uvicorn.logging \
@@ -93,34 +93,21 @@ pyinstaller \
     --strip \
     launcher.py
 
-# Detect the binary name (with or without .exe)
-BACKEND_BIN=""
-if [ -f "dist/hostwise-backend.exe" ]; then
-    BACKEND_BIN="dist/hostwise-backend.exe"
-elif [ -f "dist/hostwise-backend" ]; then
-    BACKEND_BIN="dist/hostwise-backend"
-else
-    echo -e "${RED}  ERROR: Backend binary not found in dist/${NC}"
+if [ ! -d "dist/hostwise-backend" ]; then
+    echo -e "${RED}  ERROR: Backend output directory not found in dist/${NC}"
     exit 1
 fi
-echo -e "${GREEN}   Backend: $BACKEND_DIR/$BACKEND_BIN${NC}"
+echo -e "${GREEN}   Backend: $BACKEND_DIR/dist/hostwise-backend/${NC}"
 
-# ── 2. Copy backend binary for Tauri sidecar ─────────────
+# ── 2. Copy backend directory for Tauri resources ────────
 echo ""
-echo -e "${YELLOW}[2/3] Copying backend binary to Tauri sidecar location...${NC}"
+echo -e "${YELLOW}[2/3] Copying backend to Tauri embedded resources...${NC}"
 
-# Detect Rust target triple
-TARGET_TRIPLE=$(rustc -vV | grep "host:" | awk '{print $2}')
-mkdir -p "$TAURI_DIR/binaries"
-
-if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "Linux" ]; then
-    cp "$BACKEND_DIR/$BACKEND_BIN" "$TAURI_DIR/binaries/hostwise-backend-${TARGET_TRIPLE}"
-    chmod +x "$TAURI_DIR/binaries/hostwise-backend-${TARGET_TRIPLE}"
-    echo -e "${GREEN}   Sidecar: $TAURI_DIR/binaries/hostwise-backend-${TARGET_TRIPLE}${NC}"
-else
-    cp "$BACKEND_DIR/$BACKEND_BIN" "$TAURI_DIR/binaries/hostwise-backend-${TARGET_TRIPLE}.exe"
-    echo -e "${GREEN}   Sidecar: $TAURI_DIR/binaries/hostwise-backend-${TARGET_TRIPLE}.exe${NC}"
-fi
+EMBED_DIR="$TAURI_DIR/embedded/hostwise-backend"
+mkdir -p "$EMBED_DIR"
+rm -rf "$EMBED_DIR"/*
+cp -R "$BACKEND_DIR/dist/hostwise-backend/"* "$EMBED_DIR/"
+echo -e "${GREEN}   Embedded: $EMBED_DIR${NC}"
 
 # ── 3. Frontend + Tauri build ─────────────────────────────
 echo ""

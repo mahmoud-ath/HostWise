@@ -70,7 +70,7 @@ jobs:
           .\.venv\Scripts\Activate.ps1
           pip install -q -r requirements.txt "pyinstaller>=6.10,<7"
           pyinstaller --clean `
-            --onefile `
+            --onedir `
             --name "hostwise-backend" `
             --add-data "app;app" `
             --hidden-import=uvicorn.logging `
@@ -90,12 +90,17 @@ jobs:
             --strip `
             launcher.py
 
-      - name: Prepare backend binary for Tauri
+      - name: Prepare backend directory for Tauri
         shell: pwsh
         run: |
-          $TargetTriple = (rustc -vV | Select-String "host:" | ForEach-Object { $_ -replace "host:\s+", "" }).Trim()
-          New-Item -ItemType Directory -Force -Path frontend\src-tauri\binaries | Out-Null
-          Copy-Item backend\dist\hostwise-backend.exe "frontend\src-tauri\binaries\hostwise-backend-${TargetTriple}.exe"
+          # Copy the entire --onedir output (exe + python311.dll + all deps)
+          # into the Tauri embedded resources directory.
+          # No _MEI* temp extraction at runtime — files run in-place.
+          $EmbedDir = "frontend\src-tauri\embedded"
+          New-Item -ItemType Directory -Force -Path "$EmbedDir\hostwise-backend" | Out-Null
+          Remove-Item -Recurse -Force -Path "$EmbedDir\hostwise-backend\*" -ErrorAction SilentlyContinue
+          Copy-Item -Recurse backend\dist\hostwise-backend\* "$EmbedDir\hostwise-backend\"
+          Write-Host "Backend bundled in $EmbedDir\hostwise-backend\"
 
       - name: Clear bun cache (avoid tarball extraction issues)
         shell: pwsh
