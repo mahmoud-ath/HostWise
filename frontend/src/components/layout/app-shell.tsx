@@ -2,15 +2,19 @@
 
 import { ReactNode } from "react";
 import { Sidebar } from "./sidebar";
+import { ConnectionBanner } from "./connection-banner";
 import { useAuth } from "@/contexts/auth-context";
+import { useBackend } from "@/contexts/backend-context";
 import { Button } from "@/components/ui/button";
-import { Home } from "lucide-react";
+import { Home, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isReady: backendReady, status: backendStatus } = useBackend();
 
-  if (isLoading) {
+  // Show loading while auth is restoring session
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -18,12 +22,24 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  // Not authenticated — show login/register pages
   if (!isAuthenticated) {
     return <>{children}</>;
   }
 
+  // Backend not ready yet — show a waiting state
+  if (!backendReady && backendStatus === "starting") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Starting HostWise backend...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <ConnectionBanner />
       <Sidebar />
       {/* Mobile header */}
       <div className="lg:hidden flex items-center h-14 px-4 border-b">

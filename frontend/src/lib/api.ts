@@ -3,16 +3,38 @@
  *
  * Centralized API client with JWT token management.
  * All API calls go through this module.
+ * Resolves backend URL dynamically from Tauri (desktop) or env var (dev).
  */
 
-// Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on Windows
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+// Fallback for browser dev (non-Tauri)
+const FALLBACK_API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+
+/// Try to get the backend URL from Tauri, falling back to env var.
+async function resolveApiBaseUrl(): Promise<string> {
+  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<string>("get_backend_url");
+    } catch {
+      // Tauri invoke failed — use fallback
+      return FALLBACK_API_BASE;
+    }
+  }
+  return FALLBACK_API_BASE;
+}
 
 class ApiClient {
-  private baseUrl: string;
+  private baseUrlPromise: Promise<string> | null = null;
+  private baseUrl: string | null = null;
 
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
+  private async getBaseUrl(): Promise<string> {
+    if (this.baseUrl) return this.baseUrl;
+    if (!this.baseUrlPromise) {
+      this.baseUrlPromise = resolveApiBaseUrl();
+    }
+    this.baseUrl = await this.baseUrlPromise;
+    return this.baseUrl;
   }
 
   private getToken(): string | null {
@@ -35,9 +57,11 @@ class ApiClient {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+    const baseUrl = await this.getBaseUrl();
+
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        const response = await fetch(`${baseUrl}${endpoint}`, {
           ...options,
           headers,
         });
