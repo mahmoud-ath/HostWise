@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { AppShell } from "@/components/layout/app-shell";
-import { LoginPage } from "@/components/auth/login-page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +19,6 @@ import { useState } from "react";
 
 export default function FinancePage() {
   const { isAuthenticated, organization } = useAuth();
-  if (!isAuthenticated) return <LoginPage />;
 
   return (
     <AppShell>

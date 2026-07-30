@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/auth-context";
 import { useBackend } from "@/contexts/backend-context";
 import { AppShell } from "@/components/layout/app-shell";
 import { BackupSettings } from "@/components/layout/backup-settings";
-import { LoginPage } from "@/components/auth/login-page";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +15,6 @@ import { api } from "@/lib/api";
 export default function SettingsPage() {
   const { isAuthenticated, user, organization, logout, setOrganization } = useAuth();
   const { status: backendStatus, isReady: backendReady, restartBackend } = useBackend();
-  if (!isAuthenticated) return <LoginPage />;
 
   return (
     <AppShell>

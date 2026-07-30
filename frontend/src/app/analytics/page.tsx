@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { AppShell } from "@/components/layout/app-shell";
-import { LoginPage } from "@/components/auth/login-page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +12,6 @@ import { BarChart3, TrendingUp, Percent, Calendar } from "lucide-react";
 
 export default function AnalyticsPage() {
   const { isAuthenticated, organization } = useAuth();
-  if (!isAuthenticated) return <LoginPage />;
 
   return (
     <AppShell>

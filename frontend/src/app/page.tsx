@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { AppShell } from "@/components/layout/app-shell";
-import { LoginPage } from "@/components/auth/login-page";
 import {
   GrossRevenueCard,
   NetRevenueCard,

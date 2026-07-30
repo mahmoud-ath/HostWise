@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { AppShell } from "@/components/layout/app-shell";
-import { LoginPage } from "@/components/auth/login-page";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -94,7 +93,6 @@ const guides: Record<string, {
 export default function GuidePage() {
   const { isAuthenticated } = useAuth();
 
-  if (!isAuthenticated) return <LoginPage />;
 
   return (
     <AppShell>

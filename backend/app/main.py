@@ -170,6 +170,7 @@ def create_app() -> FastAPI:
     from app.auth.router import router as auth_router
     from app.connectors.router import router as connectors_router
 from app.backup_router import router as backup_router
+from app.setup_router import router as setup_router
     from app.finance.router import router as finance_router
     from app.organizations.router import router as org_router
     from app.properties.router import router as property_router
@@ -184,6 +185,7 @@ from app.backup_router import router as backup_router
     app.include_router(reports_router, prefix="/api/v1/reports", tags=["Reports"])
     app.include_router(connectors_router, prefix="/api/v1/connectors", tags=["Connectors"])
     app.include_router(backup_router, prefix="/api/v1", tags=["Backups"])
+    app.include_router(setup_router, prefix="/api/v1", tags=["Setup"])
 
     # Health check with DB status
     @app.get("/api/health")

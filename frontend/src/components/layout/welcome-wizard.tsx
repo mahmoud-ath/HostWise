@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, Server, Database, Brain, Rocket } from "lucide-react";
 
@@ -20,11 +21,24 @@ const SETUP_STEPS: SetupStep[] = [
   { id: "ready", label: "Ready!", icon: <Rocket className="h-4 w-4" />, status: "pending" },
 ];
 
+async function waitForBackend(retries = 30): Promise<boolean> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const resp = await fetch("http://127.0.0.1:8000/api/health");
+      if (resp.ok) return true;
+    } catch {}
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return false;
+}
+
 export function WelcomeWizard() {
+  const { login } = useAuth();
   const [show, setShow] = useState(false);
   const [steps, setSteps] = useState<SetupStep[]>(SETUP_STEPS);
   const [currentStep, setCurrentStep] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const shown = localStorage.getItem(WELCOME_KEY);
@@ -33,28 +47,50 @@ export function WelcomeWizard() {
     }
   }, []);
 
+  const runSteps = useCallback(async () => {
+    // Step 0: Wait for backend
+    setCurrentStep(0);
+    setSteps(prev => prev.map((s, i) => ({ ...s, status: i === 0 ? "running" : "pending" } as SetupStep)));
+    const backendReady = await waitForBackend();
+    if (!backendReady) {
+      setError("Could not connect to the backend. Please restart the app.");
+      return;
+    }
+    setSteps(prev => prev.map((s, i) => ({ ...s, status: i <= 0 ? "done" : "pending" } as SetupStep)));
+
+    // Step 1: Initialize database (create default user & org)
+    setCurrentStep(1);
+    setSteps(prev => prev.map((s, i) => ({ ...s, status: i < 1 ? "done" : i === 1 ? "running" : "pending" } as SetupStep)));
+    try {
+      const initResp = await fetch("http://127.0.0.1:8000/api/v1/setup/initialize", { method: "POST" });
+      if (!initResp.ok) throw new Error("Setup failed");
+    } catch (err) {
+      setError("Failed to initialize the database.");
+      return;
+    }
+    setSteps(prev => prev.map((s, i) => ({ ...s, status: i <= 1 ? "done" : "pending" } as SetupStep)));
+
+    // Step 2: Auto-login
+    setCurrentStep(2);
+    setSteps(prev => prev.map((s, i) => ({ ...s, status: i < 2 ? "done" : i === 2 ? "running" : "pending" } as SetupStep)));
+    try {
+      await login("admin@hostwise.local", "hostwise_default");
+    } catch (err) {
+      setError("Auto-login failed. Please restart the app.");
+      return;
+    }
+    setSteps(prev => prev.map((s, i) => ({ ...s, status: i <= 2 ? "done" : "pending" } as SetupStep)));
+
+    // Step 3: Done
+    setCurrentStep(3);
+    setSteps(prev => prev.map((s, i) => ({ ...s, status: i <= 3 ? "done" : "pending" } as SetupStep)));
+    setFinished(true);
+    localStorage.setItem(WELCOME_KEY, "true");
+  }, [login]);
+
   useEffect(() => {
-    if (!show) return;
-
-    const runSteps = async () => {
-      for (let i = 0; i < steps.length; i++) {
-        setCurrentStep(i);
-        setSteps(prev => prev.map((s, idx) => ({
-          ...s,
-          status: idx < i ? "done" : idx === i ? "running" : "pending",
-        } as SetupStep)));
-
-        // Simulate each step taking some time
-        await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
-      }
-
-      setSteps(prev => prev.map(s => ({ ...s, status: "done" } as SetupStep)));
-      setFinished(true);
-      localStorage.setItem(WELCOME_KEY, "true");
-    };
-
-    runSteps();
-  }, [show]);
+    if (show) runSteps();
+  }, [show, runSteps]);
 
   const handleFinish = () => {
     setShow(false);
@@ -124,8 +160,18 @@ export function WelcomeWizard() {
           />
         </div>
 
+        {/* Error state */}
+        {error && (
+          <div className="text-center animate-in fade-in">
+            <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>
+            <Button size="lg" onClick={() => { setError(null); runSteps(); }} className="w-full" variant="outline">
+              Retry
+            </Button>
+          </div>
+        )}
+
         {/* Finish button */}
-        {finished && (
+        {finished && !error && (
           <div className="text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
             <p className="text-sm text-muted-foreground mb-4">
               Your workspace is ready. Let's get started!

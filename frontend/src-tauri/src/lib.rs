@@ -416,36 +416,30 @@ async fn restart_backend(app: tauri::AppHandle) -> Result<(), String> {
 
 // ── Application Entry Point ──────────────────────────────
 
-/// Write a crash report to the log directory.
-fn write_crash_report(_app: &tauri::AppHandle, panic_info: &std::panic::PanicHookInfo) {
-    let log_dir = get_data_dir().join("logs");
-    let _ = fs::create_dir_all(&log_dir);
-    let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-    let crash_file = log_dir.join(format!("crash_{}.txt", timestamp));
-    let msg = format!(
-        "HostWise Crash Report\n\
-         =====================\n\
-         Timestamp: {}\n\
-         Panic: {}\n\
-         Location: {:?}\n\
-         Backtrace:\n",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-        panic_info.to_string(),
-        panic_info.location(),
-    );
-    let _ = fs::write(&crash_file, &msg);
-    log::error!("Crash report written to: {}", crash_file.display());
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Set up panic hook for crash logging
+    let data_dir_for_crash = get_data_dir();
     let orig_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        // Log to stderr
         orig_hook(info);
-        // Crash report is written inside setup() once we have the app handle
-        eprintln!("FATAL: HostWise crashed: {}", info);
+        // Write crash report to logs directory
+        let log_dir = data_dir_for_crash.join("logs");
+        let _ = fs::create_dir_all(&log_dir);
+        let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+        let crash_file = log_dir.join(format!("crash_{}.txt", timestamp));
+        let msg = format!(
+            "HostWise Crash Report\n\
+             =====================\n\
+             Timestamp: {}\n\
+             Panic: {}\n\
+             Location: {:?}\n",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            info.to_string(),
+            info.location(),
+        );
+        let _ = fs::write(&crash_file, &msg);
+        eprintln!("FATAL: HostWise crashed — report saved to {}", crash_file.display());
     }));
 
     // Initialize logging — write both to console and file

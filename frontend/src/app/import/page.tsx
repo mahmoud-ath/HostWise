@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { AppShell } from "@/components/layout/app-shell";
-import { LoginPage } from "@/components/auth/login-page";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -11,7 +10,6 @@ import { useState } from "react";
 
 export default function ImportPage() {
   const { isAuthenticated, organization } = useAuth();
-  if (!isAuthenticated) return <LoginPage />;
 
   return (
     <AppShell>

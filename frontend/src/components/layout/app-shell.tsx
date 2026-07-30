@@ -15,28 +15,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isReady: backendReady, status: backendStatus } = useBackend();
 
-  // Show loading while auth is restoring session
-  if (authLoading) {
+  // Show loading while auth is restoring session or backend is starting
+  if (authLoading || (!backendReady && backendStatus === "starting")) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="flex flex-col items-center justify-center min-h-screen gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">
+          {backendStatus === "starting" ? "Starting HostWise..." : "Loading..."}
+        </p>
       </div>
     );
   }
 
-  // Not authenticated — show login/register pages
+  // Not authenticated — the WelcomeWizard will handle first-time setup.
+  // We still render the children (which includes the wizard).
   if (!isAuthenticated) {
     return <>{children}</>;
-  }
-
-  // Backend not ready yet — show a waiting state
-  if (!backendReady && backendStatus === "starting") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Starting HostWise backend...</p>
-      </div>
-    );
   }
 
   return (
