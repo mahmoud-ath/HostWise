@@ -3,6 +3,8 @@
 import { ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { ConnectionBanner } from "./connection-banner";
+import { ErrorBoundary } from "./error-boundary";
+import { WelcomeWizard } from "./welcome-wizard";
 import { useAuth } from "@/contexts/auth-context";
 import { useBackend } from "@/contexts/backend-context";
 import { Button } from "@/components/ui/button";
@@ -38,9 +40,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <ConnectionBanner />
-      <Sidebar />
+    <ErrorBoundary>
+      <WelcomeWizard />
+      <div className="min-h-screen bg-background">
+        <ConnectionBanner />
+        <Sidebar />
       {/* Mobile header */}
       <div className="lg:hidden flex items-center h-14 px-4 border-b">
         <Link href="/" className="flex items-center">
@@ -53,5 +57,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="p-6 max-w-7xl mx-auto">{children}</div>
       </main>
     </div>
+    </ErrorBoundary>
   );
 }

@@ -1,3 +1,4 @@
+use std::fs;
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -327,6 +328,11 @@ fn get_app_data_dir() -> String {
     get_data_dir().to_string_lossy().to_string()
 }
 
+#[tauri::command]
+fn get_log_dir() -> String {
+    get_data_dir().join("logs").to_string_lossy().to_string()
+}
+
 /// Restart the backend process (kills current, spawns new).
 #[tauri::command]
 async fn restart_backend(app: tauri::AppHandle) -> Result<(), String> {
@@ -410,12 +416,67 @@ async fn restart_backend(app: tauri::AppHandle) -> Result<(), String> {
 
 // ── Application Entry Point ──────────────────────────────
 
+/// Write a crash report to the log directory.
+fn write_crash_report(_app: &tauri::AppHandle, panic_info: &std::panic::PanicHookInfo) {
+    let log_dir = get_data_dir().join("logs");
+    let _ = fs::create_dir_all(&log_dir);
+    let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+    let crash_file = log_dir.join(format!("crash_{}.txt", timestamp));
+    let msg = format!(
+        "HostWise Crash Report\n\
+         =====================\n\
+         Timestamp: {}\n\
+         Panic: {}\n\
+         Location: {:?}\n\
+         Backtrace:\n",
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+        panic_info.to_string(),
+        panic_info.location(),
+    );
+    let _ = fs::write(&crash_file, &msg);
+    log::error!("Crash report written to: {}", crash_file.display());
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize logging
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    // Set up panic hook for crash logging
+    let orig_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        // Log to stderr
+        orig_hook(info);
+        // Crash report is written inside setup() once we have the app handle
+        eprintln!("FATAL: HostWise crashed: {}", info);
+    }));
 
-    // Set GDK backend for Linux compatibility (avoids Wayland/EGL crashes)
+    // Initialize logging — write both to console and file
+    let data_dir = get_data_dir();
+    let log_dir = data_dir.join("logs");
+    let _ = fs::create_dir_all(&log_dir);
+    let log_file = log_dir.join(format!(
+        "{}.log",
+        chrono::Local::now().format("%Y-%m-%d")
+    ));
+
+    let log_file_clone = log_file.clone();
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .target(env_logger::Target::Stdout)
+        .format(move |buf, record| {
+            let ts = chrono::Local::now().format("%H:%M:%S");
+            let msg = format!("[{}] [{}] {}\n", ts, record.level(), record.args());
+            // Write to file (best-effort)
+            if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&log_file_clone) {
+                use std::io::Write;
+                let _ = f.write_all(msg.as_bytes());
+            }
+            // Write to env_logger's buffer
+            use std::io::Write;
+            write!(buf, "{}", msg)
+        })
+        .try_init();
+
+    log::info!("=== HostWise v{} starting ===", env!("CARGO_PKG_VERSION"));
+
+    // Set GDK backend for Linux compatibility
     #[cfg(all(target_os = "linux", not(debug_assertions)))]
     {
         std::env::set_var("GDK_BACKEND", "x11");
@@ -426,6 +487,7 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState {
             backend_ready: AtomicBool::new(false),
             backend_child: Mutex::new(None),
@@ -436,6 +498,7 @@ pub fn run() {
             get_backend_url,
             get_backend_health_url,
             get_app_data_dir,
+            get_log_dir,
             restart_backend,
         ])
         .setup(|app| {

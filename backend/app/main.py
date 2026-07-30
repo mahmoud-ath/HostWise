@@ -169,6 +169,7 @@ def create_app() -> FastAPI:
     from app.analytics.router import router as analytics_router
     from app.auth.router import router as auth_router
     from app.connectors.router import router as connectors_router
+from app.backup_router import router as backup_router
     from app.finance.router import router as finance_router
     from app.organizations.router import router as org_router
     from app.properties.router import router as property_router
@@ -182,6 +183,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI Advisor"])
     app.include_router(reports_router, prefix="/api/v1/reports", tags=["Reports"])
     app.include_router(connectors_router, prefix="/api/v1/connectors", tags=["Connectors"])
+    app.include_router(backup_router, prefix="/api/v1", tags=["Backups"])
 
     # Health check with DB status
     @app.get("/api/health")

@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/auth-context";
 import { useBackend } from "@/contexts/backend-context";
 import { AppShell } from "@/components/layout/app-shell";
+import { BackupSettings } from "@/components/layout/backup-settings";
 import { LoginPage } from "@/components/auth/login-page";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,9 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Backups */}
+        <BackupSettings />
       </div>
     </AppShell>
   );

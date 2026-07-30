@@ -85,9 +85,31 @@ if getattr(sys, "frozen", False):
 
 log.debug("ENVIRONMENT=%s LOG_LEVEL=%s", os.environ.get("ENVIRONMENT"), os.environ.get("LOG_LEVEL"))
 
+# ── Run initial backup ─────────────────────────────────
+try:
+    from app.backup_service import schedule_backup
+    schedule_backup()
+    log.info("Initial database backup created")
+except Exception as e:
+    log.debug("Skipped initial backup (first run or API not ready): %s", e)
+
 # ── Import and start the app ────────────────────────────
+import threading
 import uvicorn
 from app.main import app
+
+
+def _backup_loop():
+    """Run a backup every 6 hours in a background thread."""
+    import time
+    while True:
+        time.sleep(6 * 3600)  # 6 hours
+        try:
+            from app.backup_service import schedule_backup
+            schedule_backup()
+            log.info("Scheduled backup created")
+        except Exception as e:
+            log.warning("Scheduled backup failed: %s", e)
 
 
 def main():
@@ -95,6 +117,11 @@ def main():
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
     log_level = os.environ.get("LOG_LEVEL", "info")
+
+    # Start background backup thread
+    backup_thread = threading.Thread(target=_backup_loop, daemon=True)
+    backup_thread.start()
+    log.info("Backup scheduler started (every 6 hours)")
 
     # Defensive retry: on Windows, Windows Defender may still be scanning
     # .pyd files in the _MEI* temp dir, causing transient import errors.
