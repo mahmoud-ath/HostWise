@@ -254,9 +254,6 @@ async fn spawn_backend(
         .spawn()
         .map_err(|e| format!("Failed to spawn backend sidecar: {e}"))?;
 
-    // Store child handle for potential restart
-    *app.state::<AppState>().backend_child.lock().unwrap() = Some(child.clone());
-
     // Spawn a task to log the sidecar output
     tauri::async_runtime::spawn({
         let app_handle = app.clone();
@@ -335,15 +332,17 @@ async fn restart_backend(app: tauri::AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     state.backend_ready.store(false, Ordering::SeqCst);
 
-    // Kill existing child
-    let mut child_guard = state.backend_child.lock().unwrap();
-    if let Some(child) = child_guard.take() {
+    // Kill existing child (scope the lock so MutexGuard drops before await)
+    let child_to_kill = {
+        let mut guard = state.backend_child.lock().unwrap();
+        guard.take()
+    };
+    if let Some(child) = child_to_kill {
         log::info!("Killing existing backend process");
         let _ = child.kill();
         // Give it a moment to release resources
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
-    drop(child_guard);
 
     // Emit restarting event
     let _ = app.emit(
