@@ -38,13 +38,6 @@ frontend/.next/
 frontend/out/
 frontend/.env.local
 
-# Tauri
-frontend/src-tauri/target/
-frontend/src-tauri/binaries/
-frontend/src-tauri/gen/
-frontend/src-tauri/icons/!(icon.png|icon.ico)
-frontend/src-tauri/embedded/*.bin
-
 # PyInstaller
 backend/build/
 backend/dist/

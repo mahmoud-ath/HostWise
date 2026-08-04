@@ -6,9 +6,10 @@ Never stores calculated metrics — generates them on demand.
 CID (Computed Intelligence on Demand).
 """
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -33,18 +34,16 @@ class AnalyticsService:
 
     async def get_property_analytics(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID,
         year: int,
     ) -> dict:
         """Compute comprehensive property performance analytics."""
         start_date = date(year, 1, 1)
         end_date = date(year, 12, 31)
-        days_in_year = 365 if year % 4 != 0 else 366
 
         # Revenue
         rev = await self.rev_repo.get_total_revenue(
-            organization_id, property_id, start_date, end_date
+            property_id, start_date, end_date
         )
 
         # Reservations
@@ -59,7 +58,6 @@ class AnalyticsService:
                 func.avg(Reservation.nights).label("avg_nights"),
             )
             .where(
-                Reservation.organization_id == organization_id,
                 Reservation.property_id == property_id,
                 Reservation.is_deleted == False,
                 Reservation.status.in_([
@@ -77,7 +75,6 @@ class AnalyticsService:
         canc_stmt = (
             select(func.count(Reservation.id))
             .where(
-                Reservation.organization_id == organization_id,
                 Reservation.property_id == property_id,
                 Reservation.status == ReservationStatus.CANCELLED,
                 Reservation.is_deleted == False,
@@ -93,10 +90,7 @@ class AnalyticsService:
         avg_rev = float(res_row.avg_revenue or 0)
         avg_nights = float(res_row.avg_nights or 0)
 
-        # KPIs
-        occupancy_rate = round((total_nights / days_in_year * 100), 2) if days_in_year else 0.0
-        adr = round(avg_rev / avg_nights, 2) if avg_nights > 0 else 0.0
-        revpar = round((rev["net"] / days_in_year), 2) if days_in_year else 0.0
+        # KPIs (occupancy/ADR/RevPAR intentionally removed from scope)
         cancellation_rate = round(
             (cancelled / (total_res + cancelled) * 100), 2
         ) if (total_res + cancelled) > 0 else 0.0
@@ -107,7 +101,6 @@ class AnalyticsService:
                 func.extract("day", Reservation.check_in - Reservation.booked_at)
             ))
             .where(
-                Reservation.organization_id == organization_id,
                 Reservation.property_id == property_id,
                 Reservation.is_deleted == False,
                 Reservation.booked_at.isnot(None),
@@ -119,14 +112,10 @@ class AnalyticsService:
         avg_booking_window = round(float(bw_result.scalar() or 0), 1)
 
         # Monthly breakdown
-        monthly = await self.res_repo.get_monthly_revenue(
-            organization_id, year, property_id
-        )
+        monthly = await self.res_repo.get_monthly_revenue(year, property_id)
 
         # Expense ratio
-        exp = await self.exp_repo.get_total_expenses(
-            organization_id, property_id, start_date, end_date
-        )
+        exp = await self.exp_repo.get_total_expenses(property_id, start_date, end_date)
         expense_ratio = round(
             (exp["total"] / rev["gross"] * 100), 2
         ) if rev["gross"] > 0 else 0.0
@@ -141,12 +130,6 @@ class AnalyticsService:
             "profit_margin": round(
                 ((rev["net"] - exp["total"]) / rev["net"] * 100), 2
             ) if rev["net"] > 0 else 0.0,
-            "occupancy_rate": occupancy_rate,
-            "adr": adr,
-            "revpar": revpar,
-            "total_reservations": total_res,
-            "total_nights": total_nights,
-            "average_stay": round(avg_nights, 1),
             "cancellation_rate": cancellation_rate,
             "cancelled_reservations": cancelled,
             "avg_booking_window_days": avg_booking_window,
@@ -154,10 +137,10 @@ class AnalyticsService:
             "monthly_breakdown": [
                 {
                     "month": m["month"],
-                    "gross_revenue": m["gross"],
-                    "net_revenue": m["net"],
-                    "reservation_count": m["count"],
-                    "nights": m["nights"],
+                    "gross_revenue": m["gross_revenue"],
+                    "net_revenue": m["net_revenue"],
+                    "reservation_count": m["reservation_count"],
+                    "nights": m["total_nights"],
                 }
                 for m in monthly
             ],
@@ -165,44 +148,165 @@ class AnalyticsService:
 
     async def get_portfolio_analytics(
         self,
-        organization_id: uuid.UUID,
-        year: int,
+        year: int | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> dict:
-        """Portfolio-wide analytics — all properties aggregated."""
-        start_date = date(year, 1, 1)
-        end_date = date(year, 12, 31)
+        """Portfolio-wide analytics — all properties aggregated.
 
-        rev = await self.rev_repo.get_total_revenue(
-            organization_id, start_date=start_date, end_date=end_date
-        )
-        exp = await self.exp_repo.get_total_expenses(
-            organization_id, start_date=start_date, end_date=end_date
-        )
+        Date-range aware: when `start_date`/`end_date` are omitted they default
+        to the given `year` (or the current year), preserving the old behaviour.
+        """
+        if start_date is None or end_date is None:
+            y = year or date.today().year
+            start_date = start_date or date(y, 1, 1)
+            end_date = end_date or date(y, 12, 31)
+
+        rev = await self.rev_repo.get_total_revenue(start_date=start_date, end_date=end_date)
+        exp = await self.exp_repo.get_total_expenses(start_date=start_date, end_date=end_date)
 
         # Property ranking
-        prop_data = await self.rev_repo.get_revenue_by_property(
-            organization_id, start_date, end_date
-        )
+        prop_data = await self.rev_repo.get_revenue_by_property(start_date, end_date)
 
         from app.properties.repository import PropertyRepository
         prop_repo = PropertyRepository(self.session)
-        prop_count = await prop_repo.count_by_organization(organization_id)
+        prop_count = await prop_repo.count_all()
 
-        # YoY growth
+        # Growth vs the equally-sized preceding period
+        prev_end = start_date - timedelta(days=1)
+        prev_start = prev_end - (end_date - start_date)
         prev_rev = await self.rev_repo.get_total_revenue(
-            organization_id,
-            start_date=date(year - 1, 1, 1),
-            end_date=date(year - 1, 12, 31),
+            start_date=prev_start,
+            end_date=prev_end,
         )
         revenue_growth = round(
             ((rev["net"] - prev_rev["net"]) / prev_rev["net"] * 100), 2
         ) if prev_rev["net"] > 0 else None
 
-        # Seasonality
-        monthly = await self.rev_repo.get_monthly_revenue(organization_id, year)
+        # Monthly revenue/expense maps for every year spanned by the range
+        rev_by_month: dict[tuple[int, int], dict] = {}
+        exp_by_month: dict[tuple[int, int], dict] = {}
+        for y in range(start_date.year, end_date.year + 1):
+            for rm in await self.rev_repo.get_monthly_revenue(y):
+                rev_by_month[(y, rm["month"])] = rm
+            for em in await self.exp_repo.get_monthly_expenses(y):
+                exp_by_month[(y, em["month"])] = em
+
+        # Reservation stats
+        from app.reservations.models import Reservation, ReservationStatus
+        from sqlalchemy import func as sa_func
+
+        res_stmt = (
+            select(
+                sa_func.count(Reservation.id).label("total"),
+                sa_func.avg(Reservation.nights).label("avg_nights"),
+                sa_func.coalesce(sa_func.sum(Reservation.gross_revenue), 0.0).label("total_rev"),
+            )
+            .where(
+                Reservation.is_deleted == False,
+                Reservation.status.in_([ReservationStatus.CONFIRMED, ReservationStatus.COMPLETED]),
+                Reservation.check_in >= start_date,
+                Reservation.check_in <= end_date,
+            )
+        )
+        res_result = await self.session.execute(res_stmt)
+        res_row = res_result.one()
+        total_reservations = res_row.total or 0
+        avg_stay = round(float(res_row.avg_nights or 0), 1)
+
+        # Cancellation rate
+        canc_stmt = (
+            select(sa_func.count(Reservation.id))
+            .where(
+                Reservation.is_deleted == False,
+                Reservation.status == ReservationStatus.CANCELLED,
+                Reservation.check_in >= start_date,
+                Reservation.check_in <= end_date,
+            )
+        )
+        canc_result = await self.session.execute(canc_stmt)
+        cancelled = canc_result.scalar() or 0
+        cancellation_rate = round(
+            (cancelled / (total_reservations + cancelled) * 100), 2
+        ) if (total_reservations + cancelled) > 0 else 0.0
+
+        # Booking window
+        bw_stmt = (
+            select(sa_func.avg(
+                sa_func.extract("day", Reservation.check_in - Reservation.booked_at)
+            ))
+            .where(
+                Reservation.is_deleted == False,
+                Reservation.booked_at.isnot(None),
+                Reservation.check_in >= start_date,
+                Reservation.check_in <= end_date,
+            )
+        )
+        bw_result = await self.session.execute(bw_stmt)
+        avg_booking_window = round(float(bw_result.scalar() or 0), 1)
+
+        # (Occupancy / ADR / RevPAR intentionally removed from scope)
+
+        # Expense categories
+        exp_cats = await self.exp_repo.get_expenses_by_category(start_date, end_date)
+
+        # Revenue categories
+        rev_cats = await self.rev_repo.get_revenue_by_category(start_date, end_date)
+
+        # Property health scores
+        health_distribution = {"excellent": 0, "good": 0, "average": 0, "poor": 0}
+        enhanced_ranking = []
+        for pd in prop_data:
+            pid = uuid.UUID(pd["property_id"]) if isinstance(pd["property_id"], str) else pd["property_id"]
+            health = await self.get_property_health_score(pid)
+            h = health["health_score"]
+            if h >= 75:
+                health_distribution["excellent"] += 1
+            elif h >= 50:
+                health_distribution["good"] += 1
+            elif h >= 25:
+                health_distribution["average"] += 1
+            else:
+                health_distribution["poor"] += 1
+            enhanced_ranking.append({
+                "property_id": pd["property_id"],
+                "property_name": pd["property_name"],
+                "net_revenue": round(pd["net"], 2),
+                "reservation_count": pd["count"],
+                "health_score": h,
+                "profit_margin": health.get("profit_margin", 0),
+            })
+
+        # Revenue forecast (simple: average of the last 3 months with data)
+        recent_months = [
+            m for m in rev_by_month.values() if m["net"] > 0
+        ][-3:]
+        avg_monthly = sum(m["net"] for m in recent_months) / max(len(recent_months), 1)
+        forecast_next_month = round(avg_monthly, 2)
+
+        # Seasonality — every month in the range, so partial ranges stay honest
+        seasonality = []
+        cy, cm = start_date.year, start_date.month
+        while (cy, cm) <= (end_date.year, end_date.month):
+            rm = rev_by_month.get((cy, cm))
+            em = exp_by_month.get((cy, cm))
+            seasonality.append({
+                "month": cm,
+                "gross_revenue": round(rm["gross"], 2) if rm else 0.0,
+                "net_revenue": round(rm["net"], 2) if rm else 0.0,
+                "reservation_count": rm["count"] if rm else 0,
+                "total_expenses": round(em["total"], 2) if em else 0.0,
+            })
+            if cm == 12:
+                cy += 1
+                cm = 1
+            else:
+                cm += 1
 
         return {
-            "year": year,
+            "year": end_date.year,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
             "property_count": prop_count,
             "gross_revenue": round(rev["gross"], 2),
             "net_revenue": round(rev["net"], 2),
@@ -215,41 +319,36 @@ class AnalyticsService:
                 rev["net"] / prop_count, 2
             ) if prop_count > 0 else 0.0,
             "revenue_growth_yoy": revenue_growth,
-            "property_ranking": [
-                {
-                    "property_id": p["property_id"],
-                    "property_name": p["property_name"],
-                    "net_revenue": round(p["net"], 2),
-                    "reservation_count": p["count"],
-                }
-                for p in prop_data
+            "total_reservations": total_reservations,
+            "avg_stay": avg_stay,
+            "cancellation_rate": cancellation_rate,
+            "avg_booking_window": avg_booking_window,
+            "health_distribution": health_distribution,
+            "property_ranking": enhanced_ranking,
+            "expense_categories": [
+                {"name": c["category_name"], "total": round(c["total"], 2), "percentage": c["percentage"]}
+                for c in exp_cats
             ],
-            "seasonality": [
-                {
-                    "month": m["month"],
-                    "gross_revenue": m["gross"],
-                    "net_revenue": m["net"],
-                    "reservation_count": m["count"],
-                }
-                for m in monthly
+            "revenue_categories": [
+                {"name": c["category_name"], "total": round(c["total"], 2), "percentage": c["percentage"]}
+                for c in rev_cats
             ],
+            "seasonality": seasonality,
         }
 
     async def get_property_health_score(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID,
     ) -> dict:
         """
         Compute a Property Health Score (0-100) based on:
-        - Occupancy vs target
-        - Revenue trend
-        - Expense ratio
-        - Cancellation rate
         - Profit margin
+        - Cancellation rate
+        - Expense ratio
+        - Revenue vs annual target
         """
         analytics = await self.get_property_analytics(
-            organization_id, property_id, date.today().year
+            property_id, date.today().year
         )
 
         # Fetch property target
@@ -259,16 +358,11 @@ class AnalyticsService:
 
         score = 50.0  # baseline
 
-        # Occupancy vs target
-        if prop and prop.target_occupancy and prop.target_occupancy > 0:
-            occ_ratio = analytics["occupancy_rate"] / prop.target_occupancy
-            score += min((occ_ratio - 0.5) * 40, 20)
-
         # Profit margin
-        if analytics["profit_margin"] > 30:
-            score += 15
-        elif analytics["profit_margin"] > 15:
-            score += 8
+        if analytics["profit_margin"] > 40:
+            score += 20
+        elif analytics["profit_margin"] > 20:
+            score += 12
         elif analytics["profit_margin"] < 0:
             score -= 20
 
@@ -283,6 +377,15 @@ class AnalyticsService:
             score += 10
         elif analytics["expense_ratio"] > 60:
             score -= 10
+
+        # Revenue vs annual target (when one is set)
+        target_rev = prop.target_annual_revenue if prop else None
+        if target_rev and target_rev > 0:
+            achieved = analytics["net_revenue"] / target_rev
+            if achieved >= 0.8:
+                score += 10
+            elif achieved < 0.5:
+                score -= 10
 
         score = max(0, min(100, round(score, 1)))
 
@@ -301,11 +404,11 @@ class AnalyticsService:
             "property_name": prop.name if prop else "Unknown",
             "health_score": score,
             "status": status,
-            "occupancy_rate": analytics["occupancy_rate"],
-            "target_occupancy": prop.target_occupancy if prop else None,
+            "target_annual_revenue": prop.target_annual_revenue if prop else None,
             "profit_margin": analytics["profit_margin"],
             "cancellation_rate": analytics["cancellation_rate"],
             "expense_ratio": analytics["expense_ratio"],
+            "net_revenue": analytics["net_revenue"],
         }
 
 

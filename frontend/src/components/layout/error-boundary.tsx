@@ -2,7 +2,7 @@
 
 import { Component, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, RefreshCw, FolderOpen } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface Props {
   children: ReactNode;
@@ -32,16 +32,8 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   handleOpenLogs = async () => {
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const logDir = await invoke<string>("get_log_dir");
-        const { open } = await import("@tauri-apps/plugin-shell");
-        await open(logDir);
-      } catch {
-        // Fallback
-      }
-    }
+    // Logs viewing not available in browser dev mode
+    console.log("Crash logs location: backend directory");
   };
 
   render() {
@@ -68,9 +60,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <Button onClick={this.handleRestart} className="gap-2">
                 <RefreshCw className="h-4 w-4" /> Restart App
               </Button>
-              <Button variant="outline" onClick={this.handleOpenLogs} className="gap-2">
-                <FolderOpen className="h-4 w-4" /> Open Logs
-              </Button>
+
             </div>
           </div>
         </div>

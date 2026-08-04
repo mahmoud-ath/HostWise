@@ -6,7 +6,7 @@ All KPI calculations happen here — never in the router.
 """
 import uuid
 from calendar import monthrange
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,13 +38,12 @@ class RevenueService:
         self.repo = RevenueRepository(session)
 
     async def create(
-        self, organization_id: uuid.UUID, data: RevenueCreateRequest
+        self, data: RevenueCreateRequest
     ) -> RevenueResponse:
         """Create a revenue record. Auto-calculates net_amount."""
         net = data.gross_amount - data.commission_amount
 
         revenue = Revenue(
-            organization_id=organization_id,
             property_id=uuid.UUID(data.property_id),
             reservation_id=uuid.UUID(data.reservation_id) if data.reservation_id else None,
             category_id=uuid.UUID(data.category_id) if data.category_id else None,
@@ -66,9 +65,8 @@ class RevenueService:
             raise NotFoundException("Revenue", str(revenue_id))
         return RevenueResponse.model_validate(r)
 
-    async def list_organization(
+    async def list_all(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
         start_date: date | None = None,
@@ -76,8 +74,7 @@ class RevenueService:
         skip: int = 0,
         limit: int = 100,
     ) -> list[RevenueResponse]:
-        records = await self.repo.get_by_organization(
-            organization_id,
+        records = await self.repo.get_all(
             property_id=property_id,
             category_id=category_id,
             start_date=start_date,
@@ -109,6 +106,15 @@ class RevenueService:
 
         return RevenueResponse.model_validate(r)
 
+    async def delete(self, revenue_id: uuid.UUID) -> None:
+        """Soft-delete a revenue record."""
+        r = await self.repo.get_by_id(revenue_id)
+        if not r:
+            raise NotFoundException("Revenue", str(revenue_id))
+        r.is_deleted = True
+        r.deleted_at = datetime.utcnow()
+        await self.session.flush()
+
 
 class ExpenseService:
     """Business logic for expense records."""
@@ -118,10 +124,9 @@ class ExpenseService:
         self.repo = ExpenseRepository(session)
 
     async def create(
-        self, organization_id: uuid.UUID, data: ExpenseCreateRequest
+        self, data: ExpenseCreateRequest
     ) -> ExpenseResponse:
         expense = Expense(
-            organization_id=organization_id,
             property_id=uuid.UUID(data.property_id),
             category_id=uuid.UUID(data.category_id) if data.category_id else None,
             date=data.date,
@@ -142,9 +147,8 @@ class ExpenseService:
             raise NotFoundException("Expense", str(expense_id))
         return ExpenseResponse.model_validate(e)
 
-    async def list_organization(
+    async def list_all(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
         start_date: date | None = None,
@@ -152,8 +156,7 @@ class ExpenseService:
         skip: int = 0,
         limit: int = 100,
     ) -> list[ExpenseResponse]:
-        records = await self.repo.get_by_organization(
-            organization_id,
+        records = await self.repo.get_all(
             property_id=property_id,
             category_id=category_id,
             start_date=start_date,
@@ -162,6 +165,62 @@ class ExpenseService:
             limit=limit,
         )
         return [ExpenseResponse.model_validate(e) for e in records]
+
+    async def update(
+        self, expense_id: uuid.UUID, data: dict
+    ) -> ExpenseResponse:
+        """Update an expense record with a partial set of fields."""
+        e = await self.repo.get_by_id(expense_id)
+        if not e:
+            raise NotFoundException("Expense", str(expense_id))
+        for field, value in data.items():
+            if field in ("property_id", "category_id") and value:
+                setattr(e, field, uuid.UUID(value))
+            elif field == "is_recurring":
+                setattr(e, field, bool(value))
+            elif value is not None:
+                setattr(e, field, value)
+        return ExpenseResponse.model_validate(e)
+
+    async def delete(self, expense_id: uuid.UUID) -> None:
+        """Soft-delete an expense record."""
+        e = await self.repo.get_by_id(expense_id)
+        if not e:
+            raise NotFoundException("Expense", str(expense_id))
+        e.is_deleted = True
+        e.deleted_at = datetime.utcnow()
+        await self.session.flush()
+
+
+class PeriodReport:
+    """Lightweight date-range financial report.
+
+    Mirrors the fields of `AnnualReport` (so report consumers can treat a
+    custom period and a calendar year identically) but is bucketed to whatever
+    months intersect `[start_date, end_date]`.
+    """
+
+    def __init__(
+        self,
+        start_date: date,
+        end_date: date,
+        summary: FinancialSummary,
+        monthly_breakdown: list[MonthlyBreakdown],
+        revenue_by_category: list[CategoryBreakdown],
+        expense_by_category: list[CategoryBreakdown],
+        revenue_by_property: list[PropertyFinancialSummary],
+        best_month: MonthlyBreakdown | None = None,
+        worst_month: MonthlyBreakdown | None = None,
+    ):
+        self.start_date = start_date
+        self.end_date = end_date
+        self.summary = summary
+        self.monthly_breakdown = monthly_breakdown
+        self.revenue_by_category = revenue_by_category
+        self.expense_by_category = expense_by_category
+        self.revenue_by_property = revenue_by_property
+        self.best_month = best_month
+        self.worst_month = worst_month
 
 
 class FinancialReportingService:
@@ -179,7 +238,6 @@ class FinancialReportingService:
 
     async def get_summary(
         self,
-        organization_id: uuid.UUID,
         start_date: date | None = None,
         end_date: date | None = None,
     ) -> FinancialSummary:
@@ -187,13 +245,9 @@ class FinancialReportingService:
         from app.properties.repository import PropertyRepository
         prop_repo = PropertyRepository(self.session)
 
-        rev = await self.rev_repo.get_total_revenue(
-            organization_id, start_date=start_date, end_date=end_date
-        )
-        exp = await self.exp_repo.get_total_expenses(
-            organization_id, start_date=start_date, end_date=end_date
-        )
-        prop_count = await prop_repo.count_by_organization(organization_id)
+        rev = await self.rev_repo.get_total_revenue(start_date=start_date, end_date=end_date)
+        exp = await self.exp_repo.get_total_expenses(start_date=start_date, end_date=end_date)
+        prop_count = await prop_repo.count_all()
 
         gross = rev["gross"]
         net = rev["net"]
@@ -214,9 +268,135 @@ class FinancialReportingService:
             avg_revenue_per_property=round(avg_per_prop, 2),
         )
 
+    async def get_period_report(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> PeriodReport:
+        """Complete financial report for an arbitrary date range.
+
+        Composes the same primitives as `get_annual_report` but bucketed to
+        whatever months intersect `[start_date, end_date]`, so a custom period
+        (a quarter, a season, a partial year) yields identical report sections
+        without pretending to be a calendar year.
+        """
+        summary = await self.get_summary(start_date, end_date)
+        monthly_breakdown = await self._get_monthly_buckets(start_date, end_date)
+
+        rev_cats = await self.rev_repo.get_revenue_by_category(start_date, end_date)
+        exp_cats = await self.exp_repo.get_expenses_by_category(start_date, end_date)
+
+        rev_props = await self.rev_repo.get_revenue_by_property(start_date, end_date)
+        exp_props = await self.exp_repo.get_expenses_by_property(start_date, end_date)
+
+        best_month = max(monthly_breakdown, key=lambda m: m.profit) if monthly_breakdown else None
+        worst_month = min(monthly_breakdown, key=lambda m: m.profit) if monthly_breakdown else None
+
+        return PeriodReport(
+            start_date=start_date,
+            end_date=end_date,
+            summary=summary,
+            monthly_breakdown=monthly_breakdown,
+            revenue_by_category=[CategoryBreakdown(**c) for c in rev_cats],
+            expense_by_category=[CategoryBreakdown(**c) for c in exp_cats],
+            revenue_by_property=self._merge_property_breakdown(rev_props, exp_props),
+            best_month=best_month,
+            worst_month=worst_month,
+        )
+
+    async def _get_monthly_buckets(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> list[MonthlyBreakdown]:
+        """Revenue/expense per month for every month in the range.
+
+        Uses the per-year aggregation queries (which only return months that
+        have data) and walks the calendar from `start_date` to `end_date`, so a
+        partial month is represented by the records that actually fall in the
+        range rather than an assumed full month.
+        """
+        rev_by_key: dict[tuple[int, int], dict] = {}
+        exp_by_key: dict[tuple[int, int], dict] = {}
+        for y in range(start_date.year, end_date.year + 1):
+            for rm in await self.rev_repo.get_monthly_revenue(y):
+                rev_by_key[(y, rm["month"])] = rm
+            for em in await self.exp_repo.get_monthly_expenses(y):
+                exp_by_key[(y, em["month"])] = em
+
+        buckets: list[MonthlyBreakdown] = []
+        y, m = start_date.year, start_date.month
+        while (y, m) <= (end_date.year, end_date.month):
+            rm = rev_by_key.get((y, m))
+            em = exp_by_key.get((y, m))
+            gross = rm["gross"] if rm else 0.0
+            net = rm["net"] if rm else 0.0
+            expenses = em["total"] if em else 0.0
+            profit = net - expenses
+            buckets.append(MonthlyBreakdown(
+                month=m, year=y,
+                gross_revenue=round(gross, 2),
+                net_revenue=round(net, 2),
+                total_expenses=round(expenses, 2),
+                cashflow=round(profit, 2),
+                profit=round(profit, 2),
+                reservation_count=rm["count"] if rm else 0,
+            ))
+            if m == 12:
+                y += 1
+                m = 1
+            else:
+                m += 1
+        return buckets
+
+    @staticmethod
+    def _merge_property_breakdown(
+        rev_props: list[dict],
+        exp_props: list[dict],
+    ) -> list[PropertyFinancialSummary]:
+        """Merge per-property revenue & expenses into one ranked list."""
+        prop_map: dict[str, dict] = {}
+        for rp in rev_props:
+            prop_map[rp["property_id"]] = {
+                "property_id": rp["property_id"],
+                "property_name": rp["property_name"],
+                "gross_revenue": rp["gross"],
+                "net_revenue": rp["net"],
+                "total_expenses": 0.0,
+                "reservation_count": rp["count"],
+            }
+        for ep in exp_props:
+            if ep["property_id"] in prop_map:
+                prop_map[ep["property_id"]]["total_expenses"] = ep["total"]
+            else:
+                prop_map[ep["property_id"]] = {
+                    "property_id": ep["property_id"],
+                    "property_name": ep["property_name"],
+                    "gross_revenue": 0.0,
+                    "net_revenue": 0.0,
+                    "total_expenses": ep["total"],
+                    "reservation_count": 0,
+                }
+
+        result = []
+        for p in prop_map.values():
+            profit_val = p["net_revenue"] - p["total_expenses"]
+            margin_val = (profit_val / p["net_revenue"] * 100) if p["net_revenue"] > 0 else 0.0
+            result.append(PropertyFinancialSummary(
+                property_id=p["property_id"],
+                property_name=p["property_name"],
+                gross_revenue=round(p["gross_revenue"], 2),
+                net_revenue=round(p["net_revenue"], 2),
+                total_expenses=round(p["total_expenses"], 2),
+                profit=round(profit_val, 2),
+                profit_margin=round(margin_val, 2),
+                reservation_count=p["reservation_count"],
+            ))
+        result.sort(key=lambda x: x.net_revenue, reverse=True)
+        return result
+
     async def get_monthly_report(
         self,
-        organization_id: uuid.UUID,
         year: int,
         month: int,
     ) -> MonthlyReport:
@@ -226,11 +406,11 @@ class FinancialReportingService:
         _, last_day = monthrange(year, month)
         end_date = date(year, month, last_day)
 
-        summary = await self.get_summary(organization_id, start_date, end_date)
+        summary = await self.get_summary(start_date, end_date)
 
         # Year-to-date monthly trend
-        rev_monthly = await self.rev_repo.get_monthly_revenue(organization_id, year)
-        exp_monthly = await self.exp_repo.get_monthly_expenses(organization_id, year)
+        rev_monthly = await self.rev_repo.get_monthly_revenue(year)
+        exp_monthly = await self.exp_repo.get_monthly_expenses(year)
 
         monthly_trend = []
         for m in range(1, 13):
@@ -251,20 +431,12 @@ class FinancialReportingService:
             ))
 
         # Category breakdowns
-        rev_cats = await self.rev_repo.get_revenue_by_category(
-            organization_id, start_date, end_date
-        )
-        exp_cats = await self.exp_repo.get_expenses_by_category(
-            organization_id, start_date, end_date
-        )
+        rev_cats = await self.rev_repo.get_revenue_by_category(start_date, end_date)
+        exp_cats = await self.exp_repo.get_expenses_by_category(start_date, end_date)
 
         # Property breakdown
-        rev_props = await self.rev_repo.get_revenue_by_property(
-            organization_id, start_date, end_date
-        )
-        exp_props = await self.exp_repo.get_expenses_by_property(
-            organization_id, start_date, end_date
-        )
+        rev_props = await self.rev_repo.get_revenue_by_property(start_date, end_date)
+        exp_props = await self.exp_repo.get_expenses_by_property(start_date, end_date)
 
         # Merge property revenue & expenses
         prop_map: dict[str, dict] = {}
@@ -321,18 +493,16 @@ class FinancialReportingService:
 
     async def get_annual_report(
         self,
-        organization_id: uuid.UUID,
         year: int,
     ) -> AnnualReport:
         """Complete annual financial report with YoY comparison."""
         summary = await self.get_summary(
-            organization_id,
             start_date=date(year, 1, 1),
             end_date=date(year, 12, 31),
         )
 
-        rev_monthly = await self.rev_repo.get_monthly_revenue(organization_id, year)
-        exp_monthly = await self.exp_repo.get_monthly_expenses(organization_id, year)
+        rev_monthly = await self.rev_repo.get_monthly_revenue(year)
+        exp_monthly = await self.exp_repo.get_monthly_expenses(year)
 
         monthly_breakdown = []
         best_month = None
@@ -362,7 +532,6 @@ class FinancialReportingService:
 
         # YoY growth — compare with previous year
         prev_summary = await self.get_summary(
-            organization_id,
             start_date=date(year - 1, 1, 1),
             end_date=date(year - 1, 12, 31),
         )
@@ -372,20 +541,12 @@ class FinancialReportingService:
                 (summary.net_revenue - prev_summary.net_revenue) / prev_summary.net_revenue * 100, 2
             )
 
-        rev_cats = await self.rev_repo.get_revenue_by_category(
-            organization_id, date(year, 1, 1), date(year, 12, 31)
-        )
-        exp_cats = await self.exp_repo.get_expenses_by_category(
-            organization_id, date(year, 1, 1), date(year, 12, 31)
-        )
+        rev_cats = await self.rev_repo.get_revenue_by_category(date(year, 1, 1), date(year, 12, 31))
+        exp_cats = await self.exp_repo.get_expenses_by_category(date(year, 1, 1), date(year, 12, 31))
 
         # Property breakdown
-        rev_props = await self.rev_repo.get_revenue_by_property(
-            organization_id, date(year, 1, 1), date(year, 12, 31)
-        )
-        exp_props = await self.exp_repo.get_expenses_by_property(
-            organization_id, date(year, 1, 1), date(year, 12, 31)
-        )
+        rev_props = await self.rev_repo.get_revenue_by_property(date(year, 1, 1), date(year, 12, 31))
+        exp_props = await self.exp_repo.get_expenses_by_property(date(year, 1, 1), date(year, 12, 31))
 
         prop_map = {}
         for rp in rev_props:

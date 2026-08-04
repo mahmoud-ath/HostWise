@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/contexts/auth-context";
+import { useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,56 +8,69 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  useRevenue, useCreateRevenue,
-  useExpenses, useCreateExpense,
+  useRevenue,
+  useCreateRevenue,
+  useUpdateRevenue,
+  useDeleteRevenue,
+  useExpenses,
+  useCreateExpense,
+  useUpdateExpense,
+  useDeleteExpense,
   useFinancialSummary,
   useProperties,
+  type Revenue,
+  type Expense,
 } from "@/hooks/use-api";
+import { useSettings } from "@/contexts/settings-context";
+import { useI18n } from "@/lib/i18n";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Plus, TrendingUp, TrendingDown } from "lucide-react";
-import { useState } from "react";
+import { Plus, TrendingUp, TrendingDown, Pencil, Trash2, Filter, X } from "lucide-react";
 
 export default function FinancePage() {
-  const { isAuthenticated, organization } = useAuth();
-
+  const { t } = useI18n();
   return (
     <AppShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Finance</h1>
-          <p className="text-muted-foreground mt-1">Track revenue, expenses, and cashflow.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("pages.finance.title")}</h1>
+          <p className="mt-1 text-muted-foreground">{t("pages.finance.subtitle")}</p>
         </div>
-
-        <SummaryCards organizationId={organization?.id} />
-
+        <SummaryCards />
         <div className="grid gap-6 lg:grid-cols-2">
-          <RevenueSection organizationId={organization?.id} />
-          <ExpenseSection organizationId={organization?.id} />
+          <RevenueSection />
+          <ExpenseSection />
         </div>
       </div>
     </AppShell>
   );
 }
 
-function SummaryCards({ organizationId }: { organizationId?: string }) {
-  const { data: summary, isLoading } = useFinancialSummary(organizationId);
+function useCurrency() {
+  const { get } = useSettings();
+  return get("default_currency", "EUR") as string;
+}
+
+function SummaryCards() {
+  const { data: summary, isLoading } = useFinancialSummary();
+  const currency = useCurrency();
+  const { t } = useI18n();
   if (isLoading || !summary) return null;
 
   const cards = [
-    { label: "Gross Revenue", value: formatCurrency(summary.gross_revenue), color: "text-blue-400" },
-    { label: "Net Revenue", value: formatCurrency(summary.net_revenue), color: "text-success" },
-    { label: "Expenses", value: formatCurrency(summary.total_expenses), color: "text-destructive" },
-    { label: "Cashflow", value: formatCurrency(summary.cashflow), color: summary.cashflow >= 0 ? "text-success" : "text-destructive" },
-    { label: "Margin", value: `${summary.profit_margin}%`, color: "text-primary" },
+    { label: t("finance.grossRevenue"), value: formatCurrency(summary.gross_revenue, currency), color: "text-blue-400" },
+    { label: t("finance.netRevenue"), value: formatCurrency(summary.net_revenue, currency), color: "text-success" },
+    { label: t("finance.expenses"), value: formatCurrency(summary.total_expenses, currency), color: "text-destructive" },
+    { label: t("finance.cashflow"), value: formatCurrency(summary.cashflow, currency), color: summary.cashflow >= 0 ? "text-success" : "text-destructive" },
+    { label: t("finance.margin"), value: `${summary.profit_margin}%`, color: "text-primary" },
   ];
 
   return (
-    <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {cards.map((c) => (
         <Card key={c.label}>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">{c.label}</p>
-            <p className={`text-lg font-bold mt-1 ${c.color}`}>{c.value}</p>
+            <p className={`mt-1 text-lg font-bold ${c.color}`}>{c.value}</p>
           </CardContent>
         </Card>
       ))}
@@ -65,152 +78,300 @@ function SummaryCards({ organizationId }: { organizationId?: string }) {
   );
 }
 
-function RevenueSection({ organizationId }: { organizationId?: string }) {
-  const { data: revenues, isLoading } = useRevenue(organizationId);
-  const { data: properties } = useProperties(organizationId);
-  const createRevenue = useCreateRevenue(organizationId || "");
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    property_id: "", date: new Date().toISOString().slice(0, 10),
-    gross_amount: "", commission_amount: "0", description: "",
-  });
+interface Filters {
+  property_id: string;
+  start_date: string;
+  end_date: string;
+}
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.property_id || !form.gross_amount) return;
-    await createRevenue.mutateAsync({
-      property_id: form.property_id,
-      date: form.date,
-      gross_amount: parseFloat(form.gross_amount),
-      commission_amount: parseFloat(form.commission_amount || "0"),
-      description: form.description,
-      source: "manual",
-      currency: "USD",
-    });
-    setForm({ property_id: "", date: new Date().toISOString().slice(0, 10), gross_amount: "", commission_amount: "0", description: "" });
-    setShowForm(false);
+function FiltersBar({ filters, setFilters, properties, onClear }: {
+  filters: Filters;
+  setFilters: (f: Filters) => void;
+  properties: { id: string; name: string }[];
+  onClear: () => void;
+}) {
+  const selectCls = "h-9 rounded-md border border-input bg-background px-3 text-sm outline-none";
+  const inputCls = "h-9 rounded-md border border-input bg-background px-3 text-sm outline-none";
+  const { t } = useI18n();
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <Filter className="h-4 w-4 text-muted-foreground" />
+      <select
+        className={selectCls}
+        value={filters.property_id}
+        onChange={(e) => setFilters({ ...filters, property_id: e.target.value })}
+      >
+        <option value="">{t("common.allProperties")}</option>
+        {properties.map((p) => (
+          <option key={p.id} value={p.id}>{p.name}</option>
+        ))}
+      </select>
+      <input type="date" className={inputCls} value={filters.start_date} onChange={(e) => setFilters({ ...filters, start_date: e.target.value })} aria-label={t("common.from")} />
+      <span className="text-xs text-muted-foreground">→</span>
+      <input type="date" className={inputCls} value={filters.end_date} onChange={(e) => setFilters({ ...filters, end_date: e.target.value })} aria-label={t("common.to")} />
+      {(filters.property_id || filters.start_date || filters.end_date) && (
+        <Button variant="ghost" size="sm" onClick={onClear}><X className="mr-1 h-3.5 w-3.5" />{t("common.clear")}</Button>
+      )}
+    </div>
+  );
+}
+
+function RevenueSection() {
+  const { data: properties } = useProperties();
+  const currency = useCurrency();
+  const { t } = useI18n();
+  const [filters, setFilters] = useState<Filters>({ property_id: "", start_date: "", end_date: "" });
+  const qs = {
+    ...(filters.property_id ? { property_id: filters.property_id } : {}),
+    ...(filters.start_date ? { start_date: filters.start_date } : {}),
+    ...(filters.end_date ? { end_date: filters.end_date } : {}),
   };
+  const { data: revenue, isLoading } = useRevenue(qs);
+  const create = useCreateRevenue();
+  const update = useUpdateRevenue();
+  const del = useDeleteRevenue();
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Revenue | null>(null);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-success" /> Revenue</CardTitle>
-        <Button size="sm" onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4 mr-1" /> Add</Button>
+        <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-success" /> {t("finance.revenue")}</CardTitle>
+        <Button size="sm" onClick={() => { setEditing(null); setShowForm(!showForm); }}>
+          <Plus className="mr-1 h-4 w-4" /> {t("common.add")}
+        </Button>
       </CardHeader>
       <CardContent>
-        {showForm && (
-          <form onSubmit={handleSubmit} className="space-y-3 mb-4 p-3 border rounded-lg bg-muted/30">
-            <div>
-              <Label className="text-xs">Property</Label>
-              <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })} required>
-                <option value="">Select property...</option>
-                {(properties || []).map((p: { id: string; name: string }) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-xs">Date</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></div>
-              <div><Label className="text-xs">Gross Amount ($)</Label><Input type="number" step="0.01" placeholder="0.00" value={form.gross_amount} onChange={(e) => setForm({ ...form, gross_amount: e.target.value })} required /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-xs">Commission ($)</Label><Input type="number" step="0.01" value={form.commission_amount} onChange={(e) => setForm({ ...form, commission_amount: e.target.value })} /></div>
-              <div><Label className="text-xs">Description</Label><Input placeholder="e.g. Weekend booking" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={createRevenue.isPending}>{createRevenue.isPending ? "Saving..." : "Save Revenue"}</Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
-            </div>
-          </form>
+        <FiltersBar filters={filters} setFilters={setFilters} properties={(properties || []).map((p) => ({ id: p.id, name: p.name }))} onClear={() => setFilters({ property_id: "", start_date: "", end_date: "" })} />
+
+        {(showForm || editing) && (
+          <EntryForm
+            kind="revenue"
+            properties={properties || []}
+            currency={currency}
+            initial={editing}
+            onCancel={() => { setShowForm(false); setEditing(null); }}
+            onSubmit={async (data) => {
+              if (editing) await update.mutateAsync({ id: editing.id, data });
+              else await create.mutateAsync(data);
+              setShowForm(false);
+              setEditing(null);
+            }}
+            pending={create.isPending || update.isPending}
+          />
         )}
-        {isLoading ? <p className="text-sm text-muted-foreground">Loading...</p>
-        : (revenues || []).length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No revenue yet.</p>
-        : <div className="space-y-1 max-h-96 overflow-y-auto">
-            {(revenues || []).map((r: { id: string; date: string; description?: string; gross_amount: number; net_amount: number; source: string }) => (
-              <div key={r.id} className="flex items-center justify-between py-2 px-2 rounded hover:bg-muted/50">
-                <div>
-                  <p className="text-sm font-medium">{r.description || "Revenue"}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(r.date)} · <Badge variant="outline" className="text-[10px] px-1 py-0">{r.source}</Badge></p>
+
+        {isLoading ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">Loading...</p>
+        ) : !revenue || revenue.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">{t("finance.noRevenue")}</p>
+        ) : (
+          <>
+            <div className="max-h-96 space-y-1.5 overflow-y-auto">
+              {revenue.map((r) => (
+                <div key={r.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{r.description || "Revenue"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(r.date)}
+                      {r.property_id && properties ? ` · ${properties.find((p) => p.id === r.property_id)?.name || ""}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{formatCurrency(r.net_amount, r.currency || currency)}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(r); setShowForm(false); }} title="Edit">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => { if (confirm("Delete this revenue record?")) del.mutate(r.id); }} title="Delete">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-success">+{formatCurrency(r.net_amount)}</p>
-                  <p className="text-[10px] text-muted-foreground">gross: {formatCurrency(r.gross_amount)}</p>
-                </div>
-              </div>
-            ))}
-          </div>}
+              ))}
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t pt-2 text-sm">
+              <span className="font-medium text-muted-foreground">{t("finance.total")}</span>
+              <span className="font-bold">
+                {formatCurrency(revenue.reduce((s, r) => s + (r.net_amount || 0), 0), currency)}
+              </span>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function ExpenseSection({ organizationId }: { organizationId?: string }) {
-  const { data: expenses, isLoading } = useExpenses(organizationId);
-  const { data: properties } = useProperties(organizationId);
-  const createExpense = useCreateExpense(organizationId || "");
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    property_id: "", date: new Date().toISOString().slice(0, 10),
-    amount: "", vendor: "", description: "",
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.property_id || !form.amount) return;
-    await createExpense.mutateAsync({
-      property_id: form.property_id,
-      date: form.date,
-      amount: parseFloat(form.amount),
-      vendor: form.vendor,
-      description: form.description,
-      currency: "USD",
-    });
-    setForm({ property_id: "", date: new Date().toISOString().slice(0, 10), amount: "", vendor: "", description: "" });
-    setShowForm(false);
+function ExpenseSection() {
+  const { data: properties } = useProperties();
+  const currency = useCurrency();
+  const { t } = useI18n();
+  const [filters, setFilters] = useState<Filters>({ property_id: "", start_date: "", end_date: "" });
+  const qs = {
+    ...(filters.property_id ? { property_id: filters.property_id } : {}),
+    ...(filters.start_date ? { start_date: filters.start_date } : {}),
+    ...(filters.end_date ? { end_date: filters.end_date } : {}),
   };
+  const { data: expenses, isLoading } = useExpenses(qs);
+  const create = useCreateExpense();
+  const update = useUpdateExpense();
+  const del = useDeleteExpense();
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Expense | null>(null);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2"><TrendingDown className="h-5 w-5 text-destructive" /> Expenses</CardTitle>
-        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4 mr-1" /> Add</Button>
+        <CardTitle className="flex items-center gap-2"><TrendingDown className="h-5 w-5 text-destructive" /> {t("finance.expenses")}</CardTitle>
+        <Button size="sm" onClick={() => { setEditing(null); setShowForm(!showForm); }}>
+          <Plus className="mr-1 h-4 w-4" /> {t("common.add")}
+        </Button>
       </CardHeader>
       <CardContent>
-        {showForm && (
-          <form onSubmit={handleSubmit} className="space-y-3 mb-4 p-3 border rounded-lg bg-muted/30">
-            <div>
-              <Label className="text-xs">Property</Label>
-              <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })} required>
-                <option value="">Select property...</option>
-                {(properties || []).map((p: { id: string; name: string }) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-xs">Date</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></div>
-              <div><Label className="text-xs">Amount ($)</Label><Input type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-xs">Vendor</Label><Input placeholder="e.g. CleanCo" value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /></div>
-              <div><Label className="text-xs">Description</Label><Input placeholder="e.g. Monthly cleaning" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={createExpense.isPending}>{createExpense.isPending ? "Saving..." : "Save Expense"}</Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
-            </div>
-          </form>
+        <FiltersBar filters={filters} setFilters={setFilters} properties={(properties || []).map((p) => ({ id: p.id, name: p.name }))} onClear={() => setFilters({ property_id: "", start_date: "", end_date: "" })} />
+
+        {(showForm || editing) && (
+          <EntryForm
+            kind="expense"
+            properties={properties || []}
+            currency={currency}
+            initial={editing}
+            onCancel={() => { setShowForm(false); setEditing(null); }}
+            onSubmit={async (data) => {
+              if (editing) await update.mutateAsync({ id: editing.id, data });
+              else await create.mutateAsync(data);
+              setShowForm(false);
+              setEditing(null);
+            }}
+            pending={create.isPending || update.isPending}
+          />
         )}
-        {isLoading ? <p className="text-sm text-muted-foreground">Loading...</p>
-        : (expenses || []).length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No expenses yet.</p>
-        : <div className="space-y-1 max-h-96 overflow-y-auto">
-            {(expenses || []).map((e: { id: string; date: string; description?: string; amount: number; vendor?: string }) => (
-              <div key={e.id} className="flex items-center justify-between py-2 px-2 rounded hover:bg-muted/50">
-                <div>
-                  <p className="text-sm font-medium">{e.description || "Expense"}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(e.date)}{e.vendor ? ` · ${e.vendor}` : ""}</p>
+
+        {isLoading ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">Loading...</p>
+        ) : !expenses || expenses.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">{t("finance.noExpenses")}</p>
+        ) : (
+          <>
+            <div className="max-h-96 space-y-1.5 overflow-y-auto">
+              {expenses.map((e) => (
+                <div key={e.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{e.description || e.vendor || "Expense"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(e.date)}
+                      {e.property_id && properties ? ` · ${properties.find((p) => p.id === e.property_id)?.name || ""}` : ""}
+                      {e.is_recurring ? " · recurring" : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{formatCurrency(e.amount, e.currency || currency)}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(e); setShowForm(false); }} title="Edit">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => { if (confirm("Delete this expense record?")) del.mutate(e.id); }} title="Delete">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-sm font-semibold text-destructive">-{formatCurrency(e.amount)}</p>
-              </div>
-            ))}
-          </div>}
+              ))}
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t pt-2 text-sm">
+              <span className="font-medium text-muted-foreground">{t("finance.total")}</span>
+              <span className="font-bold">
+                {formatCurrency(expenses.reduce((s, e) => s + (e.amount || 0), 0), currency)}
+              </span>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function EntryForm({
+  kind,
+  properties,
+  currency,
+  initial,
+  onCancel,
+  onSubmit,
+  pending,
+}: {
+  kind: "revenue" | "expense";
+  properties: { id: string; name: string }[];
+  currency: string;
+  initial: Revenue | Expense | null;
+  onCancel: () => void;
+  onSubmit: (data: Record<string, unknown>) => Promise<void>;
+  pending: boolean;
+}) {
+  const [form, setForm] = useState<any>({
+    property_id: initial?.property_id || "",
+    date: (initial?.date || new Date().toISOString().slice(0, 10)) as string,
+    gross_amount: initial ? String((initial as Revenue).gross_amount ?? "") : "",
+    commission_amount: initial ? String((initial as Revenue).commission_amount ?? "0") : "0",
+    amount: initial ? String((initial as Expense).amount ?? "") : "",
+    description: initial?.description || "",
+    vendor: (initial as Expense)?.vendor || "",
+    is_recurring: (initial as Expense)?.is_recurring || false,
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const base: Record<string, unknown> = {
+      property_id: form.property_id,
+      date: form.date,
+      description: form.description,
+      currency,
+    };
+    if (kind === "revenue") {
+      base.gross_amount = parseFloat(form.gross_amount);
+      base.commission_amount = parseFloat(form.commission_amount || "0");
+    } else {
+      base.amount = parseFloat(form.amount);
+      base.vendor = form.vendor;
+      base.is_recurring = form.is_recurring;
+    }
+    onSubmit(base);
+  };
+
+  return (
+    <form onSubmit={submit} className="mb-4 space-y-3 rounded-lg border bg-muted/30 p-3">
+      <div>
+        <Label className="text-xs">Property</Label>
+        <select className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })} required>
+          <option value="">Select property...</option>
+          {properties.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><Label className="text-xs">Date</Label><Input type="date" className="mt-1" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></div>
+        {kind === "revenue" ? (
+          <>
+            <div><Label className="text-xs">Gross ({currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.gross_amount} onChange={(e) => setForm({ ...form, gross_amount: e.target.value })} required /></div>
+            <div><Label className="text-xs">Commission ({currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.commission_amount} onChange={(e) => setForm({ ...form, commission_amount: e.target.value })} /></div>
+          </>
+        ) : (
+          <>
+            <div><Label className="text-xs">Amount ({currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
+            <div><Label className="text-xs">Vendor</Label><Input className="mt-1" value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /></div>
+          </>
+        )}
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1"><Label className="text-xs">Description</Label><Input className="mt-1" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+        {kind === "expense" && (
+          <label className="flex items-center gap-1.5 pb-2 text-xs">
+            <input type="checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} />
+            Recurring
+          </label>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving..." : "Save"}</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
   );
 }

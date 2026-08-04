@@ -19,11 +19,10 @@ class ReservationService:
         self.repo = ReservationRepository(session)
 
     async def create(
-        self, organization_id: uuid.UUID, data: ReservationCreateRequest
+        self, data: ReservationCreateRequest
     ) -> ReservationResponse:
         net = data.gross_revenue - data.platform_fee - data.taxes
         reservation = Reservation(
-            organization_id=organization_id,
             property_id=uuid.UUID(data.property_id),
             listing_id=uuid.UUID(data.listing_id) if data.listing_id else None,
             **{k: v for k, v in data.model_dump().items()
@@ -39,15 +38,14 @@ class ReservationService:
             raise NotFoundException("Reservation", str(reservation_id))
         return ReservationResponse.model_validate(r)
 
-    async def list_organization(
+    async def list_all(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> list[ReservationResponse]:
         reservations = await self.repo.get_by_organization(
-            organization_id, property_id=property_id, skip=skip, limit=limit
+            property_id=property_id, skip=skip, limit=limit
         )
         return [ReservationResponse.model_validate(r) for r in reservations]
 

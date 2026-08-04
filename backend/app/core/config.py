@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # Database
-    DATABASE_TYPE: str = "postgresql"  # "postgresql" or "sqlite"
+    DATABASE_TYPE: str = "sqlite"  # "sqlite" or "postgresql"
     DATABASE_URL: str = "postgresql+asyncpg://hostwise:hostwise@db:5432/hostwise"
     DATABASE_URL_SYNC: str = "postgresql+psycopg2://hostwise:hostwise@db:5432/hostwise"
     SQLITE_PATH: str = "hostwise.db"  # Only used when DATABASE_TYPE=sqlite

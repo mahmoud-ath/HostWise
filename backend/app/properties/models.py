@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.base_model import BaseModel
 
 
-class PropertyType(enum.StrEnum):
+class PropertyType(str, enum.Enum):
     APARTMENT = "apartment"
     HOUSE = "house"
     CONDO = "condo"
@@ -27,7 +27,7 @@ class PropertyType(enum.StrEnum):
     OTHER = "other"
 
 
-class PropertyStatus(enum.StrEnum):
+class PropertyStatus(str, enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     UNDER_MAINTENANCE = "under_maintenance"
@@ -38,12 +38,6 @@ class Property(BaseModel):
     """A physical property — the core asset in the portfolio."""
     __tablename__ = "properties"
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[PropertyType] = mapped_column(
         SAEnum(PropertyType), nullable=False, default=PropertyType.OTHER
@@ -77,9 +71,6 @@ class Property(BaseModel):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
-    organization: Mapped["Organization"] = relationship(
-        "Organization", back_populates="properties"
-    )
     listings: Mapped[list["Listing"]] = relationship(
         "Listing", back_populates="property", lazy="selectin"
     )
@@ -94,7 +85,7 @@ class Property(BaseModel):
     )
 
 
-class ListingPlatform(enum.StrEnum):
+class ListingPlatform(str, enum.Enum):
     AIRBNB = "airbnb"
     BOOKING = "booking"
     VRBO = "vrbo"
@@ -133,5 +124,4 @@ class Listing(BaseModel):
 
 # Lazy imports
 from app.finance.models import Expense, Revenue
-from app.organizations.models import Organization
 from app.reservations.models import Reservation

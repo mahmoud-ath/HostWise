@@ -18,7 +18,6 @@ class ReservationRepository(BaseRepository[Reservation]):
 
     async def get_by_organization(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID | None = None,
         status: ReservationStatus | None = None,
         start_date: date | None = None,
@@ -27,7 +26,6 @@ class ReservationRepository(BaseRepository[Reservation]):
         limit: int = 100,
     ) -> Sequence[Reservation]:
         stmt = select(Reservation).where(
-            Reservation.organization_id == organization_id,
             Reservation.is_deleted == False,
         )
         if property_id:
@@ -66,7 +64,6 @@ class ReservationRepository(BaseRepository[Reservation]):
 
     async def get_monthly_revenue(
         self,
-        organization_id: uuid.UUID,
         year: int,
         property_id: uuid.UUID | None = None,
     ) -> list[dict]:
@@ -80,7 +77,6 @@ class ReservationRepository(BaseRepository[Reservation]):
                 func.sum(Reservation.nights).label("nights"),
             )
             .where(
-                Reservation.organization_id == organization_id,
                 Reservation.is_deleted == False,
                 Reservation.status.in_([
                     ReservationStatus.CONFIRMED,

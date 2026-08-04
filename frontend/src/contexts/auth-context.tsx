@@ -1,9 +1,15 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
-import { api } from "@/lib/api";
+import { createContext, useContext, ReactNode } from "react";
+import { useSettings } from "@/contexts/settings-context";
 
-interface User {
+/**
+ * Profile context — there is NO authentication in HostWise.
+ * The app is local-first and single-user: the owner's name and email are
+ * stored as application settings and exposed here for the UI.
+ */
+
+interface Profile {
   id: string;
   email: string;
   full_name: string;
@@ -11,124 +17,34 @@ interface User {
   avatar_url: string | null;
 }
 
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-  type: string;
-  default_currency: string;
-}
-
 interface AuthContextType {
-  user: User | null;
-  organization: Organization | null;
+  user: Profile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
-  logout: () => void;
-  setOrganization: (org: Organization) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [organization, setOrganizationState] = useState<Organization | null>(null);
-  const [isLoading, setIsLoading] = useState(true);  // start true — check for existing token
+  const { get, ready } = useSettings();
 
-  // Restore session on mount — check for existing JWT token
-  useEffect(() => {
-    const restoreSession = async () => {
-      if (!api.isAuthenticated()) {
-        setIsLoading(false);
-        return;
-      }
-      try {
-        const userData = await api.get<User>("/auth/me");
-        setUser(userData);
-        try {
-          const orgs = await api.get<Organization[]>("/organizations");
-          if (orgs && orgs.length > 0) {
-            setOrganizationState(orgs[0]);
-          }
-        } catch {
-          // No orgs yet — that's fine
-        }
-      } catch {
-        // Token expired or invalid — clear it
-        api.clearToken();
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    restoreSession();
-  }, []);
+  const full_name = get("profile_name", "") || get("business_name", "HostWise User");
+  const email = get("profile_email", "");
 
-  const login = useCallback(async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const response = await api.post<{ access_token: string; refresh_token: string }>(
-        "/auth/login",
-        { email, password }
-      );
-      api.setToken(response.access_token);
-
-      const userData = await api.get<User>("/auth/me");
-      setUser(userData);
-
-      // Load organizations — don't fail login if no orgs yet
-      try {
-        const orgs = await api.get<Organization[]>("/organizations");
-        if (orgs && orgs.length > 0) {
-          setOrganizationState(orgs[0]);
-        }
-      } catch (orgErr) {
-        console.log("No organizations yet — user needs to create one");
-      }
-    } catch (err) {
-      setIsLoading(false);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const register = useCallback(async (email: string, password: string, fullName: string) => {
-    setIsLoading(true);
-    try {
-      await api.post("/auth/register", {
-        email,
-        password,
-        full_name: fullName,
-      });
-      await login(email, password);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [login]);
-
-  const logout = useCallback(() => {
-    api.clearToken();
-    setUser(null);
-    setOrganizationState(null);
-  }, []);
-
-  const setOrganization = useCallback((org: Organization) => {
-    setOrganizationState(org);
-  }, []);
+  const user: Profile = {
+    id: "local",
+    email,
+    full_name,
+    is_active: true,
+    avatar_url: null,
+  };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        organization,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        register,
-        logout,
-        setOrganization,
+        isAuthenticated: true,
+        isLoading: !ready,
       }}
     >
       {children}

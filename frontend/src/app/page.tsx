@@ -1,8 +1,5 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { useAuth } from "@/contexts/auth-context";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   GrossRevenueCard,
@@ -15,19 +12,19 @@ import { RevenueBarChart, CashflowLineChart } from "@/components/dashboard/chart
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatPercentage } from "@/lib/utils";
-import { Brain, AlertTriangle, TrendingUp, CheckCircle, Info } from "lucide-react";
-
-interface FinancialSummary {
-  gross_revenue: number;
-  net_revenue: number;
-  total_expenses: number;
-  cashflow: number;
-  profit: number;
-  profit_margin: number;
-  property_count: number;
-  avg_revenue_per_property: number;
-}
+import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/utils";
+import { useSettings } from "@/contexts/settings-context";
+import { useI18n } from "@/lib/i18n";
+import {
+  useFinancialSummary,
+  useAnnualReport,
+  useAIAdvisor,
+  usePortfolioAnalytics,
+} from "@/hooks/use-api";
+import { Brain, AlertTriangle, TrendingUp, CheckCircle, Info, Building2, Upload, DollarSign, FileText, Sparkles, Download, Trophy, CalendarRange, Sparkle } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 interface AIRecommendation {
   type: "critical" | "warning" | "positive" | "info";
@@ -39,54 +36,35 @@ interface AIRecommendation {
 }
 
 export default function Home() {
-  const { isAuthenticated, organization } = useAuth();
-
-  if (!isAuthenticated) {
-    return <LoginPage />;
-  }
-
   return (
     <AppShell>
-      <DashboardContent organizationId={organization?.id} />
+      <DashboardContent />
     </AppShell>
   );
 }
 
-function DashboardContent({ organizationId }: { organizationId?: string }) {
+function DashboardContent() {
+  const { settings, get } = useSettings();
+  const { t, tWith } = useI18n();
+  const currency: string = get("default_currency", "USD");
+  const showAiSummary: boolean = get("dashboard_show_ai_summary", true) !== false;
+  const showForecast: boolean = get("dashboard_show_forecast", true) !== false;
+
+  const defaultYearSetting = String(get("dashboard_default_year", "current"));
   const currentYear = new Date().getFullYear();
+  const [year, setYear] = useState<number>(
+    defaultYearSetting === "current" ? currentYear : Number(defaultYearSetting) || currentYear
+  );
 
-  const { data: summary, isLoading: summaryLoading, error: summaryError } = useQuery<FinancialSummary>({
-    queryKey: ["financial-summary", organizationId],
-    queryFn: () => api.get(`/finance/${organizationId}/summary`),
-    enabled: !!organizationId,
-  });
+  const { data: summary, isLoading: summaryLoading, error: summaryError } = useFinancialSummary();
+  const { data: annualReport, isLoading: reportLoading, error: reportError } = useAnnualReport(year);
+  const { data: aiAnalysis, isLoading: aiLoading, error: aiError } = useAIAdvisor(year);
+  const { data: portfolio, isLoading: portfolioLoading, error: portfolioError } = usePortfolioAnalytics(year);
 
-  const { data: annualReport, isLoading: reportLoading, error: reportError } = useQuery<any>({
-    queryKey: ["annual-report", organizationId, currentYear],
-    queryFn: () =>
-      api.get(`/finance/${organizationId}/report/annual?year=${currentYear}`),
-    enabled: !!organizationId,
-  });
-
-  const { data: aiAnalysis, isLoading: aiLoading, error: aiError } = useQuery<any>({
-    queryKey: ["ai-analysis", organizationId],
-    queryFn: () => api.get(`/ai/${organizationId}/analyze`),
-    enabled: !!organizationId,
-  });
-
-  if (!organizationId) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <h2 className="text-xl font-semibold mb-2">Welcome to HostWise</h2>
-        <p className="text-muted-foreground">
-          Create an organization to get started with your financial intelligence platform.
-        </p>
-      </div>
-    );
-  }
+  const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
 
   // Show any API errors
-  if (summaryError || reportError || aiError) {
+  if (summaryError || reportError || (aiError && showAiSummary) || portfolioError) {
     return (
       <div className="space-y-4 py-8">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
@@ -94,10 +72,8 @@ function DashboardContent({ organizationId }: { organizationId?: string }) {
           <p className="text-sm font-medium text-destructive mb-2">API Connection Error</p>
           {summaryError && <p className="text-xs text-muted-foreground">Summary: {(summaryError as Error).message}</p>}
           {reportError && <p className="text-xs text-muted-foreground">Report: {(reportError as Error).message}</p>}
-          {aiError && <p className="text-xs text-muted-foreground">AI: {(aiError as Error).message}</p>}
-          <p className="text-xs text-muted-foreground mt-2">
-            Org ID: {organizationId} | Backend: {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}
-          </p>
+          {portfolioError && <p className="text-xs text-muted-foreground">Portfolio: {(portfolioError as Error).message}</p>}
+          {aiError && showAiSummary && <p className="text-xs text-muted-foreground">AI: {(aiError as Error).message}</p>}
         </div>
       </div>
     );
@@ -106,11 +82,26 @@ function DashboardContent({ organizationId }: { organizationId?: string }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Your vacation rental intelligence at a glance.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{t("pages.dashboard.title")}</h1>
+          <p className="text-muted-foreground mt-1">
+            {settings.business_name ? `${settings.business_name} · ` : ""}{t("pages.dashboard.subtitle")}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <CalendarRange className="h-4 w-4 text-muted-foreground" />
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            aria-label="Select year"
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -125,115 +116,131 @@ function DashboardContent({ organizationId }: { organizationId?: string }) {
           </>
         ) : summary ? (
           <>
-            <GrossRevenueCard value={summary.gross_revenue} />
-            <NetRevenueCard value={summary.net_revenue} />
+            <GrossRevenueCard value={summary.gross_revenue} currency={currency} />
+            <NetRevenueCard value={summary.net_revenue} currency={currency} />
             <ProfitMarginCard value={summary.profit_margin} />
-            <CashflowCard value={summary.cashflow} />
+            <CashflowCard value={summary.cashflow} currency={currency} />
             <PropertyCountCard value={summary.property_count} />
           </>
         ) : null}
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {reportLoading ? (
-          <>
-            <Skeleton className="h-96" />
-            <Skeleton className="h-96" />
-          </>
-        ) : annualReport ? (
-          <>
-            <RevenueBarChart
-              data={annualReport.monthly_breakdown || []}
-              title="Revenue vs Expenses"
-            />
-            <CashflowLineChart
-              data={annualReport.monthly_breakdown || []}
-              title="Cashflow Trend"
-            />
-          </>
-        ) : null}
-      </div>
+      {showForecast && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {reportLoading ? (
+            <>
+              <Skeleton className="h-96" />
+              <Skeleton className="h-96" />
+            </>
+          ) : annualReport ? (
+            <>
+              <RevenueBarChart
+                data={annualReport.monthly_breakdown || []}
+                title={`Revenue vs Expenses — ${year}`}
+              />
+              <CashflowLineChart
+                data={annualReport.monthly_breakdown || []}
+                title={`Cashflow Trend — ${year}`}
+              />
+            </>
+          ) : null}
+        </div>
+      )}
 
       {/* AI Recommendations */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-primary" />
-            AI Financial Advisor
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {aiLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-20" />
-              <Skeleton className="h-20" />
-            </div>
-          ) : aiAnalysis ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {aiAnalysis.executive_summary}
-              </p>
-              <div className="space-y-3 mt-4">
-                {(aiAnalysis.recommendations || []).slice(0, 5).map((rec: AIRecommendation, i: number) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 p-3 rounded-lg border bg-card"
-                  >
-                    {rec.type === "critical" && (
-                      <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
-                    )}
-                    {rec.type === "warning" && (
-                      <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
-                    )}
-                    {rec.type === "positive" && (
-                      <CheckCircle className="h-5 w-5 text-success mt-0.5 shrink-0" />
-                    )}
-                    {rec.type === "info" && (
-                      <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{rec.title}</p>
-                        <Badge
-                          variant={
-                            rec.type === "critical"
-                              ? "destructive"
-                              : rec.type === "warning"
-                              ? "secondary"
-                              : rec.type === "positive"
-                              ? "success"
-                              : "outline"
-                          }
-                        >
-                          {Math.round(rec.confidence_score * 100)}% confidence
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {rec.cause}
-                      </p>
-                      <p className="text-xs mt-1">
-                        <span className="font-medium">Action:</span> {rec.suggested_action}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+      {showAiSummary && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
+              {t("dash.aiAdvisor")}
+            </CardTitle>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Sparkle className="h-3 w-3" />
+              {!aiAnalysis?.provider || aiAnalysis.provider === "hostwise"
+                ? t("dash.rulesEngine")
+                : `LLM · ${aiAnalysis.provider}`}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {aiLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-20" />
+                <Skeleton className="h-20" />
               </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Add revenue and expense data to receive AI-powered insights.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            ) : aiAnalysis ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {aiAnalysis.executive_summary}
+                </p>
+                <div className="space-y-3 mt-4">
+                  {[
+                    ...(aiAnalysis.priority_actions?.critical || []),
+                    ...(aiAnalysis.priority_actions?.medium || []),
+                    ...(aiAnalysis.priority_actions?.low || []),
+                  ]
+                    .slice(0, 5)
+                    .map((rec: AIRecommendation, i: number) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 p-3 rounded-lg border bg-card"
+                    >
+                      {rec.type === "critical" && (
+                        <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+                      )}
+                      {rec.type === "warning" && (
+                        <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                      )}
+                      {rec.type === "positive" && (
+                        <CheckCircle className="h-5 w-5 text-success mt-0.5 shrink-0" />
+                      )}
+                      {rec.type === "info" && (
+                        <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{rec.title}</p>
+                          <Badge
+                            variant={
+                              rec.type === "critical"
+                                ? "destructive"
+                                : rec.type === "warning"
+                                ? "secondary"
+                                : rec.type === "positive"
+                                ? "success"
+                                : "outline"
+                            }
+                          >
+                            {Math.round(rec.confidence_score * 100)}% confidence
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {rec.cause}
+                        </p>
+                        <p className="text-xs mt-1">
+                          <span className="font-medium">Action:</span> {rec.suggested_action}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t("dash.noDataYet")}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Expense Categories */}
       {annualReport?.expense_by_category && (
         <Card>
           <CardHeader>
-            <CardTitle>Expense Breakdown</CardTitle>
+            <CardTitle>{t("dash.expenseBreakdown")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -250,7 +257,7 @@ function DashboardContent({ organizationId }: { organizationId?: string }) {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-sm font-medium">
-                      {formatCurrency(cat.total)}
+                      {formatCurrency(cat.total, currency)}
                     </span>
                     <span className="text-xs text-muted-foreground w-12 text-right">
                       {cat.percentage}%
@@ -262,6 +269,166 @@ function DashboardContent({ organizationId }: { organizationId?: string }) {
           </CardContent>
         </Card>
       )}
+
+      {/* ⚡ Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-3">
+            <Link
+              href="/properties"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <Building2 className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">{t("dash.addProperty")}</span>
+            </Link>
+            <Link
+              href="/import"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <Upload className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">{t("dash.importCsv")}</span>
+            </Link>
+            <Link
+              href="/finance"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <DollarSign className="h-5 w-5 text-destructive" />
+              <span className="text-xs font-medium">{t("dash.addExpense")}</span>
+            </Link>
+            <Link
+              href="/finance"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <TrendingUp className="h-5 w-5 text-success" />
+              <span className="text-xs font-medium">{t("dash.addRevenue")}</span>
+            </Link>
+            <Link
+              href="/reports"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <FileText className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">{t("dash.generateReport")}</span>
+            </Link>
+            <Link
+              href="/ai-advisor"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <Brain className="h-5 w-5 text-amber-500" />
+              <span className="text-xs font-medium">{t("dash.askAi")}</span>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 📄 Latest Reports */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FileText className="h-5 w-5 text-primary" />
+            {t("dash.latestReports")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {reportLoading ? (
+            <>
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+            </>
+          ) : annualReport ? (
+            <>
+              <div className="p-4 rounded-lg border bg-card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{year} Annual Report</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {tWith("dash.monthsWithData", { count: annualReport.monthly_breakdown?.length || 0 })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 text-right">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">{t("dash.gross")}</p>
+                      <p className="text-sm font-semibold">{formatCurrency(annualReport.summary.gross_revenue, currency)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">{t("dash.net")}</p>
+                      <p className="text-sm font-semibold">{formatCurrency(annualReport.summary.net_revenue, currency)}</p>
+                    </div>
+                    <Link href="/reports">
+                      <span className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-1">
+                        <Download className="h-3 w-3" /> {t("common.view")}
+                      </span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* 🏆 Property Ranking */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Trophy className="h-5 w-5 text-amber-500" />
+            {t("dash.propertyRanking")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {portfolioLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-12" />
+              <Skeleton className="h-12" />
+              <Skeleton className="h-12" />
+            </div>
+          ) : portfolio && portfolio.property_ranking.length > 0 ? (
+            <div className="space-y-2">
+              {portfolio.property_ranking.slice(0, 5).map((p, i: number) => (
+                <div
+                  key={p.property_id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`text-lg font-bold ${
+                      i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-muted-foreground"
+                    }`}>
+                      {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium">{p.property_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(p.net_revenue, currency)} net · {p.reservation_count} bookings · {p.profit_margin?.toFixed(1)}% margin
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-success">
+                      {formatCurrency(p.net_revenue, currency)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {portfolio.property_ranking.length > 5 && (
+                <Link href="/properties">
+                  <p className="text-xs text-center text-muted-foreground pt-2 hover:text-primary cursor-pointer">
+                    +{portfolio.property_ranking.length - 5} more properties
+                  </p>
+                </Link>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              {t("dash.addDataHint")}
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

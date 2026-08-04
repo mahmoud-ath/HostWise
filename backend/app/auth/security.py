@@ -4,7 +4,9 @@ Auth Module — Security Utilities
 JWT token generation, password hashing, and verification.
 Uses python-jose for JWT and bcrypt directly for hashing.
 """
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+UTC = timezone.utc
 
 import bcrypt
 from jose import jwt

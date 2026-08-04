@@ -72,6 +72,24 @@ export function BackupSettings() {
     }
   };
 
+  const handleDownload = async (backup: Backup) => {
+    try {
+      const resp = await fetch(`http://127.0.0.1:8000/api/v1/backups/download/${encodeURIComponent(backup.name)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("hostwise_access_token")}` },
+      });
+      if (!resp.ok) throw new Error("Download failed");
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = backup.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+    }
+  };
+
   const handleDelete = async (name: string) => {
     if (!confirm(`Delete backup "${name}"?`)) return;
     try {
@@ -133,6 +151,15 @@ export function BackupSettings() {
                   </p>
                 </div>
                 <div className="flex gap-1 ml-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleDownload(b)}
+                    title="Download"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"

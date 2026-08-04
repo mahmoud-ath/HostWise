@@ -6,7 +6,7 @@ Business logic for authentication: registration, login, token refresh.
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import OrganizationMember, User, UserRole
+from app.auth.models import User
 from app.auth.repository import UserRepository
 from app.auth.schemas import (
     TokenResponse,
@@ -22,7 +22,6 @@ from app.auth.security import (
     verify_password,
 )
 from app.core.database import get_db
-from app.organizations.models import Organization
 from app.shared.exceptions import UnauthorizedException, ValidationException
 
 
@@ -34,7 +33,7 @@ class AuthService:
         self.user_repo = UserRepository(session)
 
     async def register(self, data: UserRegisterRequest) -> UserResponse:
-        """Register a new user and auto-create a default organization."""
+        """Register a new user."""
         if await self.user_repo.email_exists(data.email):
             raise ValidationException("Email already registered")
 
@@ -44,25 +43,6 @@ class AuthService:
             full_name=data.full_name.strip(),
         )
         user = await self.user_repo.create(user)
-
-        # Auto-create a default organization so the user can start immediately
-        org_name = data.full_name.strip().split()[0] if data.full_name else "My"
-        org = Organization(
-            name=f"{org_name}'s Portfolio",
-            slug=f"{user.id.hex[:12]}",
-            type="individual_host",
-            default_currency="USD",
-        )
-        self.session.add(org)
-        await self.session.flush()
-
-        member = OrganizationMember(
-            user_id=user.id,
-            organization_id=org.id,
-            role=UserRole.ADMIN,
-        )
-        self.session.add(member)
-
         return UserResponse.model_validate(user)
 
     async def login(self, data: UserLoginRequest) -> TokenResponse:

@@ -24,33 +24,26 @@ class PropertyRepository(BaseRepository[Property]):
         )
         return result.scalar_one_or_none()
 
-    async def get_organization_properties(
+    async def get_all_properties(
         self,
-        organization_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[Property]:
         result = await self.session.execute(
             select(Property)
             .options(selectinload(Property.listings))
-            .where(
-                Property.organization_id == organization_id,
-                Property.is_deleted == False,
-            )
+            .where(Property.is_deleted == False)
             .order_by(Property.created_at.desc())
             .offset(skip)
             .limit(limit)
         )
         return result.scalars().all()
 
-    async def count_by_organization(self, organization_id: uuid.UUID) -> int:
+    async def count_all(self) -> int:
         result = await self.session.execute(
             select(func.count())
             .select_from(Property)
-            .where(
-                Property.organization_id == organization_id,
-                Property.is_deleted == False,
-            )
+            .where(Property.is_deleted == False)
         )
         return result.scalar() or 0
 
