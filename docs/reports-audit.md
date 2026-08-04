@@ -2,11 +2,15 @@
 
 ## Purpose
 
-> **v2 update:** The PDF/Print export is now a dedicated **well-designed print
-> layout** (`ReportPrintView`) — a branded cover, KPI band, styled tables, a CSS
-> bar chart for the monthly timeline, and a page-numbered footer. It is hidden on
-> screen (`hidden print:block`) and triggered via `window.print()`. Occupancy/ADR
-> were removed from all report sections.
+> **v2 update:** Reports are **period-driven** — pick a year or a **custom date
+> range** plus currency (defaults from Settings), and the report compares the
+> period against the **equal-length previous period**. **Generate Report**
+> downloads a professional PDF rendered on the backend (WeasyPrint, white
+> background) rather than a browser print. Reports include an **AI Executive
+> Insights** section (rules engine, or your connected LLM — provider badge).
+> Occupancy/ADR were removed from all sections; the Portfolio Health Revenue bar
+> scores growth vs the previous period (with the % shown) instead of a flat
+> amount.
 
 The Reports page is the **professional documentation surface** of HostWise. It
 exists so a host can turn raw operational data into an investor/owner-ready
@@ -24,8 +28,8 @@ After visiting, the user should be able to:
 - See the full portfolio story: executive summary, AI insights, KPI
   comparison, per-property performance, expense analysis, health, risks,
   forecast, and tax summary.
-- **Export** a professional document (PDF/print, Excel, CSV, Share) to give to
-  a third party.
+- **Export** a professional PDF document (backend-generated) to give to a third
+  party.
 - Decide: *is the portfolio story strong enough to present / borrow against /
   report to an owner?*
 
@@ -40,19 +44,21 @@ sequenceDiagram
     participant S as ReportGenerationService
     participant F as Finance / Analytics / AI / Settings
 
-    U->>R: opens /reports (default year, currency)
-    R->>Q: usePortfolioReport(year, currency)
-    Q->>API: GET /reports/portfolio?year&currency
-    API->>S: generate_portfolio_report(year, currency)
-    S->>F: get_annual_report(year) + prev year, portfolio analytics, AI analysis, settings
+    U->>R: opens /reports (default year/range, currency)
+    R->>Q: usePortfolioReport(period, currency)
+    Q->>API: GET /reports/portfolio?year | start_date&end_date&currency
+    API->>S: generate_portfolio_report(start, end, currency)
+    S->>F: period report + previous period, portfolio analytics, AI analysis, settings
     F-->>S: composed data
     S-->>API: one portfolio-report payload (13 sections)
     API-->>Q: JSON
     Q-->>R: render sections in order
-    U->>R: pick a section / change year / change currency
+    U->>R: change period / currency
     R->>Q: refetch with new params
-    U->>R: click Export
-    R->>R: generate CSV / Excel (.xls) / window.print() / share
+    U->>R: click Generate Report
+    R->>API: GET /reports/export?format=pdf&period&currency
+    API->>S: render_pdf(report) (WeasyPrint)
+    API-->>U: application/pdf download
 ```
 
 ## Components
@@ -60,15 +66,15 @@ sequenceDiagram
 | Component | Responsibility |
 | --- | --- |
 | `ReportsPage` | Year + currency state; orchestrates fetch, loading, error |
-| `ReportHeader` | Period selector, currency selector, export buttons (PDF/Excel/CSV/Print/Share), metadata |
+| `ReportHeader` | Period selector (year presets + custom range), currency selector, **Generate Report** (downloads backend PDF), metadata |
 | `ExecutiveSummary` | Period, gross revenue, net profit, margin, best/worst property, health badge |
-| `AIInsights` | Narrative summary, change drivers, biggest risk, recommendation |
-| `KpiComparison` | Previous vs Current vs Change table (revenue/profit/expenses/occupancy/ADR) |
+| `AIInsights` | Narrative summary, change drivers, biggest risk, recommendation + provider badge (rules vs LLM) |
+| `KpiComparison` | Previous vs Current vs Change table (revenue/profit/expenses) |
 | `RevenueBarChart` / `CashflowLineChart` | Monthly visuals (reused) |
 | `PropertyPerformance` | Per-property table + Export button |
 | `ExpenseAnalysis` | Category bars + biggest/smallest/fastest-growing |
 | `MonthlyTimeline` | Horizontal per-month revenue bars (print-friendly) |
-| `PortfolioHealth` | Score ring + component bars + distribution |
+| `PortfolioHealth` | Score ring + component bars (Revenue shows growth % vs prev period) + distribution |
 | `BusinessRisks` | Risk cards (high/medium) |
 | `Forecast` | Next-quarter revenue, confidence, expected occupancy |
 | `TaxSummary` | Rental income, deductible expenses, taxable income + tax liability |
@@ -77,14 +83,16 @@ sequenceDiagram
 
 ## Hooks
 
-- `usePortfolioReport(year, currency)` — single query for the whole page
-  (typed `useQuery<PortfolioReport>`, `staleTime: 30s`).
+- `usePortfolioReport(period, currency)` — single query for the whole page
+  (typed `useQuery<PortfolioReport>`, key `["portfolio-report", period, currency]`,
+  builds `year=` or `start_date`/`end_date`).
 
 ## API Calls
 
 | Endpoint | Why |
 | --- | --- |
-| `GET /reports/portfolio?year&currency` | One endpoint composes **everything** the page needs. This is the flagship aggregation endpoint; it internally calls finance annual reports (current + previous year), portfolio analytics, AI analysis, and settings. |
+| `GET /reports/portfolio?year \| start_date&end_date&currency` | One endpoint composes **everything** the page needs (current + equal-length previous period, portfolio analytics, AI analysis, settings). |
+| `GET /reports/export?format=pdf&year \| start_date&end_date&currency` | Renders the same report as a professional PDF (WeasyPrint) and downloads it as `hostwise-report-<period>.pdf`. |
 
 ## State Management
 
@@ -97,19 +105,19 @@ sequenceDiagram
 ```
 Open /reports
   ↓
+Pick a year or custom date range + currency
+  ↓
 Executive summary (period, revenue, profit, margin, health)
   ↓
 AI insights explain the changes + risks
   ↓
-KPI comparison (this year vs last)
+KPI comparison (this period vs the previous one)
   ↓
 Charts + property table + expense analysis
   ↓
 Forecast + tax summary
   ↓
-Add a note about why revenue changed
-  ↓
-Export to PDF/Excel → send to owner/accountant
+Generate Report → download the PDF → send to owner/accountant
 ```
 
 ## Relation With Other Pages

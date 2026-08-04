@@ -2,12 +2,16 @@
 
 ## Purpose
 
-> **v2 update:** The Dashboard, Reports, and Notifications sections were removed.
-> The page now runs Profile → Business → AI → Appearance → Security (left column)
-> and Backup → Import → Maintenance → About → Developer (right column). Profile
-> name/email are editable (bound to settings). The AI section is a BYOK
-> connection UI (provider, API key, base URL, model, “Test Connection”). Security
-> now offers **Export all** (`.xls`) and **Delete all data** (wipe, keeps settings).
+> **v2 update:** The page is now a **vertical tab sidebar** with 8 tabs —
+> Business, AI Settings, Appearance, Security, Backup & Restore, Data Import,
+> Maintenance, About HostWise. **Profile and Business are merged** into one
+> "Business" tab (identity = business name only; email, country, default
+> currency, language, tax rate, fiscal year start), and **Maintenance and
+> Developer are merged** (database housekeeping + backend diagnostics in one
+> tab). The old Dashboard/Reports/Notifications sections and the standalone
+> Account/Developer components were removed. AI is a BYOK connection UI
+> (provider, API key, base URL, model, “Test Connection”). Security offers
+> **Export all** (`.xls`) and **Delete all data** (wipe, keeps settings).
 > Backup gained an **Upload** (`.db`) button.
 
 The Settings page is the **configuration and housekeeping center**. It exists
@@ -56,19 +60,17 @@ sequenceDiagram
 
 | Component | Responsibility |
 | --- | --- |
-| `AccountSection` | Name/email (read-only) + currency/timezone/date-format/language |
-| `BusinessSection` | Business name, country, default currency, tax rate, fiscal year |
-| `AISection` | Provider, enabled, analysis level, auto-analysis, language |
-| `DashboardSection` | Default dashboard, show AI summary, show forecast, default year |
-| `ReportsSection` | Default report/format, auto-generate, email |
-| `NotificationsSection` | Which events notify (toggles) |
-| `BackupSection` | Status cards + create/restore/download/delete |
-| `ImportSection` | CSV encoding, delimiter, date format |
+| `BusinessSection` | **Merged Profile+Business**: business name, email, country, default currency, language, tax rate, fiscal year start |
+| `AISection` | Provider, enabled, analysis level, auto-analysis, language (BYOK: key, base URL, model, Test Connection) |
 | `AppearanceSection` | Theme, accent swatches, compact mode, animations |
-| `SecuritySection` | Password, sessions, 2FA (coming soon), export/delete account |
-| `MaintenanceSection` | DB size, optimize, clear cache, logs, reset demo data |
+| `SecuritySection` | Export all (.xls), delete all data (keeps settings); password/sessions/2FA placeholders |
+| `BackupSection` | Status cards + create/restore/download/upload (.db)/delete |
+| `ImportSection` | CSV encoding, delimiter, date format |
+| `MaintenanceSection` | **Merged Maintenance+Developer**: DB size/optimize, clear cache, view logs, reset demo data, backend status, API URL, restart backend, copy diagnostics |
 | `AboutSection` | Version, license, updates |
-| `DeveloperSection` | Collapsible: backend status, API URL, restart, logs, copy diagnostics |
+
+> Removed: `AccountSection` (merged into Business), `DeveloperSection` (merged
+> into Maintenance), `DashboardSection`, `ReportsSection`, `NotificationsSection`.
 
 ## Hooks / Context
 
@@ -102,17 +104,19 @@ sequenceDiagram
 ```
 Open /settings
   ↓
-Profile + business settings (set your currency, tax rate, business name)
+Business (name, email, currency, language, tax rate, fiscal year)
   ↓
-AI settings (enable/detail)
+AI Settings (enable / connect your own LLM — DeepSeek, OpenAI, …)
   ↓
 Appearance (pick theme + accent → whole app changes live)
   ↓
-Check backups (last backup, storage) — create/restore if needed
+Security (export all / delete all data)
   ↓
-Maintenance (optimize DB, clear cache, read logs)
+Backup & Restore (last backup, storage) — create/restore if needed
   ↓
-Developer (diagnostics only if something breaks)
+Data Import (CSV defaults)
+  ↓
+Maintenance (optimize DB, clear cache, read logs, restart backend, copy diagnostics)
 ```
 
 ## Relation With Other Pages

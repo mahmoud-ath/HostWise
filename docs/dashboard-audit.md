@@ -2,12 +2,15 @@
 
 ## Purpose
 
-> **v2 update:** The dashboard is now **settings-aware** — it honors
-> `default_currency` (all KPIs/reports), `dashboard_show_ai_summary`,
-> `dashboard_show_forecast`, `dashboard_default_year`, and the business name. It
-> uses the shared `use-api` hooks, gained a **year selector**, and the “Latest
-> Reports” card now shows **real** annual data instead of fabricated “Ready”
-> badges. AI framing shows which engine is in use (rules vs. configured LLM).
+> **v2 update:** The dashboard is **period-driven** — a period selector picks a
+> year or a **custom date range**, and every KPI, chart, expense breakdown, AI
+> card, and ranking follows it. It honors `default_currency` (all
+> KPIs/reports; fallback normalized to EUR app-wide), `dashboard_show_ai_summary`,
+> `dashboard_show_forecast`, `dashboard_default_year`, and the business name.
+> The KPI grid is now **six cards** (Gross, Net, Profit Margin, **Total
+> Expenses**, Cashflow, Properties). It uses the shared `use-api` hooks
+> (`useFinancialSummary`, `useAnnualReport`, `useAIAdvisor`, `usePortfolioAnalytics`),
+> and the AI card shows which engine is in use (rules vs. configured LLM).
 
 The Dashboard is the **command center**. It exists so a host can answer the
 single most common question — *"How is my portfolio doing right now?"* — in
@@ -38,11 +41,11 @@ sequenceDiagram
     participant DB as Database
 
     U->>D: opens /
-    D->>Q: 4 parallel queries (summary, annual report, ai/analyze, portfolio analytics)
-    Q->>API: GET /finance/summary
-    Q->>API: GET /finance/report/annual?year
-    Q->>API: GET /ai/analyze
-    Q->>API: GET /analytics/portfolio?year
+    D->>Q: 4 parallel queries (summary, annual report, ai/advisor, portfolio analytics)
+    Q->>API: GET /finance/summary?start_date&end_date
+    Q->>API: GET /finance/report/annual?year | start_date&end_date
+    Q->>API: GET /ai/advisor?year | start_date&end_date
+    Q->>API: GET /analytics/portfolio?year | start_date&end_date
     API->>S: services compute (summary, monthly breakdown, recommendations, ranking)
     S->>DB: aggregates
     DB-->>S: rows
@@ -57,11 +60,11 @@ sequenceDiagram
 
 | Component | Responsibility | Dependencies | Relation to page |
 | --- | --- | --- | --- |
-| `DashboardContent` | Orchestrates the 4 queries + error state | React Query, api | Main body |
-| `GrossRevenueCard` / `NetRevenueCard` / `ProfitMarginCard` / `CashflowCard` / `PropertyCountCard` | Display one KPI | `KPICard`, `formatCurrency` | KPI grid |
+| `DashboardContent` | Orchestrates the 4 queries + period state + error state | React Query, api | Main body |
+| `GrossRevenueCard` / `NetRevenueCard` / `ProfitMarginCard` / `TotalExpensesCard` / `CashflowCard` / `PropertyCountCard` | Display one KPI (6-card grid) | `KPICard`, `formatCurrency` | KPI grid |
 | `KPICard` | Generic card with value + trend icon | cn, lucide | Base of all KPI cards |
 | `RevenueBarChart` / `CashflowLineChart` | Monthly revenue vs expenses; cashflow line | Chart.js | Charts row |
-| AI Financial Advisor card | Executive summary + top-5 recommendations | ai/analyze data | Insights |
+| AI Financial Advisor card | Executive summary + top-5 recommendations + provider badge (rules vs LLM) | useAIAdvisor data | Insights |
 | Expense Breakdown card | Top expense categories with % | annual report data | Cost visibility |
 | Quick Actions | Navigation links (Add Property, Import, Add Expense, Reports, Ask AI) | next/link | Navigation |
 | Latest Reports card | Report readiness indicators | annual report data | Navigation to /reports |
@@ -69,22 +72,19 @@ sequenceDiagram
 
 ## Hooks
 
-The dashboard uses **inline `useQuery` calls** (summary, annual-report,
-ai-analysis, portfolio-analytics) rather than the shared `use-api` hooks.
-
-- **Why:** historical (built before the hook layer matured).
-- **Improvement:** migrate to `useFinancialSummary`, `useAnnualReport`,
-  `useAIAnalysis`, `usePortfolioAnalytics` so query keys/shapes are centralized
-  and cache invalidation is consistent.
+The dashboard uses the shared `use-api` hooks — `useFinancialSummary(start, end)`,
+`useAnnualReport(period)`, `useAIAdvisor(period)`, `usePortfolioAnalytics(period)`
+— all period-scoped (a `ReportPeriod` of `{year}` or `{start,end}` builds
+`year=` or `start_date`/`end_date` query params, so query keys stay consistent).
 
 ## API Calls
 
 | Endpoint | Why it belongs here |
 | --- | --- |
-| `GET /finance/summary` | Portfolio-wide financial totals — the core "how are we doing" answer. |
-| `GET /finance/report/annual?year` | Monthly breakdown (charts) + expense categories. |
-| `GET /ai/analyze` | Executive summary + prioritized recommendations — the "what should I do" answer. |
-| `GET /analytics/portfolio?year` | Property ranking with health scores. |
+| `GET /finance/summary?start_date&end_date` | Portfolio-wide financial totals — the core "how are we doing" answer. |
+| `GET /finance/report/annual?year \| start_date&end_date` | Monthly breakdown (charts) + expense categories. |
+| `GET /ai/advisor?year \| start_date&end_date` | Executive summary + prioritized recommendations — the "what should I do" answer (rules engine by default, LLM when configured). |
+| `GET /analytics/portfolio?year \| start_date&end_date` | Property ranking with health scores. |
 
 These four are the minimum surface a host needs to make a daily decision; the
 dashboard is deliberately a **read-mostly aggregation page**.

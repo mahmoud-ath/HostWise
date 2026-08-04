@@ -3,12 +3,15 @@
 ## Purpose
 
 > **v2 update:** The page is organized into **tabs** — Analytics,
-> Recommendations, Chat, and Simulator. Occupancy references were removed from
-> all advisor sections (risks now flag on revenue trend / margin / health; the
-> forecast has no expected-occupancy card; the simulator’s allowed scenarios are
-> `price_increase`, `hire_cleaner`, `expense_reduction`, `minimum_stay`). Chat
-> supports **BYOK**: when `ai_api_key` is set, answers come from the configured
-> LLM (`mode: "llm"`); otherwise the rules engine answers (`mode: "rules"`).
+> Recommendations, and Simulator (the Chat tab was removed; the backend
+> `/ai/chat` endpoint is left in place but unused by the UI). The advisor is
+> **period-aware** (year or custom date range). Occupancy references were removed
+> from all advisor sections (risks flag on revenue trend / margin / health; the
+> simulator’s allowed scenarios are `price_increase`, `hire_cleaner`,
+> `expense_reduction`, `minimum_stay`). It follows the **rules-vs-LLM** strategy:
+> the built-in rules engine by default; when `ai_api_key` + provider are
+> configured it sends the real data to your LLM (DeepSeek/OpenAI/etc.) and
+> conservatively merges its executive summary + health score.
 
 The AI Advisor page is the **financial co-pilot** — the flagship differentiator
 of HostWise. It exists so a host can move from *"I see the numbers"* to *"I
@@ -42,18 +45,14 @@ sequenceDiagram
     participant F as Finance / Analytics / Properties
 
     U->>A: opens /ai-advisor
-    A->>Q: useAIAdvisor(year)
-    Q->>API: GET /ai/advisor?year
-    API->>AI: generate_advisor_report(year)
+    A->>Q: useAIAdvisor(period)
+    Q->>API: GET /ai/advisor?year | start_date&end_date
+    API->>AI: generate_advisor_report(year | start,end)
     AI->>F: analyze_financial_performance + portfolio analytics + annual report
     F-->>AI: metrics + recommendations
     AI-->>API: AdvisorReport (health, priorities, opportunities, risks, reviews, forecast, goals, trends, wins)
     API-->>Q: JSON
-    Q-->>A: render 13 sections
-    U->>A: ask a question in chat
-    A->>API: POST /ai/chat { question, year }
-    API->>AI: answer_question (rule-based intent)
-    AI-->>A: answer bubble
+    Q-->>A: render sections (analytics / recommendations / simulator tabs)
     U->>A: run a scenario (e.g., price +10%)
     A->>API: POST /ai/scenario { scenario, params, year }
     API->>AI: simulate_scenario
@@ -64,7 +63,7 @@ sequenceDiagram
 
 | Component | Responsibility |
 | --- | --- |
-| `AIHeader` | Title + year selector |
+| `AIHeader` | Title + period selector (year or custom range) + provider badge (rules vs LLM) |
 | `ExecutiveAISummary` | Narrative summary + current metrics |
 | `BusinessHealthScore` | 0–100 ring + component bars (revenue/expenses/growth/risk) |
 | `PriorityActions` | Grouped critical/medium/low actions with confidence |
@@ -74,29 +73,28 @@ sequenceDiagram
 | `ForecastNext30` | Expected revenue/occupancy/risk/best property |
 | `TrendExplanations` | "Why it happened" reasons per KPI |
 | `RecommendedGoals` | Occupancy/ADR/cleaning/revenue targets with progress |
-| `AIChat` | Natural-language Q&A with suggested questions + typing indicator |
 | `ScenarioSimulator` | What-if controls + baseline/impact/projected comparison |
 | `Achievements` | Wins (best month, margin, expense reduction) |
 
 ## Hooks
 
-- `useAIAdvisor(year)` — one query for the whole dashboard.
-- `useAIChat()` — mutation (`POST /ai/chat`).
+- `useAIAdvisor(period)` — one query for the whole dashboard (accepts a `ReportPeriod`
+  of `{year}` or `{start,end}`).
 - `useAIScenario()` — mutation (`POST /ai/scenario`).
+- `useAIChat()` — mutation (`POST /ai/chat`); no longer called by the UI (chat removed).
 
 ## API Calls
 
 | Endpoint | Why |
 | --- | --- |
-| `GET /ai/advisor?year` | Composed advisor dashboard (the page's single source of truth). |
-| `POST /ai/chat` | Interactive Q&A over the same data (rule-based intent engine). |
+| `GET /ai/advisor?year \| start_date&end_date` | Composed advisor dashboard (the page's single source of truth; rules engine by default, LLM when configured). |
 | `POST /ai/scenario` | What-if financial simulation. |
+| `POST /ai/chat` | Interactive Q&A over the same data (rule-based intent engine) — kept in the API but unused by the UI. |
 
 ## State Management
 
-- Server state: React Query for the dashboard; mutations for chat/scenario.
-- Local state: chat message history, scenario inputs, chat typing.
-- The chat is session-local (messages not persisted) — deliberate.
+- Server state: React Query for the dashboard; mutations for scenario (and chat, unused by UI).
+- Local state: scenario inputs.
 
 ## User Journey
 
@@ -114,8 +112,6 @@ Risk detection per property
 Property AI reviews
   ↓
 Next 30 days forecast
-  ↓
-Ask the AI: "Which expenses should I reduce?" → actionable answer
   ↓
 Simulate: "Increase prices 10%?" → see projected profit
   ↓
@@ -141,14 +137,13 @@ Decision: adopt the scenario with the best projected outcome
   them consistently and an LLM can fill the same shape later.
 - **One dashboard endpoint** — composition on the backend.
 - **Chat & scenario as separate POST endpoints** — interactive, stateful
-  requests isolated from the read dashboard.
+  requests isolated from the read dashboard (chat endpoint retained, UI tab removed).
 - **Reuses the same aggregation services as Reports** — consistency between
   what the advisor says and what the report shows.
 
 ## Strengths
 
-- Differentiating product surface (chat + scenarios + priorities are not
-  "just charts").
+- Differentiating product surface (scenarios + priorities are not "just charts").
 - Explainable, deterministic AI (confidence scores, "why it happened").
 - The LLM seam means the flagship feature can be upgraded without a rewrite.
 
@@ -157,7 +152,8 @@ Decision: adopt the scenario with the best projected outcome
 - Rule engine is narrow — answers are only as good as the intents that exist.
 - Chat recomputes the **entire advisor report per question** (expensive on
   large portfolios).
-- Hardcoded € in backend AI strings; not yet driven by settings currency.
+- (Fixed) AI prose currency is driven by `default_currency` via a `CURRENCY_SYMBOL`
+  map — no longer hardcoded €.
 
 ## Technical Debt
 

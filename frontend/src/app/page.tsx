@@ -5,6 +5,7 @@ import {
   GrossRevenueCard,
   NetRevenueCard,
   ProfitMarginCard,
+  TotalExpensesCard,
   CashflowCard,
   PropertyCountCard,
 } from "@/components/dashboard/kpi-cards";
@@ -25,6 +26,7 @@ import {
 import { Brain, AlertTriangle, TrendingUp, CheckCircle, Info, Building2, Upload, DollarSign, FileText, Sparkles, Download, Trophy, CalendarRange, Sparkle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { ReportPeriod, isCustomPeriod, periodLabel } from "@/lib/report-period";
 
 interface AIRecommendation {
   type: "critical" | "warning" | "positive" | "info";
@@ -46,20 +48,50 @@ export default function Home() {
 function DashboardContent() {
   const { settings, get } = useSettings();
   const { t, tWith } = useI18n();
-  const currency: string = get("default_currency", "USD");
+  const currency: string = get("default_currency", "EUR");
   const showAiSummary: boolean = get("dashboard_show_ai_summary", true) !== false;
   const showForecast: boolean = get("dashboard_show_forecast", true) !== false;
 
   const defaultYearSetting = String(get("dashboard_default_year", "current"));
   const currentYear = new Date().getFullYear();
-  const [year, setYear] = useState<number>(
-    defaultYearSetting === "current" ? currentYear : Number(defaultYearSetting) || currentYear
-  );
+  const [period, setPeriod] = useState<ReportPeriod>(() => ({
+    year:
+      defaultYearSetting === "current" ? currentYear : Number(defaultYearSetting) || currentYear,
+  }));
+  const isCustom = isCustomPeriod(period);
+  const activeYear = period.year ?? currentYear;
+  const [customStart, setCustomStart] = useState(period.start || "");
+  const [customEnd, setCustomEnd] = useState(period.end || "");
 
-  const { data: summary, isLoading: summaryLoading, error: summaryError } = useFinancialSummary();
-  const { data: annualReport, isLoading: reportLoading, error: reportError } = useAnnualReport(year);
-  const { data: aiAnalysis, isLoading: aiLoading, error: aiError } = useAIAdvisor(year);
-  const { data: portfolio, isLoading: portfolioLoading, error: portfolioError } = usePortfolioAnalytics(year);
+  const handlePeriodChange = (value: string) => {
+    if (value === "custom") {
+      const start = customStart || `${activeYear}-01-01`;
+      const end = customEnd || `${activeYear}-12-31`;
+      setCustomStart(start);
+      setCustomEnd(end);
+      setPeriod({ start, end });
+    } else {
+      setPeriod({ year: parseInt(value, 10) });
+    }
+  };
+
+  const handleCustomStart = (value: string) => {
+    setCustomStart(value);
+    if (value && customEnd) setPeriod({ start: value, end: customEnd });
+  };
+
+  const handleCustomEnd = (value: string) => {
+    setCustomEnd(value);
+    if (customStart && value) setPeriod({ start: customStart, end: value });
+  };
+
+  const { data: summary, isLoading: summaryLoading, error: summaryError } = useFinancialSummary(
+    period.year ? `${period.year}-01-01` : period.start,
+    period.year ? `${period.year}-12-31` : period.end
+  );
+  const { data: annualReport, isLoading: reportLoading, error: reportError } = useAnnualReport(period);
+  const { data: aiAnalysis, isLoading: aiLoading, error: aiError } = useAIAdvisor(period);
+  const { data: portfolio, isLoading: portfolioLoading, error: portfolioError } = usePortfolioAnalytics(period);
 
   const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
 
@@ -89,25 +121,48 @@ function DashboardContent() {
             {settings.business_name ? `${settings.business_name} · ` : ""}{t("pages.dashboard.subtitle")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CalendarRange className="h-4 w-4 text-muted-foreground" />
           <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
+            value={isCustom ? "custom" : String(activeYear)}
+            onChange={(e) => handlePeriodChange(e.target.value)}
             className="h-9 rounded-md border bg-background px-3 text-sm"
-            aria-label="Select year"
+            aria-label="Select period"
           >
             {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
+              <option key={y} value={y}>
+                {y === currentYear ? `This year (${y})` : y}
+              </option>
             ))}
+            <option value="custom">Custom range…</option>
           </select>
+          {isCustom && (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                className="h-9 rounded-md border bg-background px-3 text-sm"
+                value={customStart}
+                onChange={(e) => handleCustomStart(e.target.value)}
+                aria-label="Start date"
+              />
+              <span className="text-muted-foreground">–</span>
+              <input
+                type="date"
+                className="h-9 rounded-md border bg-background px-3 text-sm"
+                value={customEnd}
+                onChange={(e) => handleCustomEnd(e.target.value)}
+                aria-label="End date"
+              />
+            </div>
+          )}
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         {summaryLoading ? (
           <>
+            <Skeleton className="h-28" />
             <Skeleton className="h-28" />
             <Skeleton className="h-28" />
             <Skeleton className="h-28" />
@@ -119,6 +174,7 @@ function DashboardContent() {
             <GrossRevenueCard value={summary.gross_revenue} currency={currency} />
             <NetRevenueCard value={summary.net_revenue} currency={currency} />
             <ProfitMarginCard value={summary.profit_margin} />
+            <TotalExpensesCard value={summary.total_expenses} currency={currency} />
             <CashflowCard value={summary.cashflow} currency={currency} />
             <PropertyCountCard value={summary.property_count} />
           </>
@@ -137,11 +193,11 @@ function DashboardContent() {
             <>
               <RevenueBarChart
                 data={annualReport.monthly_breakdown || []}
-                title={`Revenue vs Expenses — ${year}`}
+                title={`Revenue vs Expenses — ${periodLabel(period)}`}
               />
               <CashflowLineChart
                 data={annualReport.monthly_breakdown || []}
-                title={`Cashflow Trend — ${year}`}
+                title={`Cashflow Trend — ${periodLabel(period)}`}
               />
             </>
           ) : null}
@@ -345,7 +401,9 @@ function DashboardContent() {
               <div className="p-4 rounded-lg border bg-card">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium">{year} Annual Report</p>
+                    <p className="text-sm font-medium">
+                      {period.year ? `${period.year} Annual Report` : `${periodLabel(period)} Report`}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {tWith("dash.monthsWithData", { count: annualReport.monthly_breakdown?.length || 0 })}
                     </p>

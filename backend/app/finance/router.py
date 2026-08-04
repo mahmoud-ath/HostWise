@@ -6,7 +6,7 @@ Endpoints for revenue, expenses, financial dashboard, and reports.
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.finance.schemas import (
     AnnualReport,
@@ -171,8 +171,18 @@ async def get_monthly_report(
 
 @router.get("/report/annual", response_model=AnnualReport)
 async def get_annual_report(
-    year: int = Query(..., ge=2020, le=2100),
+    year: int | None = Query(None, ge=2020, le=2100),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     service: FinancialReportingService = Depends(get_reporting_service),
 ):
-    """Generate a complete annual financial report."""
-    return await service.get_annual_report(year)
+    """Complete annual financial report — for a year or a custom date range."""
+    if (start_date is None) != (end_date is None):
+        raise HTTPException(
+            status_code=422,
+            detail="start_date and end_date must be provided together",
+        )
+    if start_date and end_date:
+        return await service.get_range_annual_report(start_date, end_date)
+    y = year or date.today().year
+    return await service.get_annual_report(y)

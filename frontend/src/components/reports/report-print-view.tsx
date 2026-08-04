@@ -117,9 +117,62 @@ export function ReportPrintView({ report }: { report: PortfolioReport }) {
         )}
       </section>
 
+      {/* ── AI Executive Insights (rules + LLM strategy) ── */}
+      {report.ai_insights?.summary && (
+        <section className="report-section">
+          <SectionTitle>AI Executive Insights</SectionTitle>
+          <p className="report-ai-provider">
+            {!report.ai_insights.provider || report.ai_insights.provider === "hostwise"
+              ? "HostWise rules engine"
+              : `LLM · ${report.ai_insights.provider}`}
+          </p>
+          <SectionIntro>{report.ai_insights.summary}</SectionIntro>
+
+          {report.ai_insights.drivers && report.ai_insights.drivers.length > 0 && (
+            <p className="report-ai-drivers">
+              <strong>What drove the change: </strong>
+              {report.ai_insights.drivers
+                .map((d) => `${d.label} ${d.detail}`)
+                .join(" · ")}
+            </p>
+          )}
+
+          {(report.ai_insights.biggest_risk || report.ai_insights.recommendation) && (
+            <div className="report-two-col">
+              {report.ai_insights.biggest_risk && (
+                <div className="report-callout report-callout-bad">
+                  <p className="report-callout-label">Biggest risk</p>
+                  <p className="report-callout-title">
+                    {report.ai_insights.biggest_risk.title}
+                  </p>
+                  {report.ai_insights.biggest_risk.cause && (
+                    <p className="report-callout-text">
+                      {report.ai_insights.biggest_risk.cause}
+                    </p>
+                  )}
+                </div>
+              )}
+              {report.ai_insights.recommendation && (
+                <div className="report-callout report-callout-good">
+                  <p className="report-callout-label">Recommendation</p>
+                  <p className="report-callout-text">
+                    {report.ai_insights.recommendation}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── KPI comparison ──────────────────────────────── */}
       <section className="report-section">
         <SectionTitle>KPI Comparison</SectionTitle>
+        <SectionIntro>
+          {report.previous_period
+            ? `${report.previous_period.label} vs ${report.period?.label ?? report.year}`
+            : `Previous year (${report.year - 1}) vs ${report.year}`}
+        </SectionIntro>
         <table className="report-table">
           <thead>
             <tr>
@@ -259,21 +312,21 @@ export function ReportPrintView({ report }: { report: PortfolioReport }) {
             <p className="report-callout-text">
               {formatCurrency(report.goals.revenue.current, cur)} of{" "}
               {formatCurrency(report.goals.revenue.goal, cur)} —{" "}
-              {report.goals.revenue.progress >= 1 ? "achieved" : `${(report.goals.revenue.progress * 100).toFixed(0)}% complete`}
+              {report.goals.revenue.progress >= 100 ? "achieved" : `${report.goals.revenue.progress.toFixed(0)}% complete`}
             </p>
           </div>
           <div className="report-callout">
             <p className="report-callout-label">Next-quarter forecast</p>
             <p className="report-callout-text">
               {formatCurrency(report.forecast.next_quarter_revenue, cur)} · confidence{" "}
-              {(report.forecast.confidence * 100).toFixed(0)}%
+              {report.forecast.confidence}%
             </p>
           </div>
         </div>
       </section>
 
       {/* ── Tax summary ─────────────────────────────────── */}
-      <section className="report-section">
+      {/* <section className="report-section">
         <SectionTitle>Tax Summary</SectionTitle>
         <table className="report-table">
           <thead>
@@ -297,7 +350,7 @@ export function ReportPrintView({ report }: { report: PortfolioReport }) {
             </tr>
           </tbody>
         </table>
-      </section>
+      </section> */}
 
       {/* ── Footer ──────────────────────────────────────── */}
       <footer className="report-footer">

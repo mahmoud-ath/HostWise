@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, formatCurrency, formatPercentage } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import { TrendingUp, TrendingDown, Minus, DollarSign, Percent, Home, CreditCard } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, DollarSign, Percent, Home, CreditCard, Wallet } from "lucide-react";
 
 interface KPICardProps {
   title: string;
@@ -67,7 +67,7 @@ export function KPICard({
 }
 
 // Pre-configured financial KPI cards
-export function GrossRevenueCard({ value, trend, currency = "USD" }: { value: number; trend?: number; currency?: string }) {
+export function GrossRevenueCard({ value, trend, currency = "EUR" }: { value: number; trend?: number; currency?: string }) {
   const { t } = useI18n();
   return (
     <KPICard
@@ -80,7 +80,7 @@ export function GrossRevenueCard({ value, trend, currency = "USD" }: { value: nu
   );
 }
 
-export function NetRevenueCard({ value, trend, currency = "USD" }: { value: number; trend?: number; currency?: string }) {
+export function NetRevenueCard({ value, trend, currency = "EUR" }: { value: number; trend?: number; currency?: string }) {
   const { t } = useI18n();
   return (
     <KPICard
@@ -105,7 +105,7 @@ export function ProfitMarginCard({ value }: { value: number }) {
   );
 }
 
-export function CashflowCard({ value, currency = "USD" }: { value: number; currency?: string }) {
+export function CashflowCard({ value, currency = "EUR" }: { value: number; currency?: string }) {
   const { t } = useI18n();
   return (
     <KPICard
@@ -113,6 +113,17 @@ export function CashflowCard({ value, currency = "USD" }: { value: number; curre
       value={formatCurrency(value, currency)}
       trend={value >= 0 ? "up" : "down"}
       icon={<CreditCard className="h-4 w-4" />}
+    />
+  );
+}
+
+export function TotalExpensesCard({ value, currency = "EUR" }: { value: number; currency?: string }) {
+  const { t } = useI18n();
+  return (
+    <KPICard
+      title={t("kpi.totalExpenses")}
+      value={formatCurrency(value, currency)}
+      icon={<Wallet className="h-4 w-4" />}
     />
   );
 }

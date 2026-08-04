@@ -2,11 +2,15 @@
 
 ## Purpose
 
-> **v2 update:** The page now includes an in-page **Import Guide** (required vs.
-> optional columns per type), supports **JSON** files in addition to CSV, and
-> routes all calls through the dynamic API client (no hardcoded `localhost:8000`).
-> Parsing/insertion moved into the backend `ConnectorService` layer, which honors
-> `import_date_format` and `default_currency` settings.
+> **v2 update:** The page is **CSV-only** — JSON support was removed from the UI
+> (the backend connector still accepts JSON via its API). It includes an in-page
+> **Import Guide** whose required/optional columns mirror the downloadable
+> **sample templates** (`/samples/reservations.csv`, `revenues.csv`,
+> `expenses.csv`), and routes calls through the dynamic `api` client (no
+> hardcoded `localhost:8000`). Expense `category` values are matched to real
+> expense categories (created automatically if missing) so the analytics
+> breakdown never shows “Uncategorized”. Parsing/insertion lives in
+> `ConnectorService`, honoring `import_date_format` and `default_currency`.
 
 The Import page is the **onboarding engine** of HostWise. It exists so a host
 can go from a platform CSV export (Airbnb transactions, Booking
@@ -47,23 +51,25 @@ sequenceDiagram
     I->>I: clear query caches → other pages refresh
 ```
 
-> Note: the current `/import` page performs upload + import via **raw `fetch`
-> calls to `http://localhost:8000`** rather than the `api` client. This works in
-> dev but bypasses the dynamic base URL used in the packaged app — see debt.
+> The page routes upload + import through the shared `api` client
+> (`api.upload` / `api.post`), so the dynamic backend URL is honored in the
+> packaged (Tauri) app.
 
 ## Components
 
 | Component | Responsibility |
 | --- | --- |
-| `ImportPage` | Layout: CSV Upload card + Connectors card |
-| `CSVUploadSection` | File select, upload/preview, import, result display |
+| `ImportPage` | Layout: File Upload + Import Guide + Sample Templates + Connectors cards |
+| `CSVUploadSection` | File select (accept `.csv`), upload/preview, import, result display |
+| Import Guide | Required vs optional columns per type (matches the sample templates) |
+| Sample Templates | Download `reservations.csv` / `revenues.csv` / `expenses.csv` from `/samples/*.csv` to base your own data on |
 | Connectors card | Lists CSV (active) + planned platform connectors |
 
 ## Hooks
 
 - The page uses **local `useState`** (file, preview, uploading/importing flags,
-  result) and raw `fetch` — it does not use the `use-api` hooks. This is the
-  oldest part of the frontend and predates the hook layer.
+  result) but routes requests through the shared `api` client
+  (`api.upload` / `api.post`) so the dynamic base URL is honored.
 
 ## API Calls
 
@@ -97,7 +103,9 @@ The import endpoint (in the router) does the real work:
 ```
 Open /import
   ↓
-Drop a CSV (Airbnb transactions)
+Download a sample template (Reservations / Revenues / Expenses) to base your data on
+  ↓
+Drop a CSV
   ↓
 Upload & Preview → see detected columns
   ↓
@@ -115,9 +123,9 @@ Decision: fix property names in future CSVs for cleaner matching
   entry.
 - **Dashboard / Analytics / Reports / AI:** all downstream consumers light up
   once data exists.
-- **Settings:** `import_encoding` / `import_delimiter` / `import_date_format`
-  settings exist in the store but are not yet consumed by the import endpoint
-  (a gap).
+- **Settings:** `import_date_format` and `default_currency` are honored by the
+  importer; `import_encoding` / `import_delimiter` are stored but not yet
+  consumed (a gap).
 
 ## Architectural Decisions
 
@@ -136,18 +144,13 @@ Decision: fix property names in future CSVs for cleaner matching
 
 ## Weaknesses
 
-- Import logic lives **in the router** (violates the thin-router convention);
-  it should be a `ConnectorService`.
-- Uses raw `fetch` to a hardcoded URL instead of the `api` client / dynamic
-  base URL.
-- Import settings (encoding/delimiter/date format) are stored but unused.
+- Import settings `import_encoding` / `import_delimiter` are stored but not yet
+  consumed (date format and default currency are honored).
 - Limited error feedback (a generic "Import failed" in some paths).
 
 ## Technical Debt
 
-- Move CSV parsing/import into a service layer.
-- Route through the `api` client (dynamic base URL) for the packaged app.
-- Honor import settings; add per-column mapping UI.
+- Honor `import_encoding` / `import_delimiter`; add per-column mapping UI.
 - Add transaction rollback reporting (partial import counts) and idempotency
   (avoid duplicate imports of the same file).
 

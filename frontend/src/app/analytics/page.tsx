@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePortfolioAnalytics } from "@/hooks/use-api";
 import { formatCurrency } from "@/lib/utils";
 import { useSettings } from "@/contexts/settings-context";
+import { ReportPeriod, isCustomPeriod, periodLabel, previousPeriod } from "@/lib/report-period";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -83,15 +84,42 @@ function KpiCard({ label, value, yoy }: { label: string; value: string; yoy?: Re
 
 function AnalyticsContent() {
   const currentYear = new Date().getFullYear();
-  const [year, setYear] = useState(currentYear);
+  const [period, setPeriod] = useState<ReportPeriod>(() => ({ year: currentYear }));
   const [compare, setCompare] = useState(false);
   const { get } = useSettings();
   const currency = get("default_currency", "EUR") as string;
 
-  const { data, isLoading } = usePortfolioAnalytics(year);
-  const { data: prev } = usePortfolioAnalytics(compare ? year - 1 : undefined);
+  const { data, isLoading } = usePortfolioAnalytics(period);
+  const prevPeriod = compare ? previousPeriod(period) : undefined;
+  const { data: prev } = usePortfolioAnalytics(prevPeriod);
 
   const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
+  const isCustom = isCustomPeriod(period);
+  const activeYear = period.year ?? currentYear;
+  const [customStart, setCustomStart] = useState(period.start || "");
+  const [customEnd, setCustomEnd] = useState(period.end || "");
+
+  const handlePeriodChange = (value: string) => {
+    if (value === "custom") {
+      const start = customStart || `${activeYear}-01-01`;
+      const end = customEnd || `${activeYear}-12-31`;
+      setCustomStart(start);
+      setCustomEnd(end);
+      setPeriod({ start, end });
+    } else {
+      setPeriod({ year: parseInt(value, 10) });
+    }
+  };
+
+  const handleCustomStart = (value: string) => {
+    setCustomStart(value);
+    if (value && customEnd) setPeriod({ start: value, end: customEnd });
+  };
+
+  const handleCustomEnd = (value: string) => {
+    setCustomEnd(value);
+    if (customStart && value) setPeriod({ start: customStart, end: value });
+  };
 
   if (isLoading)
     return (
@@ -138,19 +166,39 @@ function AnalyticsContent() {
       <div className="flex flex-wrap items-center gap-2">
         <select
           className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
-          value={year}
-          onChange={(e) => setYear(parseInt(e.target.value))}
-          aria-label="Analytics year"
+          value={isCustom ? "custom" : String(activeYear)}
+          onChange={(e) => handlePeriodChange(e.target.value)}
+          aria-label="Analytics period"
         >
           {years.map((y) => (
             <option key={y} value={y}>
-              {y}
+              {y === currentYear ? `This year (${y})` : y}
             </option>
           ))}
+          <option value="custom">Custom range…</option>
         </select>
+        {isCustom && (
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
+              value={customStart}
+              onChange={(e) => handleCustomStart(e.target.value)}
+              aria-label="Start date"
+            />
+            <span className="text-muted-foreground">–</span>
+            <input
+              type="date"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
+              value={customEnd}
+              onChange={(e) => handleCustomEnd(e.target.value)}
+              aria-label="End date"
+            />
+          </div>
+        )}
         <Button variant={compare ? "default" : "outline"} size="sm" onClick={() => setCompare((v) => !v)}>
           <TrendingUp className="mr-1.5 h-4 w-4" />
-          Compare with {year - 1}
+          {period.year ? `Compare with ${period.year - 1}` : "Compare with previous period"}
         </Button>
       </div>
 
@@ -232,7 +280,7 @@ function AnalyticsContent() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Wallet className="h-4 w-4 text-primary" /> Expense Trend — {year}
+              <Wallet className="h-4 w-4 text-primary" /> Expense Trend — {periodLabel(period)}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -493,20 +541,20 @@ function AnalyticsContent() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingUp className="h-4 w-4 text-primary" /> Year-over-Year
+              <TrendingUp className="h-4 w-4 text-primary" /> {period.year ? "Year-over-Year" : "Period-over-Period"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-6">
               <div className="text-center">
-                <p className="text-xs text-muted-foreground">{year - 1}</p>
+                <p className="text-xs text-muted-foreground">{periodLabel(previousPeriod(period))}</p>
                 <p className="text-lg font-bold">
                   {formatCurrency(data.net_revenue * (1 - data.revenue_growth_yoy / 100), currency)}
                 </p>
               </div>
               <div className="text-2xl text-muted-foreground">→</div>
               <div className="text-center">
-                <p className="text-xs text-muted-foreground">{year}</p>
+                <p className="text-xs text-muted-foreground">{periodLabel(period)}</p>
                 <p className="text-lg font-bold">{formatCurrency(data.net_revenue, currency)}</p>
               </div>
               <span

@@ -92,6 +92,19 @@
     background: #fff !important;
   }
 
+  /* Force every app-level wrapper to white so the dark theme can't leak into
+     the page margins / edges of the printed PDF. */
+  .min-h-screen,
+  .bg-background,
+  #__next {
+    background: #fff !important;
+  }
+
+  /* Hide the mobile top bar in print */
+  .lg\:hidden {
+    display: none !important;
+  }
+
   /* Keep report sections from being split across pages */
   .print\:break-inside-avoid,
   section {
@@ -199,6 +212,23 @@
   }
   .report-intro {
     color: #374151;
+    margin: 0 0 12px;
+  }
+  .report-ai-provider {
+    display: inline-block;
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #0f766e;
+    border: 1px solid #0f766e;
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin: 0 0 10px;
+  }
+  .report-ai-drivers {
+    font-size: 10px;
+    color: #4b5563;
     margin: 0 0 12px;
   }
 

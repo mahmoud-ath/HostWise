@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { useSettings } from "@/contexts/settings-context";
 import { useI18n } from "@/lib/i18n";
-import { Upload, FileText, Database, FileJson, Info } from "lucide-react";
+import { Upload, FileText, Database, Download, Info } from "lucide-react";
 import { useState } from "react";
 
 type ImportType = "auto" | "reservations" | "revenues" | "expenses";
@@ -32,18 +32,18 @@ interface ImportResult {
 const GUIDE: Record<string, { required: string[]; optional: string[]; notes: string }> = {
   reservations: {
     required: ["property_name", "check_in", "check_out"],
-    optional: ["property_id", "guest_name", "nights", "gross_amount", "status"],
-    notes: "check_in / check_out use the configured date format (default DD/MM/YYYY). Missing properties are created automatically.",
+    optional: ["property_id", "reservation_id", "nights", "guest_name", "status", "gross_amount", "city", "country"],
+    notes: "Matches the reservations sample. check_in / check_out use the configured date format (default DD/MM/YYYY). Missing properties are created automatically.",
   },
   revenues: {
     required: ["property_name", "date", "gross_revenue"],
-    optional: ["property_id", "commission_amount", "net_revenue", "source"],
-    notes: "source can be airbnb, booking, direct or csv. net_revenue defaults to gross minus commission.",
+    optional: ["property_id", "reservation_id", "management_commission", "net_revenue", "source"],
+    notes: "Matches the revenues sample. source can be Airbnb, Booking, direct or csv. net_revenue defaults to gross minus commission.",
   },
   expenses: {
     required: ["property_name", "date", "amount"],
     optional: ["property_id", "category", "vendor"],
-    notes: "category is stored as the expense description.",
+    notes: "Matches the expenses sample. category is matched to an expense category (created automatically if missing).",
   },
 };
 
@@ -68,8 +68,7 @@ export default function ImportPage() {
                   <Upload className="h-5 w-5" /> {t("import.fileUpload")}
                 </CardTitle>
                 <CardDescription>
-                  Supported formats: <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold">.csv</span>{" "}
-                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold">.json</span> · Date format:{" "}
+                  Supported format: <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold">.csv</span> · Date format:{" "}
                   <span className="font-medium">{settings.import_date_format || "DD/MM/YYYY"}</span>
                 </CardDescription>
               </CardHeader>
@@ -84,9 +83,8 @@ export default function ImportPage() {
                   <Info className="h-5 w-5" /> {t("import.importGuide")}
                 </CardTitle>
                 <CardDescription>
-                  Pick a data type to see the expected columns. The importer also accepts{" "}
-                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold">.json</span> files: an array of row objects, or{" "}
-                  <code className="text-xs">{"{ \"type\": \"revenues\", \"rows\": [...] }"}</code>.
+                  Pick a data type to see the expected columns. Download a sample file below and base your own
+                  data on it.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -123,6 +121,50 @@ export default function ImportPage() {
                 )}
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5" /> Sample Templates
+                </CardTitle>
+                <CardDescription>
+                  Download an example file, fill it with your own data, and import it back.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {[
+                  {
+                    type: "Reservations",
+                    file: "reservations.csv",
+                    cols: "property_name, check_in, check_out, nights, guest_name, gross_amount, ...",
+                  },
+                  {
+                    type: "Revenues",
+                    file: "revenues.csv",
+                    cols: "property_name, date, gross_revenue, management_commission, net_revenue, source",
+                  },
+                  {
+                    type: "Expenses",
+                    file: "expenses.csv",
+                    cols: "property_name, date, amount, category, vendor",
+                  },
+                ].map((s) => (
+                  <div key={s.file} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{s.type} sample</p>
+                      <p className="truncate font-mono text-xs text-muted-foreground">{s.cols}</p>
+                    </div>
+                    <a
+                      href={`/samples/${s.file}`}
+                      download={s.file}
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      <Download className="h-3.5 w-3.5" /> .csv
+                    </a>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           </div>
 
           <Card className="h-fit">
@@ -133,7 +175,7 @@ export default function ImportPage() {
             <CardContent>
               <div className="space-y-2">
                 {[
-                  ["CSV / JSON Import", "Active"],
+                  ["CSV Import", "Active"],
                   ["Airbnb API", "Planned"],
                   ["Booking.com", "Planned"],
                   ["Vrbo", "Planned"],
@@ -195,20 +237,14 @@ function CSVUploadSection({ defaultType }: { defaultType: ImportType }) {
     }
   };
 
-  const isJson = file?.name.toLowerCase().endsWith(".json") ?? false;
-
   return (
     <div className="space-y-4">
       <div className="border-2 border-dashed rounded-lg p-6 text-center">
-        {isJson ? (
-          <FileJson className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        ) : (
-          <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        )}
+        <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
         <p className="text-sm text-muted-foreground mb-3">{t("import.dropHint")}</p>
         <input
           type="file"
-          accept=".csv,.json"
+          accept=".csv"
           onChange={(e) => {
             setFile(e.target.files?.[0] || null);
             setPreview(null);
