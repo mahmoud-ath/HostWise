@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, formatCurrency, formatPercentage } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 import { TrendingUp, TrendingDown, Minus, DollarSign, Percent, Home, CreditCard } from "lucide-react";
 
 interface KPICardProps {
@@ -66,11 +67,12 @@ export function KPICard({
 }
 
 // Pre-configured financial KPI cards
-export function GrossRevenueCard({ value, trend }: { value: number; trend?: number }) {
+export function GrossRevenueCard({ value, trend, currency = "USD" }: { value: number; trend?: number; currency?: string }) {
+  const { t } = useI18n();
   return (
     <KPICard
-      title="Gross Revenue"
-      value={formatCurrency(value)}
+      title={t("kpi.grossRevenue")}
+      value={formatCurrency(value, currency)}
       trendValue={trend !== undefined ? formatPercentage(trend) : undefined}
       trend={trend !== undefined ? (trend >= 0 ? "up" : "down") : undefined}
       icon={<DollarSign className="h-4 w-4" />}
@@ -78,11 +80,12 @@ export function GrossRevenueCard({ value, trend }: { value: number; trend?: numb
   );
 }
 
-export function NetRevenueCard({ value, trend }: { value: number; trend?: number }) {
+export function NetRevenueCard({ value, trend, currency = "USD" }: { value: number; trend?: number; currency?: string }) {
+  const { t } = useI18n();
   return (
     <KPICard
-      title="Net Revenue"
-      value={formatCurrency(value)}
+      title={t("kpi.netRevenue")}
+      value={formatCurrency(value, currency)}
       trendValue={trend !== undefined ? formatPercentage(trend) : undefined}
       trend={trend !== undefined ? (trend >= 0 ? "up" : "down") : undefined}
       icon={<DollarSign className="h-4 w-4" />}
@@ -91,9 +94,10 @@ export function NetRevenueCard({ value, trend }: { value: number; trend?: number
 }
 
 export function ProfitMarginCard({ value }: { value: number }) {
+  const { t } = useI18n();
   return (
     <KPICard
-      title="Profit Margin"
+      title={t("kpi.profitMargin")}
       value={`${value.toFixed(1)}%`}
       trend={value >= 30 ? "up" : value >= 0 ? "neutral" : "down"}
       icon={<Percent className="h-4 w-4" />}
@@ -101,11 +105,12 @@ export function ProfitMarginCard({ value }: { value: number }) {
   );
 }
 
-export function CashflowCard({ value }: { value: number }) {
+export function CashflowCard({ value, currency = "USD" }: { value: number; currency?: string }) {
+  const { t } = useI18n();
   return (
     <KPICard
-      title="Cashflow"
-      value={formatCurrency(value)}
+      title={t("kpi.cashflow")}
+      value={formatCurrency(value, currency)}
       trend={value >= 0 ? "up" : "down"}
       icon={<CreditCard className="h-4 w-4" />}
     />
@@ -113,9 +118,10 @@ export function CashflowCard({ value }: { value: number }) {
 }
 
 export function PropertyCountCard({ value }: { value: number }) {
+  const { t } = useI18n();
   return (
     <KPICard
-      title="Properties"
+      title={t("kpi.properties")}
       value={String(value)}
       icon={<Home className="h-4 w-4" />}
     />

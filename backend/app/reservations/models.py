@@ -27,7 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.base_model import BaseModel
 
 
-class ReservationStatus(enum.StrEnum):
+class ReservationStatus(str, enum.Enum):
     """
     Normalized reservation status — provider-agnostic.
     Airbnb 'confirmed' and Booking 'reserved' both map to CONFIRMED.
@@ -40,7 +40,7 @@ class ReservationStatus(enum.StrEnum):
     BLOCKED = "blocked"
 
 
-class ReservationSource(enum.StrEnum):
+class ReservationSource(str, enum.Enum):
     """Source of the reservation data."""
     AIRBNB = "airbnb"
     BOOKING = "booking"
@@ -55,12 +55,6 @@ class Reservation(BaseModel):
     """A guest reservation — the atomic unit of revenue generation."""
     __tablename__ = "reservations"
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     property_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         ForeignKey("properties.id", ondelete="CASCADE"),
@@ -139,12 +133,6 @@ class Guest(BaseModel):
     """Guest profile — built up over time across reservations."""
     __tablename__ = "guests"
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)

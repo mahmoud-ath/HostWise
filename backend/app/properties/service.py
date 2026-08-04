@@ -2,6 +2,7 @@
 Properties Module — Service Layer
 """
 import uuid
+from datetime import datetime
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,12 +27,9 @@ class PropertyService:
         self.repo = PropertyRepository(session)
 
     async def create(
-        self, organization_id: uuid.UUID, data: PropertyCreateRequest
+        self, data: PropertyCreateRequest
     ) -> PropertyResponse:
-        prop = Property(
-            organization_id=organization_id,
-            **data.model_dump(),
-        )
+        prop = Property(**data.model_dump())
         prop = await self.repo.create(prop)
         return PropertyResponse.model_validate(prop)
 
@@ -41,11 +39,11 @@ class PropertyService:
             raise NotFoundException("Property", str(property_id))
         return PropertyDetailResponse.model_validate(prop)
 
-    async def list_organization(
-        self, organization_id: uuid.UUID, skip: int = 0, limit: int = 100
+    async def list_all(
+        self, skip: int = 0, limit: int = 100
     ) -> tuple[list[PropertyDetailResponse], int]:
-        props = await self.repo.get_organization_properties(organization_id, skip, limit)
-        total = await self.repo.count_by_organization(organization_id)
+        props = await self.repo.get_all_properties(skip, limit)
+        total = await self.repo.count_all()
         items = [PropertyDetailResponse.model_validate(p) for p in props]
         return items, total
 
@@ -59,6 +57,39 @@ class PropertyService:
         for field, value in update_data.items():
             setattr(prop, field, value)
         return PropertyResponse.model_validate(prop)
+
+    async def delete(self, property_id: uuid.UUID) -> None:
+        """Soft-delete a property and its related records.
+
+        Listings, reservations, revenues, and expenses linked to this
+        property are soft-deleted too, so no orphaned financial data
+        remains after the property is removed.
+        """
+        prop = await self.repo.get_by_id(property_id)
+        if not prop:
+            raise NotFoundException("Property", str(property_id))
+
+        from sqlalchemy import update
+
+        from app.finance.models import Expense, Revenue
+        from app.reservations.models import Reservation
+
+        now = datetime.utcnow()
+        prop.is_deleted = True
+        prop.deleted_at = now
+
+        # Cascade soft-delete everything tied to this property.
+        for model in (Listing, Reservation, Revenue, Expense):
+            await self.session.execute(
+                update(model)
+                .where(
+                    model.property_id == property_id,
+                    model.is_deleted == False,
+                )
+                .values(is_deleted=True, deleted_at=now)
+            )
+
+        await self.session.flush()
 
 
 class ListingService:

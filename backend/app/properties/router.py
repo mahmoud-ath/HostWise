@@ -5,8 +5,6 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query
 
-from app.auth.dependencies import get_current_user
-from app.auth.models import User
 from app.properties.schemas import (
     ListingCreateRequest,
     ListingResponse,
@@ -25,28 +23,25 @@ from app.properties.service import (
 router = APIRouter()
 
 
-@router.post("/{org_id}", response_model=PropertyResponse, status_code=201)
+@router.post("", response_model=PropertyResponse, status_code=201)
 async def create_property(
-    org_id: uuid.UUID,
     data: PropertyCreateRequest,
-    current_user: User = Depends(get_current_user),
     service: PropertyService = Depends(get_property_service),
 ):
-    return await service.create(org_id, data)
+    return await service.create(data)
 
 
-@router.get("/{org_id}", response_model=list[PropertyDetailResponse])
+@router.get("", response_model=list[PropertyDetailResponse])
 async def list_properties(
-    org_id: uuid.UUID,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     service: PropertyService = Depends(get_property_service),
 ):
-    items, _ = await service.list_organization(org_id, skip, limit)
+    items, _ = await service.list_all(skip, limit)
     return items
 
 
-@router.get("/detail/{property_id}", response_model=PropertyDetailResponse)
+@router.get("/{property_id}", response_model=PropertyDetailResponse)
 async def get_property(
     property_id: uuid.UUID,
     service: PropertyService = Depends(get_property_service),
@@ -61,6 +56,15 @@ async def update_property(
     service: PropertyService = Depends(get_property_service),
 ):
     return await service.update(property_id, data)
+
+
+@router.delete("/{property_id}", status_code=204)
+async def delete_property(
+    property_id: uuid.UUID,
+    service: PropertyService = Depends(get_property_service),
+):
+    """Delete a property (soft delete)."""
+    await service.delete(property_id)
 
 
 # Listings

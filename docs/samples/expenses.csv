@@ -1,19 +1,8 @@
-expense_id,property_id,date,category,amount
-EXP1P001,P001,2026-01-25,Maintenance,179
-EXP1P002,P002,2026-01-25,Utilities,51
-EXP1P003,P003,2026-01-25,Utilities,156
-EXP2P001,P001,2026-02-25,Utilities,54
-EXP2P002,P002,2026-02-25,Utilities,149
-EXP2P003,P003,2026-02-25,Utilities,42
-EXP3P001,P001,2026-03-25,Maintenance,79
-EXP3P002,P002,2026-03-25,Maintenance,72
-EXP3P003,P003,2026-03-25,Maintenance,97
-EXP4P001,P001,2026-04-25,Internet,94
-EXP4P002,P002,2026-04-25,Cleaning,143
-EXP4P003,P003,2026-04-25,Cleaning,63
-EXP5P001,P001,2026-05-25,Maintenance,115
-EXP5P002,P002,2026-05-25,Cleaning,100
-EXP5P003,P003,2026-05-25,Utilities,141
-EXP6P001,P001,2026-06-25,Maintenance,134
-EXP6P002,P002,2026-06-25,Utilities,112
-EXP6P003,P003,2026-06-25,Internet,149
+property_id,property_name,date,amount,category,vendor
+PROP001,Riad Atlas,15/01/2026,45.00,Cleaning,CleanPro Services
+PROP001,Riad Atlas,20/02/2026,120.00,Maintenance,FixIt Solutions
+PROP002,Villa Océan,10/03/2026,95.00,Pool Maintenance,Blue Pool Care
+PROP002,Villa Océan,05/04/2026,220.00,Utilities,Maroc Électricité
+PROP003,Studio Marina,12/05/2026,60.00,Cleaning,CleanPro Services
+PROP003,Studio Marina,18/06/2026,85.00,Internet & TV,Maroc Telecom
+PROP001,Riad Atlas,01/08/2026,150.00,Gardening,Jardin Vert

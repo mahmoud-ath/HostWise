@@ -169,15 +169,16 @@ def create_app() -> FastAPI:
     from app.analytics.router import router as analytics_router
     from app.auth.router import router as auth_router
     from app.connectors.router import router as connectors_router
-from app.backup_router import router as backup_router
-from app.setup_router import router as setup_router
+    from app.backup_router import router as backup_router
+    from app.setup_router import router as setup_router
     from app.finance.router import router as finance_router
-    from app.organizations.router import router as org_router
     from app.properties.router import router as property_router
     from app.reports.router import router as reports_router
+    from app.maintenance_router import router as maintenance_router
+    from app.settings.router import router as settings_router
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
-    app.include_router(org_router, prefix="/api/v1/organizations", tags=["Organizations"])
+
     app.include_router(property_router, prefix="/api/v1/properties", tags=["Properties"])
     app.include_router(finance_router, prefix="/api/v1/finance", tags=["Finance"])
     app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["Analytics"])
@@ -185,6 +186,8 @@ from app.setup_router import router as setup_router
     app.include_router(reports_router, prefix="/api/v1/reports", tags=["Reports"])
     app.include_router(connectors_router, prefix="/api/v1/connectors", tags=["Connectors"])
     app.include_router(backup_router, prefix="/api/v1", tags=["Backups"])
+    app.include_router(maintenance_router, prefix="/api/v1", tags=["Maintenance"])
+    app.include_router(settings_router, prefix="/api/v1/settings", tags=["Settings"])
     app.include_router(setup_router, prefix="/api/v1", tags=["Setup"])
 
     # Health check with DB status

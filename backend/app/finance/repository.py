@@ -19,9 +19,8 @@ class RevenueRepository(BaseRepository[Revenue]):
     def __init__(self, session: AsyncSession):
         super().__init__(Revenue, session)
 
-    async def get_by_organization(
+    async def get_all(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
         start_date: date | None = None,
@@ -29,13 +28,7 @@ class RevenueRepository(BaseRepository[Revenue]):
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[Revenue]:
-        stmt = (
-            select(Revenue)
-            .where(
-                Revenue.organization_id == organization_id,
-                Revenue.is_deleted == False,
-            )
-        )
+        stmt = select(Revenue).where(Revenue.is_deleted == False)
         if property_id:
             stmt = stmt.where(Revenue.property_id == property_id)
         if category_id:
@@ -51,7 +44,6 @@ class RevenueRepository(BaseRepository[Revenue]):
 
     async def get_total_revenue(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID | None = None,
         start_date: date | None = None,
         end_date: date | None = None,
@@ -64,10 +56,7 @@ class RevenueRepository(BaseRepository[Revenue]):
                 func.coalesce(func.sum(Revenue.commission_amount), 0.0).label("commission"),
                 func.count(Revenue.id).label("count"),
             )
-            .where(
-                Revenue.organization_id == organization_id,
-                Revenue.is_deleted == False,
-            )
+            .where(Revenue.is_deleted == False)
         )
         if property_id:
             stmt = stmt.where(Revenue.property_id == property_id)
@@ -87,7 +76,6 @@ class RevenueRepository(BaseRepository[Revenue]):
 
     async def get_monthly_revenue(
         self,
-        organization_id: uuid.UUID,
         year: int,
         property_id: uuid.UUID | None = None,
     ) -> list[dict]:
@@ -101,7 +89,6 @@ class RevenueRepository(BaseRepository[Revenue]):
                 func.count(Revenue.id).label("count"),
             )
             .where(
-                Revenue.organization_id == organization_id,
                 Revenue.is_deleted == False,
                 extract("year", Revenue.date) == year,
             )
@@ -125,12 +112,11 @@ class RevenueRepository(BaseRepository[Revenue]):
 
     async def get_revenue_by_category(
         self,
-        organization_id: uuid.UUID,
         start_date: date | None = None,
         end_date: date | None = None,
     ) -> list[dict]:
         """Revenue grouped by category."""
-        from app.organizations.models import RevenueCategory
+        from app.finance.category_models import RevenueCategory
         stmt = (
             select(
                 func.coalesce(RevenueCategory.name, "Uncategorized").label("name"),
@@ -138,17 +124,14 @@ class RevenueRepository(BaseRepository[Revenue]):
                 func.count(Revenue.id).label("count"),
             )
             .outerjoin(RevenueCategory, Revenue.category_id == RevenueCategory.id)
-            .where(
-                Revenue.organization_id == organization_id,
-                Revenue.is_deleted == False,
-            )
+            .where(Revenue.is_deleted == False)
         )
         if start_date:
             stmt = stmt.where(Revenue.date >= start_date)
         if end_date:
             stmt = stmt.where(Revenue.date <= end_date)
 
-        total_rev = await self.get_total_revenue(organization_id, start_date=start_date, end_date=end_date)
+        total_rev = await self.get_total_revenue(start_date=start_date, end_date=end_date)
         total_net = total_rev["net"] or 1.0
 
         stmt = stmt.group_by(RevenueCategory.name).order_by(func.sum(Revenue.net_amount).desc())
@@ -165,7 +148,6 @@ class RevenueRepository(BaseRepository[Revenue]):
 
     async def get_revenue_by_property(
         self,
-        organization_id: uuid.UUID,
         start_date: date | None = None,
         end_date: date | None = None,
     ) -> list[dict]:
@@ -181,10 +163,7 @@ class RevenueRepository(BaseRepository[Revenue]):
                 func.count(Revenue.id).label("count"),
             )
             .join(Property, Revenue.property_id == Property.id)
-            .where(
-                Revenue.organization_id == organization_id,
-                Revenue.is_deleted == False,
-            )
+            .where(Revenue.is_deleted == False)
         )
         if start_date:
             stmt = stmt.where(Revenue.date >= start_date)
@@ -210,9 +189,8 @@ class ExpenseRepository(BaseRepository[Expense]):
     def __init__(self, session: AsyncSession):
         super().__init__(Expense, session)
 
-    async def get_by_organization(
+    async def get_all(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
         start_date: date | None = None,
@@ -220,13 +198,7 @@ class ExpenseRepository(BaseRepository[Expense]):
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[Expense]:
-        stmt = (
-            select(Expense)
-            .where(
-                Expense.organization_id == organization_id,
-                Expense.is_deleted == False,
-            )
-        )
+        stmt = select(Expense).where(Expense.is_deleted == False)
         if property_id:
             stmt = stmt.where(Expense.property_id == property_id)
         if category_id:
@@ -242,7 +214,6 @@ class ExpenseRepository(BaseRepository[Expense]):
 
     async def get_total_expenses(
         self,
-        organization_id: uuid.UUID,
         property_id: uuid.UUID | None = None,
         start_date: date | None = None,
         end_date: date | None = None,
@@ -252,10 +223,7 @@ class ExpenseRepository(BaseRepository[Expense]):
                 func.coalesce(func.sum(Expense.amount), 0.0).label("total"),
                 func.count(Expense.id).label("count"),
             )
-            .where(
-                Expense.organization_id == organization_id,
-                Expense.is_deleted == False,
-            )
+            .where(Expense.is_deleted == False)
         )
         if property_id:
             stmt = stmt.where(Expense.property_id == property_id)
@@ -270,7 +238,6 @@ class ExpenseRepository(BaseRepository[Expense]):
 
     async def get_monthly_expenses(
         self,
-        organization_id: uuid.UUID,
         year: int,
         property_id: uuid.UUID | None = None,
     ) -> list[dict]:
@@ -281,7 +248,6 @@ class ExpenseRepository(BaseRepository[Expense]):
                 func.count(Expense.id).label("count"),
             )
             .where(
-                Expense.organization_id == organization_id,
                 Expense.is_deleted == False,
                 extract("year", Expense.date) == year,
             )
@@ -299,11 +265,10 @@ class ExpenseRepository(BaseRepository[Expense]):
 
     async def get_expenses_by_category(
         self,
-        organization_id: uuid.UUID,
         start_date: date | None = None,
         end_date: date | None = None,
     ) -> list[dict]:
-        from app.organizations.models import ExpenseCategory
+        from app.finance.category_models import ExpenseCategory
         stmt = (
             select(
                 func.coalesce(ExpenseCategory.name, "Uncategorized").label("name"),
@@ -311,17 +276,14 @@ class ExpenseRepository(BaseRepository[Expense]):
                 func.count(Expense.id).label("count"),
             )
             .outerjoin(ExpenseCategory, Expense.category_id == ExpenseCategory.id)
-            .where(
-                Expense.organization_id == organization_id,
-                Expense.is_deleted == False,
-            )
+            .where(Expense.is_deleted == False)
         )
         if start_date:
             stmt = stmt.where(Expense.date >= start_date)
         if end_date:
             stmt = stmt.where(Expense.date <= end_date)
 
-        total_exp = await self.get_total_expenses(organization_id, start_date=start_date, end_date=end_date)
+        total_exp = await self.get_total_expenses(start_date=start_date, end_date=end_date)
         total_amt = total_exp["total"] or 1.0
 
         stmt = stmt.group_by(ExpenseCategory.name).order_by(func.sum(Expense.amount).desc())
@@ -338,7 +300,6 @@ class ExpenseRepository(BaseRepository[Expense]):
 
     async def get_expenses_by_property(
         self,
-        organization_id: uuid.UUID,
         start_date: date | None = None,
         end_date: date | None = None,
     ) -> list[dict]:
@@ -351,10 +312,7 @@ class ExpenseRepository(BaseRepository[Expense]):
                 func.count(Expense.id).label("count"),
             )
             .join(Property, Expense.property_id == Property.id)
-            .where(
-                Expense.organization_id == organization_id,
-                Expense.is_deleted == False,
-            )
+            .where(Expense.is_deleted == False)
         )
         if start_date:
             stmt = stmt.where(Expense.date >= start_date)

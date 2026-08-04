@@ -5,34 +5,29 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query
 
-from app.auth.dependencies import get_current_user
-from app.auth.models import User
 from app.reservations.schemas import ReservationCreateRequest, ReservationResponse
 from app.reservations.service import ReservationService, get_reservation_service
 
 router = APIRouter()
 
 
-@router.post("/{org_id}", response_model=ReservationResponse, status_code=201)
+@router.post("", response_model=ReservationResponse, status_code=201)
 async def create_reservation(
-    org_id: str,
     data: ReservationCreateRequest,
-    current_user: User = Depends(get_current_user),
     service: ReservationService = Depends(get_reservation_service),
 ):
-    return await service.create(uuid.UUID(org_id), data)
+    return await service.create(data)
 
 
-@router.get("/{org_id}", response_model=list[ReservationResponse])
+@router.get("", response_model=list[ReservationResponse])
 async def list_reservations(
-    org_id: str,
     property_id: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     service: ReservationService = Depends(get_reservation_service),
 ):
     pid = uuid.UUID(property_id) if property_id else None
-    return await service.list_organization(uuid.UUID(org_id), property_id=pid, skip=skip, limit=limit)
+    return await service.list_all(property_id=pid, skip=skip, limit=limit)
 
 
 @router.get("/detail/{reservation_id}", response_model=ReservationResponse)

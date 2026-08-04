@@ -2,7 +2,7 @@
 Properties Module — Schemas
 """
 
-from pydantic import BaseModel, field
+from pydantic import BaseModel, Field
 
 from app.properties.models import ListingPlatform, PropertyStatus, PropertyType
 from app.shared.schemas import BaseResponse
@@ -78,7 +78,7 @@ class PropertyResponse(BaseResponse):
 
 class PropertyDetailResponse(PropertyResponse):
     """Full property response with listings (eagerly loaded)."""
-    listings: list[ListingResponse] = field(default_factory=list)
+    listings: list[ListingResponse] = Field(default_factory=list)
 
 
 class PropertySummaryResponse(BaseResponse):

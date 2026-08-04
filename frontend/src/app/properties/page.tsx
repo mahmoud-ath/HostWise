@@ -1,142 +1,213 @@
 "use client";
 
-import { useAuth } from "@/contexts/auth-context";
+import { useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { useProperties, usePropertyHealth } from "@/hooks/use-api";
-import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
-import { Building2, Plus, MapPin, Bed, Users } from "lucide-react";
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  useProperties,
+  useCreateProperty,
+  useUpdateProperty,
+  useDeleteProperty,
+  usePropertyHealth,
+  usePropertyAnalytics,
+  usePortfolioAnalytics,
+  type Property,
+} from "@/hooks/use-api";
+import { useSettings } from "@/contexts/settings-context";
+import { useI18n } from "@/lib/i18n";
+import { formatCurrency, formatMonth } from "@/lib/utils";
+import { Building2, Plus, MapPin, Bed, Users, Pencil, Trash2, X, TrendingUp } from "lucide-react";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function PropertiesPage() {
-  const { isAuthenticated, organization } = useAuth();
-
+  const { t } = useI18n();
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Properties</h1>
-            <p className="text-muted-foreground mt-1">Manage your vacation rental portfolio.</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{t("pages.properties.title")}</h1>
+          <p className="mt-1 text-muted-foreground">{t("pages.properties.subtitle")}</p>
         </div>
-        <PropertyList organizationId={organization?.id} />
+        <PropertyList />
       </div>
     </AppShell>
   );
 }
 
-function PropertyList({ organizationId }: { organizationId?: string }) {
-  const { data: properties, isLoading } = useProperties(organizationId);
-  const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "", type: "apartment", city: "", country: "", bedrooms: "1", bathrooms: "1", max_guests: "2",
-  });
+const EMPTY_FORM = {
+  name: "",
+  type: "apartment",
+  city: "",
+  country: "",
+  bedrooms: "1",
+  bathrooms: "1",
+  max_guests: "2",
+  target_annual_revenue: "",
+  target_occupancy: "",
+};
 
-  const handleCreate = async (e: React.FormEvent) => {
+function PropertyList() {
+  const { data: properties, isLoading } = useProperties();
+  const create = useCreateProperty();
+  const update = useUpdateProperty();
+  const del = useDeleteProperty();
+  const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<Property | null>(null);
+  const [detail, setDetail] = useState<Property | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const resetForm = () => { setForm(EMPTY_FORM); setEditing(null); setShowCreate(false); setError(null); };
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!organizationId) {
-      setError("No organization found. Please create an organization first.");
-      return;
-    }
     try {
-      await api.post(`/properties/${organizationId}`, {
-        name: form.name, type: form.type, city: form.city, country: form.country,
-        bedrooms: parseInt(form.bedrooms), bathrooms: parseFloat(form.bathrooms), max_guests: parseInt(form.max_guests),
-      });
-      queryClient.invalidateQueries({ queryKey: ["properties"] });
-      setForm({ name: "", type: "apartment", city: "", country: "", bedrooms: "1", bathrooms: "1", max_guests: "2" });
-      setShowForm(false);
+      const data = {
+        name: form.name,
+        type: form.type,
+        city: form.city,
+        country: form.country,
+        bedrooms: parseInt(form.bedrooms),
+        bathrooms: parseFloat(form.bathrooms),
+        max_guests: parseInt(form.max_guests),
+        target_annual_revenue: form.target_annual_revenue ? parseFloat(form.target_annual_revenue) : undefined,
+        target_occupancy: form.target_occupancy ? parseFloat(form.target_occupancy) : undefined,
+      };
+      if (editing) await update.mutateAsync({ id: editing.id, data });
+      else await create.mutateAsync(data);
+      resetForm();
     } catch (err: any) {
-      setError(err.message || "Failed to create property. Please try again.");
+      setError(err.message || "Failed to save property.");
     }
+  };
+
+  const startEdit = (p: Property) => {
+    setEditing(p);
+    setForm({
+      name: p.name, type: p.type, city: p.city || "", country: p.country || "",
+      bedrooms: String(p.bedrooms), bathrooms: String(p.bathrooms), max_guests: String(p.max_guests),
+      target_annual_revenue: p.target_annual_revenue ? String(p.target_annual_revenue) : "",
+      target_occupancy: p.target_occupancy ? String(p.target_occupancy) : "",
+    });
+    setShowCreate(false);
+    setError(null);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4 mr-1" /> Add Property</Button>
+        <Button onClick={() => { setEditing(null); setForm(EMPTY_FORM); setShowCreate(!showCreate); }}>
+          <Plus className="mr-1 h-4 w-4" /> Add Property
+        </Button>
       </div>
 
-      {error && (
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
+      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
-      {!organizationId && (
-        <div className="rounded-md bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
-          You don&apos;t have an organization yet. Please create one from Settings before adding properties.
-        </div>
-      )}
-
-      {showForm && (
+      {(showCreate || editing) && (
         <Card>
           <CardContent className="p-4">
-            <form onSubmit={handleCreate} className="space-y-3">
+            <form onSubmit={submit} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div><Label className="text-xs">Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Sunset Villa" required /></div>
                 <div>
                   <Label className="text-xs">Type</Label>
-                  <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                    {["apartment","house","condo","villa","cabin","cottage","townhouse","studio","loft"].map(t => <option key={t} value={t}>{t}</option>)}
+                  <select className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                    {["apartment", "house", "condo", "villa", "cabin", "cottage", "townhouse", "studio", "loft"].map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-xs">City</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="e.g. Malibu" /></div>
-                <div><Label className="text-xs">Country</Label><Input value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} placeholder="e.g. US" /></div>
+                <div><Label className="text-xs">City</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+                <div><Label className="text-xs">Country</Label><Input value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} /></div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div><Label className="text-xs">Bedrooms</Label><Input type="number" value={form.bedrooms} onChange={(e) => setForm({ ...form, bedrooms: e.target.value })} /></div>
                 <div><Label className="text-xs">Bathrooms</Label><Input type="number" step="0.5" value={form.bathrooms} onChange={(e) => setForm({ ...form, bathrooms: e.target.value })} /></div>
                 <div><Label className="text-xs">Max Guests</Label><Input type="number" value={form.max_guests} onChange={(e) => setForm({ ...form, max_guests: e.target.value })} /></div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs">Target Annual Revenue</Label><Input type="number" step="0.01" value={form.target_annual_revenue} onChange={(e) => setForm({ ...form, target_annual_revenue: e.target.value })} placeholder="Optional" /></div>
+                <div><Label className="text-xs">Target Occupancy (%)</Label><Input type="number" step="0.1" value={form.target_occupancy} onChange={(e) => setForm({ ...form, target_occupancy: e.target.value })} placeholder="Optional" /></div>
+              </div>
               <div className="flex gap-2">
-                <Button type="submit" size="sm">Create Property</Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
+                <Button type="submit" size="sm">{editing ? "Save Changes" : "Create Property"}</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={resetForm}>Cancel</Button>
               </div>
             </form>
           </CardContent>
         </Card>
       )}
 
-      {isLoading ? <p className="text-sm text-muted-foreground">Loading...</p>
-      : (properties || []).length === 0 ? <p className="text-sm text-muted-foreground text-center py-8">No properties yet. Add your first property!</p>
-      : <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {(properties || []).map((p: { id: string; name: string; type: string; city?: string; country?: string; bedrooms: number; max_guests: number; status: string }) => (
-            <PropertyCard key={p.id} property={p} organizationId={organizationId} />
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      ) : !properties || properties.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">No properties yet. Add your first property!</p>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {properties.map((p) => (
+            <PropertyCard
+              key={p.id}
+              property={p}
+              onOpen={() => setDetail(p)}
+              onEdit={() => startEdit(p)}
+              onDelete={() => { if (confirm(`Delete "${p.name}"? This soft-deletes the property.`)) del.mutate(p.id); }}
+            />
           ))}
-        </div>}
+        </div>
+      )}
+
+      {detail && <PropertyDetailModal property={detail} onClose={() => setDetail(null)} />}
     </div>
   );
 }
 
-function PropertyCard({ property, organizationId }: { property: { id: string; name: string; type: string; city?: string; country?: string; bedrooms: number; max_guests: number; status: string }; organizationId?: string }) {
-  const { data: health } = usePropertyHealth(organizationId, property.id);
+function PropertyCard({ property, onOpen, onEdit, onDelete }: {
+  property: Property;
+  onOpen: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { data: health } = usePropertyHealth(property.id);
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={onOpen}>
       <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-3">
+        <div className="mb-3 flex items-start justify-between">
           <div>
             <h3 className="font-semibold">{property.name}</h3>
-            <p className="text-xs text-muted-foreground capitalize">{property.type}</p>
+            <p className="text-xs capitalize text-muted-foreground">{property.type}</p>
           </div>
-          {health && (
-            <Badge variant={health.status === "healthy" ? "success" : health.status === "average" ? "secondary" : "destructive"}>
-              {health.health_score}/100
-            </Badge>
-          )}
+          <div className="flex items-center gap-1">
+            {health && (
+              <Badge variant={health.status === "healthy" ? "success" : health.status === "average" ? "secondary" : "destructive"}>
+                {health.health_score}/100
+              </Badge>
+            )}
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit(); }} title="Edit">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={(e) => { e.stopPropagation(); onDelete(); }} title="Delete">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
         <div className="space-y-1 text-sm text-muted-foreground">
           {(property.city || property.country) && (
@@ -147,7 +218,110 @@ function PropertyCard({ property, organizationId }: { property: { id: string; na
             <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {property.max_guests} guests</span>
           </div>
         </div>
+        <p className="mt-2 text-xs text-primary">Click for analytics →</p>
       </CardContent>
     </Card>
+  );
+}
+
+function PropertyDetailModal({ property, onClose }: { property: Property; onClose: () => void }) {
+  const year = new Date().getFullYear();
+  const { data: analytics } = usePropertyAnalytics(property.id, year);
+  const { data: health } = usePropertyHealth(property.id);
+  const { get } = useSettings();
+  const currency = get("default_currency", "EUR") as string;
+
+  const monthly = (analytics?.monthly_breakdown as any[]) || [];
+
+  // Derive bookings / avg stay from the real monthly breakdown — the property
+  // analytics endpoint returns `reservation_count` and `nights` per month
+  // (there is no total_reservations / average_stay field), so we sum them
+  // instead of showing a hard-coded 0.
+  const totalReservations = monthly.reduce((s, m) => s + (m.reservation_count || 0), 0);
+  const totalNights = monthly.reduce((s, m) => s + (m.nights || 0), 0);
+  const avgStay = totalReservations > 0 ? +(totalNights / totalReservations).toFixed(1) : 0;
+
+  const stats = [
+    { label: "Net Revenue", value: formatCurrency((analytics?.net_revenue as number) || 0, currency) },
+    { label: "Profit", value: formatCurrency((analytics?.profit as number) || 0, currency) },
+    { label: "Expenses", value: formatCurrency((analytics?.total_expenses as number) || 0, currency) },
+    { label: "Profit Margin", value: `${(analytics?.profit_margin as number) || 0}%` },
+    { label: "Reservations", value: String(totalReservations) },
+    { label: "Avg Stay", value: `${avgStay} nights` },
+    { label: "Cancellation", value: `${(analytics?.cancellation_rate as number) || 0}%` },
+    { label: "Expense Ratio", value: `${(analytics?.expense_ratio as number) || 0}%` },
+    { label: "Health", value: health ? `${health.health_score}/100` : "—" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-bold">{property.name}</h2>
+            <p className="text-xs text-muted-foreground">
+              {property.type} · {[property.city, property.country].filter(Boolean).join(", ") || "—"}
+            </p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {stats.map((s) => (
+            <div key={s.label} className="rounded-lg bg-muted/40 p-3">
+              <p className="text-[10px] text-muted-foreground">{s.label}</p>
+              <p className="text-sm font-bold">{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {monthly.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <TrendingUp className="h-3.5 w-3.5" /> Monthly Net Revenue
+            </p>
+            <div className="h-[220px]">
+              <Bar
+                data={{
+                  labels: monthly.map((m) => formatMonth(m.month).slice(0, 3)),
+                  datasets: [
+                    {
+                      label: "Net Revenue",
+                      data: monthly.map((m) => m.net_revenue || 0),
+                      backgroundColor: "rgba(255, 56, 92, 0.7)",
+                      borderColor: "rgb(255, 56, 92)",
+                      borderWidth: 1,
+                      borderRadius: 6,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      callbacks: {
+                        label: (ctx: any) => ` ${formatCurrency(ctx.raw as number, currency)}`,
+                      },
+                    },
+                  },
+                  scales: {
+                    x: { grid: { display: false } },
+                    y: {
+                      grid: { color: "rgba(221,221,221,0.4)" },
+                      ticks: {
+                        callback: (v: any) =>
+                          Number(v) >= 1000 ? `${(Number(v) / 1000).toFixed(1)}k` : String(Number(v)),
+                      },
+                    },
+                  },
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -32,8 +32,20 @@ def _get_backup_dir() -> Path:
 def get_db_path() -> Optional[Path]:
     """Get the active database path."""
     db_path = os.environ.get("SQLITE_PATH", "")
-    if db_path and Path(db_path).exists():
-        return Path(db_path)
+    if db_path:
+        p = Path(db_path)
+        if not p.is_absolute():
+            p = Path.cwd() / db_path
+        if p.exists():
+            return p
+    # Fallback: check config default
+    from app.core.config import get_settings
+    settings = get_settings()
+    p = Path(settings.SQLITE_PATH)
+    if not p.is_absolute():
+        p = Path.cwd() / settings.SQLITE_PATH
+    if p.exists():
+        return p
     return None
 
 

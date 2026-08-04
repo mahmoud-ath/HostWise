@@ -1,90 +1,123 @@
 "use client";
 
-import { useAuth } from "@/contexts/auth-context";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useAnnualReport, useMonthlyReport } from "@/hooks/use-api";
-import { RevenueBarChart, CashflowLineChart } from "@/components/dashboard/charts";
-import { formatCurrency, getMonthName } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Download } from "lucide-react";
-import { useState } from "react";
+import { usePortfolioReport } from "@/hooks/use-api";
+import { useSettings } from "@/contexts/settings-context";
+import { ReportHeader } from "@/components/reports/report-header";
+import { ExecutiveSummary } from "@/components/reports/executive-summary";
+import { AIInsights } from "@/components/reports/ai-insights";
+import { KpiComparison } from "@/components/reports/kpi-comparison";
+import { PropertyPerformance } from "@/components/reports/property-performance";
+import { ExpenseAnalysis } from "@/components/reports/expense-analysis";
+import { MonthlyTimeline } from "@/components/reports/monthly-timeline";
+import { PortfolioHealth } from "@/components/reports/portfolio-health";
+import { BusinessRisks } from "@/components/reports/business-risks";
+import { Forecast } from "@/components/reports/forecast";
+import { Notes } from "@/components/reports/notes";
+import { RevenueBarChart, CashflowLineChart } from "@/components/dashboard/charts";
+import { ReportPrintView } from "@/components/reports/report-print-view";
+import type { PortfolioReport } from "@/lib/report-types";
+import type { ReportPeriod } from "@/lib/report-period";
 
 export default function ReportsPage() {
-  const { isAuthenticated, organization } = useAuth();
+  const { get, ready } = useSettings();
+  const [currency, setCurrency] = useState(
+    (get("default_currency", "EUR") as string) || "EUR"
+  );
+  const currencyInitialized = useRef(false);
+  useEffect(() => {
+    // Apply the configured default currency once settings are loaded,
+    // without overriding a manual selection made afterwards.
+    if (ready && !currencyInitialized.current) {
+      currencyInitialized.current = true;
+      setCurrency((get("default_currency", "EUR") as string) || "EUR");
+    }
+  }, [ready, get]);
+  const [period, setPeriod] = useState<ReportPeriod>(() => ({
+    year: new Date().getFullYear(),
+  }));
+  const { data: report, isLoading, isError, refetch } = usePortfolioReport(period, currency);
 
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground mt-1">Generate financial reports and executive summaries.</p>
+        <div className="print:hidden">
+          <ReportHeader
+            report={report}
+            period={period}
+            onPeriodChange={setPeriod}
+            currency={currency}
+            onCurrencyChange={setCurrency}
+            loading={isLoading}
+          />
         </div>
-        <ReportsContent organizationId={organization?.id} />
+
+        {isLoading && <ReportsSkeleton />}
+
+        {!isLoading && isError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
+            <p className="font-medium">Could not load the report.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              The backend may be starting up or there is no data for the selected period.
+            </p>
+            <button
+              className="mt-3 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              onClick={() => refetch()}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!isLoading && !isError && report && (
+          <>
+            <div className="space-y-6 print:hidden">
+              <ReportsContent report={report} />
+            </div>
+            <div className="hidden print:block">
+              <ReportPrintView report={report} />
+            </div>
+          </>
+        )}
       </div>
     </AppShell>
   );
 }
 
-function ReportsContent({ organizationId }: { organizationId?: string }) {
-  const year = new Date().getFullYear();
-  const month = new Date().getMonth() + 1;
-  const [view, setView] = useState<"annual" | "monthly">("annual");
-  const [selMonth, setSelMonth] = useState(month);
-
-  const { data: annual, isLoading: annualLoading } = useAnnualReport(organizationId, year);
-  const { data: monthly, isLoading: monthlyLoading } = useMonthlyReport(organizationId, year, selMonth);
-  const data = view === "annual" ? annual : monthly;
-  const loading = view === "annual" ? annualLoading : monthlyLoading;
-
+function ReportsContent({ report }: { report: PortfolioReport }) {
   return (
     <div className="space-y-6">
-      <div className="flex gap-2">
-        <Button variant={view === "annual" ? "default" : "outline"} size="sm" onClick={() => setView("annual")}>Annual {year}</Button>
-        <Button variant={view === "monthly" ? "default" : "outline"} size="sm" onClick={() => setView("monthly")}>Monthly</Button>
-        {view === "monthly" && (
-          <select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={selMonth} onChange={(e) => setSelMonth(parseInt(e.target.value))}>
-            {Array.from({length:12},(_,i)=>i+1).map(m=><option key={m} value={m}>{getMonthName(m)}</option>)}
-          </select>
-        )}
+      <ExecutiveSummary report={report} />
+      <AIInsights report={report} />
+      <KpiComparison report={report} />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <RevenueBarChart data={report.monthly_breakdown || []} title="Monthly Revenue" />
+        <CashflowLineChart data={report.monthly_breakdown || []} title="Cashflow Trend" />
       </div>
 
-      {loading ? <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-60" /></div>
-      : !data ? <p className="text-sm text-muted-foreground">No data available.</p>
-      : <>
-          <div className="grid gap-4 md:grid-cols-5">
-            {["gross_revenue","net_revenue","total_expenses","profit","profit_margin"].map(k=>(
-              <Card key={k}><CardContent className="p-4"><p className="text-xs text-muted-foreground capitalize">{k.replace(/_/g," ")}</p><p className="text-lg font-bold">{k==="profit_margin"?`${(data.summary as any)[k]}%`:formatCurrency((data.summary as any)[k])}</p></CardContent></Card>
-            ))}
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <RevenueBarChart data={(data as any).monthly_breakdown || (data as any).monthly_trend || []} />
-            <CashflowLineChart data={(data as any).monthly_breakdown || (data as any).monthly_trend || []} />
-          </div>
-
-          {data.revenue_by_property && (
-            <Card>
-              <CardHeader><CardTitle>Revenue by Property</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {(data.revenue_by_property || []).map((p: { property_id: string; property_name: string; net_revenue: number; profit: number; profit_margin: number }) => (
-                    <div key={p.property_id} className="flex items-center justify-between py-2 border-b last:border-0">
-                      <span className="text-sm font-medium">{p.property_name}</span>
-                      <div className="flex gap-4 text-sm">
-                        <span>{formatCurrency(p.net_revenue)}</span>
-                        <span className="text-success">{p.profit_margin}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {data.yoy_growth !== undefined && <p className="text-sm text-muted-foreground">Year-over-year growth: <span className={data.yoy_growth >= 0 ? "text-success font-semibold" : "text-destructive font-semibold"}>{data.yoy_growth}%</span></p>}
-        </>}
+      <PropertyPerformance report={report} />
+      <ExpenseAnalysis report={report} />
+      <MonthlyTimeline report={report} />
+      <PortfolioHealth report={report} />
+      <BusinessRisks report={report} />
+      <Forecast report={report} />
+      <Notes report={report} />
     </div>
   );
 }
+
+function ReportsSkeleton() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-32" />
+      <Skeleton className="h-40" />
+      <Skeleton className="h-40" />
+      <Skeleton className="h-60" />
+      <Skeleton className="h-60" />
+    </div>
+  );
+}
+

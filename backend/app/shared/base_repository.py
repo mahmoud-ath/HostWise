@@ -43,11 +43,8 @@ class BaseRepository(Generic[ModelType]):
         self,
         skip: int = 0,
         limit: int = 100,
-        organization_id: uuid.UUID | None = None,
     ) -> Sequence[ModelType]:
         stmt = select(self.model).where(self.model.is_deleted == False)
-        if organization_id and hasattr(self.model, "organization_id"):
-            stmt = stmt.where(self.model.organization_id == organization_id)
         stmt = stmt.offset(skip).limit(limit)
         result = await self.session.execute(stmt)
         return result.scalars().all()

@@ -37,6 +37,17 @@ class ApiClient {
     return this.baseUrl;
   }
 
+  /** Public base URL (e.g. `http://127.0.0.1:8000/api/v1`). */
+  async getApiBaseUrl(): Promise<string> {
+    return this.getBaseUrl();
+  }
+
+  /** Bare host + port (e.g. `http://127.0.0.1:8000`), for health/download URLs. */
+  async getApiHost(): Promise<string> {
+    const base = await this.getBaseUrl();
+    return base.replace(/\/api\/v1\/?$/, "");
+  }
+
   private getToken(): string | null {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("hostwise_access_token");
@@ -103,6 +114,13 @@ class ApiClient {
     });
   }
 
+  async put<T>(endpoint: string, data?: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: "PUT",
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
   async patch<T>(endpoint: string, data?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: "PATCH",
@@ -112,6 +130,33 @@ class ApiClient {
 
   async delete<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: "DELETE" });
+  }
+
+  /** Multipart file upload (FormData). Content-Type is set by the browser. */
+  async upload<T>(endpoint: string, file: File, extraFields?: Record<string, string>): Promise<T> {
+    const baseUrl = await this.getBaseUrl();
+    const token = this.getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+    if (extraFields) {
+      for (const [key, value] of Object.entries(extraFields)) {
+        formData.append(key, value);
+      }
+    }
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+    return response.json();
   }
 
   // Auth helpers

@@ -24,7 +24,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.base_model import BaseModel
 
 
-class RevenueSource(enum.StrEnum):
+class RevenueSource(str, enum.Enum):
     """Where the revenue record originated."""
     MANUAL = "manual"
     CSV = "csv"
@@ -42,12 +42,6 @@ class Revenue(BaseModel):
     """
     __tablename__ = "revenues"
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     property_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         ForeignKey("properties.id", ondelete="CASCADE"),
@@ -95,7 +89,7 @@ class Revenue(BaseModel):
     category: Mapped["RevenueCategory | None"] = relationship("RevenueCategory")
 
 
-class PaymentMethod(enum.StrEnum):
+class PaymentMethod(str, enum.Enum):
     CASH = "cash"
     CREDIT_CARD = "credit_card"
     DEBIT_CARD = "debit_card"
@@ -111,12 +105,6 @@ class Expense(BaseModel):
     """
     __tablename__ = "expenses"
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     property_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         ForeignKey("properties.id", ondelete="CASCADE"),
@@ -152,6 +140,6 @@ class Expense(BaseModel):
 
 
 # Lazy imports
-from app.organizations.models import ExpenseCategory, RevenueCategory
+from app.finance.category_models import ExpenseCategory, RevenueCategory
 from app.properties.models import Property
 from app.reservations.models import Reservation

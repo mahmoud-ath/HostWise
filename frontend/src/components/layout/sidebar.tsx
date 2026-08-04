@@ -12,38 +12,36 @@ import {
   FileText,
   Upload,
   Settings,
-  LogOut,
   Home,
-  Sun,
-  Moon,
   BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
+import { useI18n } from "@/lib/i18n";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/properties", label: "Properties", icon: Building2 },
-  { href: "/finance", label: "Finance", icon: DollarSign },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/ai-advisor", label: "AI Advisor", icon: Brain },
-  { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/import", label: "Import Data", icon: Upload },
-  { href: "/guide", label: "Guide", icon: BookOpen },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", key: "nav.dashboard", icon: LayoutDashboard },
+  { href: "/properties", key: "nav.properties", icon: Building2 },
+  { href: "/finance", key: "nav.finance", icon: DollarSign },
+  { href: "/analytics", key: "nav.analytics", icon: BarChart3 },
+  { href: "/ai-advisor", key: "nav.aiAdvisor", icon: Brain },
+  { href: "/reports", key: "nav.reports", icon: FileText },
+  { href: "/import", key: "nav.importData", icon: Upload },
+  { href: "/guide", key: "nav.guide", icon: BookOpen },
+  { href: "/settings", key: "nav.settings", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
+  const { t } = useI18n();
+
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r bg-card">
+    <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:start-0 border-e bg-card">
       {/* Logo */}
       <div className="flex items-center h-16 px-6 border-b">
-        <Home className="h-6 w-6 text-primary mr-2" />
+        <Home className="h-6 w-6 text-primary me-2" />
         <span className="text-xl font-bold">HostWise</span>
       </div>
 
@@ -63,37 +61,18 @@ export function Sidebar() {
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               )}
             >
-              <Icon className="h-4 w-4 mr-3" />
-              {item.label}
+              <Icon className="h-4 w-4 me-3" />
+              {t(item.key)}
             </Link>
           );
         })}
       </nav>
 
-      {/* Theme Toggle */}
-      <div className="px-3 py-2 border-t">
-        <button
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="flex items-center w-full px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-        >
-          {theme === "dark" ? (
-            <><Sun className="h-4 w-4 mr-3" /> Light Mode</>
-          ) : (
-            <><Moon className="h-4 w-4 mr-3" /> Dark Mode</>
-          )}
-        </button>
-      </div>
-
       {/* User */}
       <div className="p-4 border-t">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{user?.full_name}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-          </div>
-          <Button variant="ghost" size="icon" onClick={logout} title="Logout">
-            <LogOut className="h-4 w-4" />
-          </Button>
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{user?.full_name}</p>
+          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
         </div>
       </div>
     </aside>

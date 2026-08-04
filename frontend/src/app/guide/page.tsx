@@ -1,10 +1,10 @@
 "use client";
 
-import { useAuth } from "@/contexts/auth-context";
 import { AppShell } from "@/components/layout/app-shell";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Building2, DollarSign, BarChart3, Brain, FileText, Upload, Settings,
   Lightbulb, ArrowRight, TrendingUp, Target, AlertTriangle, CheckCircle,
@@ -91,17 +91,14 @@ const guides: Record<string, {
 };
 
 export default function GuidePage() {
-  const { isAuthenticated } = useAuth();
-
+  const { t } = useI18n();
 
   return (
     <AppShell>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Guide</h1>
-          <p className="text-muted-foreground mt-1">
-            Everything you need to know about HostWise — all features explained in one place.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("pages.guide.title")}</h1>
+          <p className="text-muted-foreground mt-1">{t("pages.guide.subtitle")}</p>
         </div>
 
         {Object.entries(guides).map(([path, guide]) => (

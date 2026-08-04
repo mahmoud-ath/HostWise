@@ -1,46 +1,149 @@
 "use client";
 
-import { useAuth } from "@/contexts/auth-context";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
-import { Upload, FileText, Database } from "lucide-react";
+import { useSettings } from "@/contexts/settings-context";
+import { useI18n } from "@/lib/i18n";
+import { Upload, FileText, Database, FileJson, Info } from "lucide-react";
 import { useState } from "react";
 
+type ImportType = "auto" | "reservations" | "revenues" | "expenses";
+
+interface UploadPreview {
+  filename: string;
+  format: string;
+  columns: string[];
+  preview_rows: Record<string, string>[];
+  row_count_estimate: number;
+}
+
+interface ImportResult {
+  format?: string;
+  import_type: string;
+  imported: number;
+  properties_created: number;
+  errors?: string[];
+  error?: string;
+}
+
+const GUIDE: Record<string, { required: string[]; optional: string[]; notes: string }> = {
+  reservations: {
+    required: ["property_name", "check_in", "check_out"],
+    optional: ["property_id", "guest_name", "nights", "gross_amount", "status"],
+    notes: "check_in / check_out use the configured date format (default DD/MM/YYYY). Missing properties are created automatically.",
+  },
+  revenues: {
+    required: ["property_name", "date", "gross_revenue"],
+    optional: ["property_id", "commission_amount", "net_revenue", "source"],
+    notes: "source can be airbnb, booking, direct or csv. net_revenue defaults to gross minus commission.",
+  },
+  expenses: {
+    required: ["property_name", "date", "amount"],
+    optional: ["property_id", "category", "vendor"],
+    notes: "category is stored as the expense description.",
+  },
+};
+
 export default function ImportPage() {
-  const { isAuthenticated, organization } = useAuth();
+  const { settings } = useSettings();
+  const { t } = useI18n();
+  const [activeType, setActiveType] = useState<ImportType>("auto");
 
   return (
     <AppShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Import Data</h1>
-          <p className="text-muted-foreground mt-1">Upload CSV files or connect booking platforms.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("pages.import.title")}</h1>
+          <p className="text-muted-foreground mt-1">{t("pages.import.subtitle")}</p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Upload className="h-5 w-5" /> CSV Upload</CardTitle>
-              <CardDescription>Import reservations, revenue, or expenses from CSV files.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CSVUploadSection />
-            </CardContent>
-          </Card>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" /> {t("import.fileUpload")}
+                </CardTitle>
+                <CardDescription>
+                  Supported formats: <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold">.csv</span>{" "}
+                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold">.json</span> · Date format:{" "}
+                  <span className="font-medium">{settings.import_date_format || "DD/MM/YYYY"}</span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CSVUploadSection defaultType={activeType} />
+              </CardContent>
+            </Card>
 
-          <Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Info className="h-5 w-5" /> {t("import.importGuide")}
+                </CardTitle>
+                <CardDescription>
+                  Pick a data type to see the expected columns. The importer also accepts{" "}
+                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold">.json</span> files: an array of row objects, or{" "}
+                  <code className="text-xs">{"{ \"type\": \"revenues\", \"rows\": [...] }"}</code>.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {(["reservations", "revenues", "expenses"] as const).map((type) => (
+                    <Button
+                      key={type}
+                      size="sm"
+                      variant={activeType === type ? "default" : "outline"}
+                      onClick={() => setActiveType(type)}
+                    >
+                      {t(`import.${type}`)}
+                    </Button>
+                  ))}
+                </div>
+                {activeType !== "auto" && (
+                  <div className="space-y-3 text-sm">
+                    <div className="flex flex-wrap gap-1.5">
+                      {GUIDE[activeType].required.map((col) => (
+                        <Badge key={col} className="bg-emerald-600 text-white">{col}*</Badge>
+                      ))}
+                      {GUIDE[activeType].optional.map((col) => (
+                        <Badge key={col} variant="secondary">{col}</Badge>
+                      ))}
+                    </div>
+                    <p className="text-muted-foreground text-xs leading-relaxed">{GUIDE[activeType].notes}</p>
+                  </div>
+                )}
+                {activeType === "auto" && (
+                  <p className="text-sm text-muted-foreground">
+                    The importer can auto-detect the type from the file&apos;s columns. Select a specific type to
+                    view its required columns.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="h-fit">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" /> Available Connectors</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" /> {t("import.availableConnectors")}</CardTitle>
               <CardDescription>Connect booking platforms for automatic data sync.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {["CSV Import", "Airbnb API — Coming Soon", "Booking.com — Coming Soon", "Vrbo — Coming Soon", "iCal — Coming Soon"].map((c, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 px-3 rounded border">
+                {[
+                  ["CSV / JSON Import", "Active"],
+                  ["Airbnb API", "Planned"],
+                  ["Booking.com", "Planned"],
+                  ["Vrbo", "Planned"],
+                  ["iCal", "Planned"],
+                ].map(([c, status]) => (
+                  <div key={c} className="flex items-center justify-between py-2 px-3 rounded border">
                     <span className="text-sm">{c}</span>
-                    <span className="text-[10px] text-muted-foreground">{i === 0 ? "Active" : "Planned"}</span>
+                    <span className={`text-[10px] font-medium ${status === "Active" ? "text-emerald-600" : "text-muted-foreground"}`}>
+                      {status}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -52,29 +155,25 @@ export default function ImportPage() {
   );
 }
 
-function CSVUploadSection() {
+function CSVUploadSection({ defaultType }: { defaultType: ImportType }) {
+  const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<any>(null);
+  const [preview, setPreview] = useState<UploadPreview | null>(null);
+  const [importType, setImportType] = useState<ImportType>(defaultType);
   const [uploading, setUploading] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<any>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
     setImportResult(null);
-    const formData = new FormData();
-    formData.append("file", file);
     try {
-      const result = await fetch("http://localhost:8000/api/v1/connectors/csv/upload", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("hostwise_access_token")}` },
-        body: formData,
-      });
-      const data = await result.json();
+      const data = await api.upload<UploadPreview>("/connectors/csv/upload", file);
       setPreview(data);
     } catch (e) {
       console.error(e);
+      setImportResult({ import_type: "upload", imported: 0, properties_created: 0, error: e instanceof Error ? e.message : "Upload failed" });
     } finally {
       setUploading(false);
     }
@@ -84,64 +183,98 @@ function CSVUploadSection() {
     if (!preview?.filename) return;
     setImporting(true);
     try {
-      const result = await fetch(
-        `http://localhost:8000/api/v1/connectors/csv/import?filename=${encodeURIComponent(preview.filename)}&import_type=auto`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${localStorage.getItem("hostwise_access_token")}` },
-        }
+      const data = await api.post<ImportResult>(
+        `/connectors/csv/import?filename=${encodeURIComponent(preview.filename)}&import_type=${importType}`
       );
-      const data = await result.json();
       setImportResult(data);
     } catch (e) {
       console.error(e);
-      setImportResult({ error: "Import failed" });
+      setImportResult({ import_type: "import", imported: 0, properties_created: 0, error: e instanceof Error ? e.message : "Import failed" });
     } finally {
       setImporting(false);
     }
   };
 
+  const isJson = file?.name.toLowerCase().endsWith(".json") ?? false;
+
   return (
     <div className="space-y-4">
       <div className="border-2 border-dashed rounded-lg p-6 text-center">
-        <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm text-muted-foreground mb-3">Drop a CSV file or click to browse</p>
-        <input type="file" accept=".csv" onChange={(e) => setFile(e.target.files?.[0] || null)} className="text-sm" />
+        {isJson ? (
+          <FileJson className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+        ) : (
+          <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+        )}
+        <p className="text-sm text-muted-foreground mb-3">{t("import.dropHint")}</p>
+        <input
+          type="file"
+          accept=".csv,.json"
+          onChange={(e) => {
+            setFile(e.target.files?.[0] || null);
+            setPreview(null);
+            setImportResult(null);
+          }}
+          className="text-sm"
+        />
       </div>
+
       {file && (
-        <div className="flex items-center justify-between">
-          <span className="text-sm">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-          <Button size="sm" onClick={handleUpload} disabled={uploading}>{uploading ? "Uploading..." : "Upload & Preview"}</Button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm truncate max-w-[220px]">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+          <div className="flex items-center gap-2">
+            <select
+              value={importType}
+              onChange={(e) => setImportType(e.target.value as ImportType)}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="auto">{t("import.autoDetect")}</option>
+              <option value="reservations">{t("import.reservations")}</option>
+              <option value="revenues">{t("import.revenues")}</option>
+              <option value="expenses">{t("import.expenses")}</option>
+            </select>
+            <Button size="sm" onClick={handleUpload} disabled={uploading}>
+              {uploading ? "..." : t("import.uploadPreview")}
+            </Button>
+          </div>
         </div>
       )}
+
       {preview && (
         <div className="mt-4 space-y-3">
           <div className="p-3 rounded-lg bg-muted/50">
-            <p className="text-xs font-medium mb-2">Preview — {preview.columns?.length || 0} columns detected</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium">
+                {preview.format === "json" ? "JSON" : "CSV"} — {preview.columns?.length || 0} columns ·{" "}
+                {preview.row_count_estimate} rows detected
+              </p>
+              <span className="text-[10px] text-muted-foreground">Preview of first 5 rows</span>
+            </div>
             <div className="overflow-x-auto">
               <table className="text-xs w-full">
-                <thead><tr>{preview.columns?.map((c: string) => <th key={c} className="text-left p-1">{c}</th>)}</tr></thead>
+                <thead>
+                  <tr>{preview.columns?.map((c) => <th key={c} className="text-left p-1">{c}</th>)}</tr>
+                </thead>
                 <tbody>
-                  {preview.preview_rows?.map((row: any, i: number) => (
-                    <tr key={i}>{preview.columns?.map((c: string) => <td key={c} className="p-1">{row[c]}</td>)}</tr>
+                  {preview.preview_rows?.map((row, i) => (
+                    <tr key={i}>{preview.columns?.map((c) => <td key={c} className="p-1">{row[c] ?? ""}</td>)}</tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
           <Button onClick={handleImport} disabled={importing} className="w-full">
-            {importing ? "Importing..." : "Import into Database"}
+            {importing ? "..." : t("import.importDatabase")}
           </Button>
           {importResult && (
             <div className={`p-3 rounded-lg text-sm ${importResult.error ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
               {importResult.error
-                ? importResult.error
+                ? `❌ ${importResult.error}`
                 : `✅ Imported ${importResult.imported} ${importResult.import_type} rows` +
                   (importResult.properties_created ? ` (${importResult.properties_created} new properties created)` : "")}
-              {importResult.errors?.length > 0 && (
+              {importResult.errors && importResult.errors.length > 0 && (
                 <details className="mt-1 text-xs">
                   <summary>{importResult.errors.length} errors</summary>
-                  {importResult.errors.map((e: string, i: number) => <div key={i}>• {e}</div>)}
+                  {importResult.errors.map((e, i) => <div key={i}>• {e}</div>)}
                 </details>
               )}
             </div>

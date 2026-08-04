@@ -3,6 +3,7 @@ Finance Module — Schemas
 
 Request/Response schemas for revenue, expense, and financial KPIs.
 """
+import datetime
 from datetime import date
 from uuid import UUID
 
@@ -66,6 +67,18 @@ class ExpenseCreateRequest(BaseModel):
     description: str | None = None
     notes: str | None = None
     is_recurring: bool = False
+
+
+class ExpenseUpdateRequest(BaseModel):
+    property_id: str | None = None
+    category_id: str | None = None
+    date: datetime.date | None = None
+    amount: float | None = Field(None, ge=0)
+    vendor: str | None = None
+    payment_method: PaymentMethod | None = None
+    description: str | None = None
+    notes: str | None = None
+    is_recurring: bool | None = None
 
 
 class ExpenseResponse(BaseResponse):
