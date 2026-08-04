@@ -14,6 +14,7 @@ import {
   Settings,
   Home,
   BookOpen,
+  MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "next-themes";
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/import", key: "nav.importData", icon: Upload },
   { href: "/guide", key: "nav.guide", icon: BookOpen },
   { href: "/settings", key: "nav.settings", icon: Settings },
+  { href: "/feedback", key: "nav.feedback", icon: MessageSquare },
 ];
 
 export function Sidebar() {

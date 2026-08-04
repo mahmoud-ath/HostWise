@@ -15,7 +15,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.finance.models import Expense, Revenue, RevenueSource
+from app.finance.models import Expense, ExpenseCategory, Revenue, RevenueSource
 from app.properties.models import Property, PropertyType
 from app.reservations.models import Reservation, ReservationSource, ReservationStatus
 
@@ -148,6 +148,27 @@ class ConnectorService:
                 prop_map[row.get("property_id", "")] = pid
             return pid
 
+        # Expense category cache — CSV imports carry a category name, so we
+        # find-or-create the matching ExpenseCategory and link it by id.
+        exp_cat_cache: dict[str, ExpenseCategory] = {}
+        result = await self.session.execute(
+            select(ExpenseCategory).where(ExpenseCategory.is_deleted == False)
+        )
+        for cat in result.scalars().all():
+            exp_cat_cache[cat.name.lower()] = cat
+
+        async def resolve_expense_category(name: str) -> ExpenseCategory | None:
+            key = (name or "").strip().lower()
+            if not key:
+                return None
+            cat = exp_cat_cache.get(key)
+            if not cat:
+                cat = ExpenseCategory(name=name.strip(), is_default=False, sort_order=0)
+                self.session.add(cat)
+                await self.session.flush()
+                exp_cat_cache[key] = cat
+            return cat
+
         detected = self.detect_type(import_type, columns)
         imported = 0
         errors: list[str] = []
@@ -224,12 +245,15 @@ class ConnectorService:
                         continue
                     exp_date = _parse_date(row.get("date") or "", date_fmt)
                     amount = float(row.get("amount", 0) or 0)
+                    cat_name = (row.get("category") or "").strip()
+                    category = await resolve_expense_category(cat_name) if cat_name else None
                     self.session.add(Expense(
                         property_id=prop_id,
                         date=exp_date,
                         amount=amount,
                         currency=currency,
-                        description=(row.get("category") or "").strip() or None,
+                        category_id=category.id if category else None,
+                        description=cat_name or None,
                         vendor=(row.get("vendor") or "").strip() or None,
                     ))
                     imported += 1

@@ -278,7 +278,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
         {monthly.length > 0 && (
           <div className="mt-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <TrendingUp className="h-3.5 w-3.5" /> Monthly Net Revenue
+              <TrendingUp className="h-3.5 w-3.5" /> Monthly Revenue & Expenses
             </p>
             <div className="h-[220px]">
               <Bar
@@ -290,6 +290,14 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
                       data: monthly.map((m) => m.net_revenue || 0),
                       backgroundColor: "rgba(255, 56, 92, 0.7)",
                       borderColor: "rgb(255, 56, 92)",
+                      borderWidth: 1,
+                      borderRadius: 6,
+                    },
+                    {
+                      label: "Expenses",
+                      data: monthly.map((m) => m.total_expenses || 0),
+                      backgroundColor: "rgba(0, 132, 137, 0.7)",
+                      borderColor: "rgb(0, 132, 137)",
                       borderWidth: 1,
                       borderRadius: 6,
                     },
@@ -319,8 +327,19 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
                 }}
               />
             </div>
+            <div className="mt-2 flex items-center justify-center gap-5 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "rgba(255, 56, 92, 0.7)" }} />
+                Net Revenue
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "rgba(0, 132, 137, 0.7)" }} />
+                Expenses
+              </span>
+            </div>
           </div>
         )}
+
       </div>
     </div>
   );

@@ -252,7 +252,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A[GET /ai/analyze or /ai/advisor] --> B[AIAdvisorService]
+    A[GET /ai/advisor] --> B[AIAdvisorService]
     B --> C[FinancialReportingService.get_annual_report]
     B --> D[AnalyticsService.get_portfolio_analytics]
     B --> E[property health scores]

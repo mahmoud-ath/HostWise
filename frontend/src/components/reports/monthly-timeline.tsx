@@ -24,7 +24,7 @@ export function MonthlyTimeline({ report }: { report: PortfolioReport }) {
             </span>
             <div className="flex h-6 flex-1 items-center overflow-hidden rounded bg-muted/60">
               <div
-                className="flex h-full items-center rounded bg-primary/80 px-2"
+                className="flex h-full items-center rounded bg-primary/80 px-2 bg-primary"
                 style={{ width: `${Math.max((m.net_revenue / max) * 100, m.net_revenue > 0 ? 3 : 0)}%` }}
               >
                 {m.net_revenue > 0 && (

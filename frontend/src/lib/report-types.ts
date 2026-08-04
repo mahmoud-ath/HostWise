@@ -121,6 +121,7 @@ export interface PortfolioReport {
       revenue: number;
       profit: number;
       expenses: number;
+      revenue_change_pct: number;
     };
     distribution: {
       excellent: number;

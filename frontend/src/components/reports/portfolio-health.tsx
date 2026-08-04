@@ -15,6 +15,7 @@ const COMPONENT_COLORS: Record<string, string> = {
 export function PortfolioHealth({ report }: { report: PortfolioReport }) {
   const health = report.portfolio_health;
   const { components, distribution } = health;
+  const revenueGrowth = health.components.revenue_change_pct;
 
   const bars = [
     { key: "revenue", label: "Revenue" },
@@ -65,7 +66,19 @@ export function PortfolioHealth({ report }: { report: PortfolioReport }) {
           {bars.map((b) => (
             <div key={b.key}>
               <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-medium">{b.label}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  {b.label}
+                  {b.key === "revenue" && revenueGrowth !== undefined && (
+                    <span
+                      className={`text-xs font-normal ${
+                        revenueGrowth < 0 ? "text-destructive" : "text-success"
+                      }`}
+                    >
+                      {revenueGrowth < 0 ? "↓" : "↑"} {Math.abs(revenueGrowth).toFixed(1)}% vs prev
+                      period
+                    </span>
+                  )}
+                </span>
                 <span className="text-muted-foreground">{components[b.key]}/100</span>
               </div>
               <ProgressBar value={components[b.key]} color={COMPONENT_COLORS[b.key]} />

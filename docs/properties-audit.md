@@ -4,9 +4,11 @@
 
 > **v2 update:** Full **CRUD** — create/edit (including `target_annual_revenue`)
 > and soft-delete via the API. Selecting a property opens a **detail modal** with
-> brief profit-focused analytics (revenue, profit, margin, reservations, avg stay,
-> cancellation, expense ratio, health) plus monthly bars, honoring the settings
-> currency.
+> profit-focused analytics (net revenue, profit, expenses, margin, reservations,
+> avg stay, cancellation, expense ratio, health) plus a combined **Monthly
+> Revenue & Expenses** bar chart (Net Revenue + Expenses datasets with a custom
+> legend), honoring the settings currency. Reservations/avg stay are derived from
+> the monthly breakdown (the property endpoint doesn't return them directly).
 
 The Properties page manages the **portfolio of assets** — the physical units
 whose performance everything else measures. It exists so a host can register
@@ -55,13 +57,16 @@ sequenceDiagram
 | Component | Responsibility |
 | --- | --- |
 | `PropertyList` | Fetch, create form, grid of `PropertyCard` |
-| `PropertyCard` | Name, type, location, bedrooms/guests, health badge |
+| `PropertyCard` | Name, type, location, bedrooms/guests, health badge, “Click for analytics” |
 | Form (inline) | Create property (name, type, city, country, bedrooms, bathrooms, max_guests) |
+| `PropertyDetailModal` | Per-property analytics modal: 9-stat grid + combined Monthly Revenue & Expenses chart (Net Revenue + Expenses datasets, custom legend) |
 
 ## Hooks
 
 - `useProperties()` → `/properties` list.
 - `usePropertyHealth(propertyId)` → per-property health score.
+- `usePropertyAnalytics(propertyId, year)` → detail modal data (net revenue, profit,
+  expenses, margin, monthly breakdown incl. `total_expenses` per month).
 - Create uses **direct `api.post` + manual invalidation** (inconsistent with
   the create-mutation pattern used in Finance — a small debt).
 
@@ -71,7 +76,8 @@ sequenceDiagram
 | --- | --- |
 | `GET /properties` | List all properties with listings. |
 | `POST /properties` | Create a property (the write surface). |
-| `GET /analytics/property/{id}/health` | Health score badge per card (computed on demand from occupancy vs target, margin, cancellation rate, expense ratio). |
+| `GET /analytics/property/{id}/health` | Health score badge per card (margin, cancellation rate, expense ratio, net revenue). |
+| `GET /analytics/property/{id}?year` | Detail modal: totals + `monthly_breakdown[]` (each month: gross/net revenue, reservation_count, nights, `total_expenses`). |
 
 > Note: `GET /properties` returns `PropertyDetailResponse` (with listings) even
 > for the list view — slightly heavier than needed; a lightweight summary
@@ -93,6 +99,8 @@ See property cards with health badges
 Add a property (name, type, location, capacity)
   ↓
 Card appears with a health score (computed from real data)
+  ↓
+Click "Click for analytics" → modal with stats + Monthly Revenue & Expenses chart
   ↓
 Decision: "Villa Atlas is healthy (85); Apartment B (55) needs a look" → /analytics
 ```

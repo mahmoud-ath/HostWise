@@ -37,7 +37,7 @@ export function setAppLocale(locale: string) {
   activeLocale = locale;
 }
 
-export function formatCurrency(amount: number, currency: string = "USD"): string {
+export function formatCurrency(amount: number, currency: string = "EUR"): string {
   return new Intl.NumberFormat(activeLocale, {
     style: "currency",
     currency,
@@ -46,7 +46,7 @@ export function formatCurrency(amount: number, currency: string = "USD"): string
   }).format(amount);
 }
 
-export function formatCurrencyDetailed(amount: number, currency: string = "USD"): string {
+export function formatCurrencyDetailed(amount: number, currency: string = "EUR"): string {
   return new Intl.NumberFormat(activeLocale, {
     style: "currency",
     currency,

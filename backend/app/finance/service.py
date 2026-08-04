@@ -598,6 +598,29 @@ class FinancialReportingService:
             yoy_growth=yoy_growth,
         )
 
+    async def get_range_annual_report(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> AnnualReport:
+        """Annual-report shaped data for an arbitrary date range.
+
+        Lets the dashboard render the same sections for a custom period as it
+        does for a calendar year (charts, expense breakdown, latest report).
+        """
+        pr = await self.get_period_report(start_date, end_date)
+        return AnnualReport(
+            year=end_date.year,
+            summary=pr.summary,
+            monthly_breakdown=pr.monthly_breakdown,
+            revenue_by_category=pr.revenue_by_category,
+            expense_by_category=pr.expense_by_category,
+            revenue_by_property=pr.revenue_by_property,
+            best_month=pr.best_month,
+            worst_month=pr.worst_month,
+            yoy_growth=None,
+        )
+
 
 # FastAPI dependencies
 async def get_revenue_service(

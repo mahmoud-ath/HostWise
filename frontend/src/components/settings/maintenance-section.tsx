@@ -12,6 +12,8 @@ import {
   FileText,
   Loader2,
   CheckCircle2,
+  RefreshCw,
+  ClipboardCopy,
 } from "lucide-react";
 import {
   useMaintenanceStatus,
@@ -19,16 +21,28 @@ import {
   useResetDemoData,
   useBackendLogs,
 } from "@/hooks/use-api";
+import { useBackend } from "@/contexts/backend-context";
 import { useI18n } from "@/lib/i18n";
 import { formatBytes } from "./backup-section";
 
+// Merged Maintenance + Developer tab (one tab, no redundancy):
+// database housekeeping + backend diagnostics + a single shared log viewer.
 export function MaintenanceSection() {
   const { data: status, isLoading } = useMaintenanceStatus();
   const { t } = useI18n();
   const optimize = useOptimizeDatabase();
   const reset = useResetDemoData();
+  const { status: backendStatus, isReady, restartBackend } = useBackend();
   const [showLogs, setShowLogs] = useState(false);
+  const [copied, setCopied] = useState(false);
   const logs = useBackendLogs(200);
+
+  const apiUrl =
+    (typeof window !== "undefined" &&
+      "__TAURI_INTERNALS__" in window &&
+      "get_backend_url" in window)
+      ? "dynamic (Tauri)"
+      : process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 
   const clearCache = () => {
     if (!confirm("Clear cached application data? Your data is safe; only cached values are removed.")) return;
@@ -49,6 +63,25 @@ export function MaintenanceSection() {
       onSuccess: (res) => alert(`Demo data reset: ${Object.entries(res.deleted).map(([k, v]) => `${k} (${v})`).join(", ")}`),
       onError: () => alert("Failed to reset demo data."),
     });
+  };
+
+  const copyDiagnostics = async () => {
+    const text = [
+      "HostWise Diagnostics",
+      `Backend status: ${backendStatus}`,
+      `Backend ready: ${isReady}`,
+      `API URL: ${apiUrl}`,
+      `User agent: ${navigator.userAgent}`,
+      `Screen: ${window.screen.width}x${window.screen.height}`,
+      `Local time: ${new Date().toISOString()}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
   };
 
   return (
@@ -78,6 +111,17 @@ export function MaintenanceSection() {
         </div>
       </div>
 
+      <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+        <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
+          <span className="text-muted-foreground">Backend Status</span>
+          <Badge variant={isReady ? "success" : "destructive"} className="capitalize">{backendStatus}</Badge>
+        </div>
+        <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
+          <span className="text-muted-foreground">API URL</span>
+          <span className="font-mono text-xs">{apiUrl}</span>
+        </div>
+      </div>
+
       <div className="mt-4 flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => optimize.mutate()} disabled={optimize.isPending}>
           {optimize.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Database className="mr-1.5 h-4 w-4" />}
@@ -88,6 +132,13 @@ export function MaintenanceSection() {
         </Button>
         <Button variant="outline" size="sm" onClick={() => setShowLogs((v) => !v)}>
           <FileText className="mr-1.5 h-4 w-4" /> View Logs
+        </Button>
+        <Button variant="outline" size="sm" onClick={restartBackend}>
+          <RefreshCw className="mr-1.5 h-4 w-4" /> Restart Backend
+        </Button>
+        <Button variant="outline" size="sm" onClick={copyDiagnostics}>
+          <ClipboardCopy className="mr-1.5 h-4 w-4" />
+          {copied ? "Copied!" : "Copy Diagnostics"}
         </Button>
         <Button variant="destructive" size="sm" onClick={resetDemo} disabled={reset.isPending}>
           {reset.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}

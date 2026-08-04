@@ -33,3 +33,28 @@ export function toInputDate(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+/** Short label for a period (used in titles/buttons). */
+export function periodLabel(p: ReportPeriod): string {
+  if (p.year) return String(p.year);
+  if (p.start && p.end) return `${p.start} – ${p.end}`;
+  return "";
+}
+
+/**
+ * The equally-sized period immediately before `p`.
+ * A calendar year compares to the previous year; a custom range compares to
+ * the same-length window immediately before it (matching the backend).
+ */
+export function previousPeriod(p: ReportPeriod): ReportPeriod {
+  if (p.year) return { year: p.year - 1 };
+  if (p.start && p.end) {
+    const start = new Date(`${p.start}T00:00:00`);
+    const end = new Date(`${p.end}T00:00:00`);
+    const len = end.getTime() - start.getTime();
+    const prevEnd = new Date(start.getTime() - 86_400_000); // day before start
+    const prevStart = new Date(prevEnd.getTime() - len);
+    return { start: toInputDate(prevStart), end: toInputDate(prevEnd) };
+  }
+  return {};
+}

@@ -152,7 +152,7 @@ class ReportGenerationService:
         self,
         start_date: date | None = None,
         end_date: date | None = None,
-        currency: str = "USD",
+        currency: str = "EUR",
     ) -> dict:
         """
         Generate a comprehensive portfolio report aggregating financials,
@@ -176,7 +176,7 @@ class ReportGenerationService:
         # Business settings affect the report (currency + tax rate)
         settings = await SettingsService(self.session).get_all()
         if not currency:
-            currency = settings.get("default_currency", "USD")
+            currency = settings.get("default_currency", "EUR")
         tax_rate = float(settings.get("tax_rate", 0) or 0)
 
         # Financial data (current + previous period for comparisons)
@@ -319,7 +319,10 @@ class ReportGenerationService:
         """Compute a portfolio health score (0-100) + component bars."""
         # Component scores (used for the visual bars)
         rev_growth = kpi["revenue"]["change_pct"]
-        revenue_score = self._clamp(50 + (rev_growth or 0) * 2.5)
+        # The Revenue bar scores GROWTH vs the previous period, not the revenue
+        # amount. Soft scale: 0% growth = 50 (neutral), ~+-50% growth maps to
+        # 0/100 — so a moderate decline like -20% reads ~30 instead of a flat 0.
+        revenue_score = self._clamp(50 + (rev_growth or 0) * 1.0)
 
         margin = annual.summary.profit_margin
         profit_score = self._clamp(margin / 50 * 100)
@@ -350,6 +353,7 @@ class ReportGenerationService:
                 "revenue": revenue_score,
                 "profit": profit_score,
                 "expenses": expense_score,
+                "revenue_change_pct": round(rev_growth or 0, 1),
             },
             "distribution": portfolio.get(
                 "health_distribution",

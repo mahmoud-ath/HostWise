@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n";
 import { useSettings } from "@/contexts/settings-context";
-import { AccountSection } from "@/components/settings/account-section";
 import { BusinessSection } from "@/components/settings/business-section";
 import { AISection } from "@/components/settings/ai-section";
 import { BackupSection } from "@/components/settings/backup-section";
@@ -15,8 +14,34 @@ import { AppearanceSection } from "@/components/settings/appearance-section";
 import { SecuritySection } from "@/components/settings/security-section";
 import { MaintenanceSection } from "@/components/settings/maintenance-section";
 import { AboutSection } from "@/components/settings/about-section";
-import { DeveloperSection } from "@/components/settings/developer-section";
-import { Settings as SettingsIcon, Save, RotateCcw, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Settings as SettingsIcon,
+  Save,
+  RotateCcw,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  Briefcase,
+  Brain,
+  Palette,
+  Shield,
+  Database,
+  Upload,
+  Wrench,
+  Info,
+} from "lucide-react";
+
+const TABS = [
+  { id: "business", labelKey: "settings.business", label: "Business", icon: Briefcase, content: <BusinessSection /> },
+  { id: "ai", labelKey: "settings.ai", label: "AI Advisor", icon: Brain, content: <AISection /> },
+  { id: "appearance", label: "Appearance", icon: Palette, content: <AppearanceSection /> },
+  { id: "security", labelKey: "settings.security", label: "Security", icon: Shield, content: <SecuritySection /> },
+  { id: "backup", labelKey: "settings.backup", label: "Backup", icon: Database, content: <BackupSection /> },
+  { id: "import", labelKey: "settings.dataImport", label: "Import", icon: Upload, content: <ImportSection /> },
+  { id: "maintenance", labelKey: "settings.maintenance", label: "Maintenance", icon: Wrench, content: <MaintenanceSection /> },
+  { id: "about", labelKey: "settings.aboutTitle", label: "About", icon: Info, content: <AboutSection /> },
+] as const;
 
 export default function SettingsPage() {
   const { t } = useI18n();
@@ -79,22 +104,27 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-6">
-            <AccountSection />
-            <BusinessSection />
-            <AISection />
-            <AppearanceSection />
-            <SecuritySection />
+        <Tabs defaultValue="business" orientation="vertical" className="flex gap-6">
+          <TabsList className="flex h-auto w-52 shrink-0 flex-col items-stretch justify-start gap-1 rounded-lg p-1.5">
+            {TABS.map((tab) => (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="justify-start gap-2 rounded-md px-3 py-2 text-sm"
+              >
+                <tab.icon className="h-4 w-4 shrink-0" />
+                {tab.labelKey ? t(tab.labelKey) : tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="min-w-0 flex-1">
+            {TABS.map((tab) => (
+              <TabsContent key={tab.id} value={tab.id} className="mt-0">
+                {tab.content}
+              </TabsContent>
+            ))}
           </div>
-          <div className="space-y-6">
-            <BackupSection />
-            <ImportSection />
-            <MaintenanceSection />
-            <AboutSection />
-            <DeveloperSection />
-          </div>
-        </div>
+        </Tabs>
       </div>
     </AppShell>
   );

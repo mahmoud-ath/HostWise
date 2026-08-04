@@ -39,15 +39,25 @@ async def analyze_financial_performance(
 
 @router.get("/advisor")
 async def get_advisor_report(
-    year: int = Query(..., ge=2020, le=2100),
+    year: int | None = Query(None, ge=2020, le=2100),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     service: AIAdvisorService = Depends(get_ai_advisor_service),
 ):
     """
     Comprehensive AI advisor dashboard: executive summary, business
     health, priority actions, opportunities, lost revenue, risks,
     property reviews, 30-day forecast, achievements, goals.
+
+    Either `year` (defaults to the current year) or a `start_date`/`end_date`
+    pair selects the reporting period.
     """
-    return await service.generate_advisor_report(year)
+    if (start_date is None) != (end_date is None):
+        raise HTTPException(
+            status_code=422,
+            detail="start_date and end_date must be provided together",
+        )
+    return await service.generate_advisor_report(year, start_date, end_date)
 
 
 @router.post("/chat")

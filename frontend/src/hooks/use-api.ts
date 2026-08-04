@@ -195,11 +195,18 @@ export function useMonthlyReport(year?: number, month?: number) {
   });
 }
 
-export function useAnnualReport(year?: number) {
+export function useAnnualReport(yearOrPeriod?: number | ReportPeriod) {
+  const period: ReportPeriod | undefined =
+    typeof yearOrPeriod === "number" ? { year: yearOrPeriod } : yearOrPeriod;
+  const params = new URLSearchParams();
+  if (period?.year) params.set("year", String(period.year));
+  if (period?.start) params.set("start_date", period.start);
+  if (period?.end) params.set("end_date", period.end);
+  const qs = params.toString();
   return useQuery<AnnualReport>({
-    queryKey: ["annual-report", year],
-    queryFn: () => api.get(`/finance/report/annual?year=${year}`),
-    enabled: !!year,
+    queryKey: ["annual-report", period],
+    queryFn: () => api.get(`/finance/report/annual${qs ? `?${qs}` : ""}`),
+    enabled: !!period && (!!period.year || !!(period.start && period.end)),
   });
 }
 
@@ -336,11 +343,18 @@ export function useAIAnalysis() {
   });
 }
 
-export function useAIAdvisor(year?: number) {
+export function useAIAdvisor(yearOrPeriod?: number | ReportPeriod) {
+  const period: ReportPeriod | undefined =
+    typeof yearOrPeriod === "number" ? { year: yearOrPeriod } : yearOrPeriod;
+  const params = new URLSearchParams();
+  if (period?.year) params.set("year", String(period.year));
+  if (period?.start) params.set("start_date", period.start);
+  if (period?.end) params.set("end_date", period.end);
+  const qs = params.toString();
   return useQuery<AdvisorReport>({
-    queryKey: ["ai-advisor", year],
-    queryFn: () => api.get(`/ai/advisor?year=${year}`),
-    enabled: !!year,
+    queryKey: ["ai-advisor", period],
+    queryFn: () => api.get(`/ai/advisor${qs ? `?${qs}` : ""}`),
+    enabled: !!period && (!!period.year || !!(period.start && period.end)),
     staleTime: 30_000,
   });
 }
@@ -480,11 +494,18 @@ export function usePropertyAnalytics(propertyId?: string, year?: number) {
   });
 }
 
-export function usePortfolioAnalytics(year?: number) {
+export function usePortfolioAnalytics(yearOrPeriod?: number | ReportPeriod) {
+  const period: ReportPeriod | undefined =
+    typeof yearOrPeriod === "number" ? { year: yearOrPeriod } : yearOrPeriod;
+  const params = new URLSearchParams();
+  if (period?.year) params.set("year", String(period.year));
+  if (period?.start) params.set("start_date", period.start);
+  if (period?.end) params.set("end_date", period.end);
+  const qs = params.toString();
   return useQuery<PortfolioAnalytics>({
-    queryKey: ["portfolio-analytics", year],
-    queryFn: () => api.get(`/analytics/portfolio?year=${year}`),
-    enabled: !!year,
+    queryKey: ["portfolio-analytics", period],
+    queryFn: () => api.get(`/analytics/portfolio${qs ? `?${qs}` : ""}`),
+    enabled: !!period && (!!period.year || !!(period.start && period.end)),
   });
 }
 

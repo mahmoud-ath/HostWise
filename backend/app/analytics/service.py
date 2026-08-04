@@ -111,8 +111,23 @@ class AnalyticsService:
         bw_result = await self.session.execute(bw_stmt)
         avg_booking_window = round(float(bw_result.scalar() or 0), 1)
 
-        # Monthly breakdown
+        # Monthly breakdown (revenue + expenses per month)
         monthly = await self.res_repo.get_monthly_revenue(year, property_id)
+        monthly_exp = await self.exp_repo.get_monthly_expenses(year, property_id)
+        exp_by_month = {em["month"]: em["total"] for em in monthly_exp}
+        rev_by_month = {m["month"]: m for m in monthly}
+
+        breakdown = []
+        for mon in sorted(set(rev_by_month) | set(exp_by_month)):
+            rm = rev_by_month.get(mon)
+            breakdown.append({
+                "month": mon,
+                "gross_revenue": round(rm["gross_revenue"], 2) if rm else 0.0,
+                "net_revenue": round(rm["net_revenue"], 2) if rm else 0.0,
+                "reservation_count": rm["reservation_count"] if rm else 0,
+                "nights": rm["total_nights"] if rm else 0,
+                "total_expenses": round(exp_by_month.get(mon, 0.0), 2),
+            })
 
         # Expense ratio
         exp = await self.exp_repo.get_total_expenses(property_id, start_date, end_date)
@@ -134,16 +149,7 @@ class AnalyticsService:
             "cancelled_reservations": cancelled,
             "avg_booking_window_days": avg_booking_window,
             "expense_ratio": expense_ratio,
-            "monthly_breakdown": [
-                {
-                    "month": m["month"],
-                    "gross_revenue": m["gross_revenue"],
-                    "net_revenue": m["net_revenue"],
-                    "reservation_count": m["reservation_count"],
-                    "nights": m["total_nights"],
-                }
-                for m in monthly
-            ],
+            "monthly_breakdown": breakdown,
         }
 
     async def get_portfolio_analytics(
