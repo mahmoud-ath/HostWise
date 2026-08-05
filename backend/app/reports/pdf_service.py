@@ -14,7 +14,26 @@ Used by: GET /api/v1/reports/export?format=pdf&start_date=…&end_date=…&curre
 """
 from datetime import date
 
-from weasyprint import HTML
+
+def _load_weasyprint_html():
+    """Import WeasyPrint lazily.
+
+    WeasyPrint needs the GTK/Pango/cairo native libraries at runtime. On the
+    desktop builds (Windows/macOS) those are often not installed, and importing
+    WeasyPrint at module load would crash the whole backend (cffi fails to
+    dlopen 'libgobject-2.0-0' etc.). We therefore import it only when a PDF is
+    actually requested and raise a clear, catchable error if it is unavailable.
+    """
+    try:
+        from weasyprint import HTML  # noqa: PLC0415 - intentionally lazy
+        return HTML
+    except Exception as exc:  # noqa: BLE001 - cffi dlopen OSError, ImportError, ...
+        raise RuntimeError(
+            "PDF export is unavailable: WeasyPrint could not load its native "
+            "libraries (GTK/Pango/cairo). On this machine install the GTK3 "
+            "runtime, or use the report print view instead."
+        ) from exc
+
 
 CURRENCY_SYMBOL = {
     "USD": "$", "EUR": "€", "GBP": "£",
@@ -488,7 +507,8 @@ def render_pdf(report: dict) -> bytes:
 {body}
 </body>
 </html>"""
-    return HTML(string=html).write_pdf()
+    _HTML = _load_weasyprint_html()
+    return _HTML(string=html).write_pdf()
 
 
 def _exec_section(report: dict, cur: str) -> str:

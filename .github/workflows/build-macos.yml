@@ -1,16 +1,11 @@
 name: Build macOS
 
-# Build the HostWise .dmg for macOS (Apple Silicon + Intel universal if
-# building on a universal setup; GitHub runners are arm64 by default).
-#
-# Python 3.12 to match backend/requirements.txt ("Python 3.12+") and the
-# other build workflows (see build-windows.yml for the 3.10 _ssl rationale).
+# Legacy per-OS build (manual only). Releases are now produced by the
+# consolidated production pipeline: .github/workflows/release.yml.
 permissions:
   contents: write
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 jobs:
   build:

@@ -118,7 +118,12 @@ async def export_report(
             date(y, 1, 1), date(y, 12, 31), currency
         )
 
-    pdf = render_pdf(report)
+    try:
+        pdf = render_pdf(report)
+    except RuntimeError as exc:
+        # WeasyPrint's native GTK/Pango libs are missing (e.g. Windows desktop
+        # without the GTK runtime) — surface a clear error instead of crashing.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     period = report.get("period") or {}
     label = str(period.get("label") or report.get("year", "report"))
     safe = "".join(c if c.isalnum() or c in "- " else "_" for c in label).replace(" ", "_")

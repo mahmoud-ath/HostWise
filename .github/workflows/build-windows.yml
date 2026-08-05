@@ -1,18 +1,11 @@
 name: Build Windows
 
-# Build the HostWise desktop installer for Windows.
-# Run manually, or automatically when a `v*` tag is pushed.
-#
-# Python 3.12 (not 3.10): the repo targets 3.12 (see backend/requirements.txt).
-# Python 3.10's bundled OpenSSL DLLs are incompatible with the packaged
-# `_ssl` under PyInstaller, which crashed at startup with
-# "DLL load failed while importing _ssl: Invalid access to memory location".
+# Legacy per-OS build (manual only). Releases are now produced by the
+# consolidated production pipeline: .github/workflows/release.yml.
 permissions:
   contents: write
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 jobs:
   build:

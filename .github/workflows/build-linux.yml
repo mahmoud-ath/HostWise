@@ -1,19 +1,11 @@
 name: Build Linux
 
-# Build HostWise as an AppImage + .deb for Linux.
-# Needs the Tauri (webkit2gtk) system deps AND the WeasyPrint native libs
-# (pango/cairo/gdk-pixbuf) that the backend PDF exporter requires.
-#
-# AppImage note: Tauri's linuxdeploy bundles an old strip (binutils 2.35)
-# that aborts on the .relr.dyn sections of Ubuntu 24.04's glibc, failing the
-# AppImage step with "failed to run linuxdeploy" (tauri-apps/tauri#14796).
-# The tauri build step therefore sets NO_STRIP=true and --verbose.
+# Legacy per-OS build (manual only). Releases are now produced by the
+# consolidated production pipeline: .github/workflows/release.yml.
 permissions:
   contents: write
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 jobs:
   build:
