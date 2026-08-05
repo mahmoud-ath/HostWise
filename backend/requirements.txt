@@ -17,7 +17,11 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 
 # Authentication
+# cryptography is pinned: `python-jose[cryptography]` alone would float to
+# whatever is latest, which repeatedly broke the PyInstaller bundles (OpenSSL
+# DLL mismatch with Python's `_ssl`). 49.0.0 is the tested-good version.
 python-jose[cryptography]==3.3.0
+cryptography==49.0.0
 bcrypt==4.2.1
 python-multipart==0.0.19
 

@@ -2,6 +2,9 @@ name: Build macOS
 
 # Build the HostWise .dmg for macOS (Apple Silicon + Intel universal if
 # building on a universal setup; GitHub runners are arm64 by default).
+#
+# Python 3.12 to match backend/requirements.txt ("Python 3.12+") and the
+# other build workflows (see build-windows.yml for the 3.10 _ssl rationale).
 permissions:
   contents: write
 on:
@@ -18,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2

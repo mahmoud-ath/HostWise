@@ -3,6 +3,11 @@ name: Build Linux
 # Build HostWise as an AppImage + .deb for Linux.
 # Needs the Tauri (webkit2gtk) system deps AND the WeasyPrint native libs
 # (pango/cairo/gdk-pixbuf) that the backend PDF exporter requires.
+#
+# AppImage note: Tauri's linuxdeploy bundles an old strip (binutils 2.35)
+# that aborts on the .relr.dyn sections of Ubuntu 24.04's glibc, failing the
+# AppImage step with "failed to run linuxdeploy" (tauri-apps/tauri#14796).
+# The tauri build step therefore sets NO_STRIP=true and --verbose.
 permissions:
   contents: write
 on:
@@ -19,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -30,7 +35,8 @@ jobs:
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev \
             libayatana-appindicator3-dev librsvg2-dev \
-            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 libcairo2 libgdk-pixbuf-2.0-0
+            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 libcairo2 libgdk-pixbuf-2.0-0 \
+            patchelf libfuse2
 
       - name: Install backend deps + PyInstaller
         working-directory: backend
@@ -50,7 +56,12 @@ jobs:
 
       - name: Build Tauri AppImage + deb
         working-directory: frontend
-        run: bunx tauri build --bundles appimage,deb
+        env:
+          # linuxdeploy (bundled by Tauri for AppImage) uses an old strip that
+          # chokes on the .relr.dyn sections of Ubuntu 24.04's glibc. Skip its
+          # strip pass; --verbose surfaces its (otherwise swallowed) stderr.
+          NO_STRIP: "true"
+        run: bunx tauri build --bundles appimage,deb --verbose
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
