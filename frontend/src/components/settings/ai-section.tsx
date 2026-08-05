@@ -85,14 +85,27 @@ export function AISection() {
 
         {!isHostWise && (
           <>
-            <SettingRow label="API Key" hint="Stored locally, sent only to your provider">
-              <Input
-                type="password"
-                className="h-9 w-64"
-                value={get("ai_api_key", "")}
-                onChange={(e) => updateSetting("ai_api_key", e.target.value)}
-                placeholder="sk-..."
-              />
+            <SettingRow label="API Key" hint="Stored locally, sent only to your provider. Saved keys are shown masked.">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="password"
+                  className="h-9 w-64"
+                  value={get("ai_api_key", "")}
+                  onChange={(e) => updateSetting("ai_api_key", e.target.value)}
+                  placeholder="sk-..."
+                />
+                {hasKey && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => updateSetting("ai_api_key", "")}
+                    title="Remove the saved API key"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </SettingRow>
             <SettingRow label="Base URL" hint="OpenAI-compatible endpoint">
               <Input
@@ -132,6 +145,16 @@ export function AISection() {
                 <span>{result.message}</span>
               </div>
             )}
+            <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-muted-foreground">
+              <p className="mb-1 font-medium text-foreground">What is sent to your LLM provider?</p>
+              <p>
+                With an external provider enabled, HostWise sends your <span className="font-medium">real portfolio data</span> as JSON to
+                that provider to generate the advisor report: current metrics (net revenue, profit, expenses),
+                month-over-month growth, the monthly breakdown, expense categories, and the property ranking.
+                Your API key is only sent to that provider&apos;s endpoint. The built-in HostWise rules engine (no
+                external provider) keeps everything 100% local.
+              </p>
+            </div>
           </>
         )}
 

@@ -169,4 +169,4 @@ Decision: adopt the scenario with the best projected outcome
 - Cheap per-intent data path + caching for chat.
 - Persistent conversation history; "ask about a specific property".
 - Scenario sensitivity analysis (multi-parameter what-if).
-- Honor `ai_analysis_level` and `ai_language` settings in the generator.
+- ~~Honor `ai_analysis_level` and `ai_language`~~ — ✅ Done (v4): `ai_analysis_level` trims report depth; `ai_language` steers the BYOK LLM and is surfaced on the report; `ai_api_key` is masked in public reads with a safe round-trip + clear button; LLM replies parse strictly with guaranteed rules fallback.

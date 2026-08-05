@@ -45,16 +45,39 @@ class AIAdvisorService:
 
         Pass a `year` for the classic yearly analysis, or `start_date`/
         `end_date` for a custom period.
-        """
-        base_report, llm_ctx = await self.rules.build_advisor_report(
-            year, start_date, end_date
-        )
 
-        # ── External LLM: send the real data as JSON and let the API update the page ──
+        The result is cached (short TTL, keyed by period + data fingerprint +
+        the user-visible AI settings) so repeated loads are cheap (4.2).
+        """
+        from app.ai.cache import advisor_cache, data_fingerprint
         from app.settings.service import SettingsService
 
-        settings = await SettingsService(self.session).get_all()
+        settings = await SettingsService(self.session).get_all_internal()
+        currency = settings.get("default_currency", "EUR")
+        lang = settings.get("ai_language", "English")
+        level = settings.get("ai_analysis_level", "detailed")
         provider = settings.get("ai_provider", "hostwise")
+
+        today = date.today()
+        y = year or today.year
+        p_start = start_date or date(y, 1, 1)
+        p_end = end_date or date(y, 12, 31)
+        fp = await data_fingerprint(self.session)
+        cache_key = (
+            f"advisor:{p_start.isoformat()}:{p_end.isoformat()}:{fp}:"
+            f"{currency}:{lang}:{level}:{provider}"
+        )
+        cached = advisor_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        base_report, llm_ctx = await self.rules.build_advisor_report(
+            year, start_date, end_date, analysis_level=level
+        )
+        base_report["language"] = lang
+        base_report["analysis_level"] = level
+
+        # ── External LLM: send the real data as JSON and let the API update the page ──
         llm_enabled = (
             provider != "hostwise"
             and bool(settings.get("ai_api_key"))
@@ -64,14 +87,16 @@ class AIAdvisorService:
             input_data = {
                 "year": base_report.get("year"),
                 "period": base_report.get("period"),
-                "currency": settings.get("default_currency", "EUR"),
+                "currency": currency,
                 "current_metrics": base_report["current_metrics"],
                 "kpi_growth": llm_ctx["kpi_growth"],
                 "monthly_breakdown": base_report["monthly_breakdown"],
                 "expense_categories": base_report["expense_categories"],
                 "property_ranking": llm_ctx["property_ranking"],
             }
-            llm_report = await self.provider.advisor_report(settings, input_data)
+            llm_report = await self.provider.advisor_report(
+                settings, input_data, language=lang
+            )
             if llm_report:
                 base_report = self.provider.merge_report(base_report, llm_report)
                 base_report["provider"] = provider
@@ -80,6 +105,7 @@ class AIAdvisorService:
         else:
             base_report["provider"] = "hostwise"
 
+        advisor_cache.set(cache_key, base_report)
         return base_report
 
     async def test_llm_connection(self) -> dict:
@@ -111,7 +137,7 @@ class AIAdvisorService:
             return f"€{v:,.0f}"
 
         # ── BYOK: use the owner's LLM when a key is configured ──
-        settings = await SettingsService(self.session).get_all()
+        settings = await SettingsService(self.session).get_all_internal()
         if settings.get("ai_api_key") and settings.get("ai_enabled", True):
             try:
                 system = (
@@ -389,11 +415,12 @@ class AIAdvisorService:
     async def simulate_scenario(
         self, scenario: str, params: dict | None, year: int
     ) -> dict:
-        """Estimate the financial impact of a 'what-if' scenario."""
-        from app.finance.service import FinancialReportingService
+        """Estimate the financial impact of a 'what-if' scenario.
 
-        finance = FinancialReportingService(self.session)
-        annual = await finance.get_annual_report(year)
+        Uses the cached annual report (4.5) so repeat what-if runs don't
+        recompute the whole report every time.
+        """
+        annual = await self._cached_annual_report(year)
         params = params or {}
 
         base_rev = annual.summary.net_revenue
@@ -449,6 +476,20 @@ class AIAdvisorService:
             },
             "confidence": 85.0,
         }
+
+    async def _cached_annual_report(self, year: int):
+        """Annual financial report served from the short-TTL cache (4.5)."""
+        from app.ai.cache import annual_report_cache, data_fingerprint
+        from app.finance.service import FinancialReportingService
+
+        fp = await data_fingerprint(self.session)
+        key = f"annual:{year}:{fp}"
+        cached = annual_report_cache.get(key)
+        if cached is not None:
+            return cached
+        annual = await FinancialReportingService(self.session).get_annual_report(year)
+        annual_report_cache.set(key, annual)
+        return annual
 
 
 async def get_ai_advisor_service(

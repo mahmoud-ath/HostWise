@@ -295,16 +295,28 @@ configurable. **Why now.** AI is the differentiator; trust is the gate.
 
 | # | Recommendation | Why | Problem solved | Business impact | Technical impact | Depends on | Risks |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 4.1 | Honor `ai_analysis_level`, `ai_language`, `ai_enabled` in generation | Settings exist but are half-wired | Predictable AI behavior | Personalization | Medium | None | None |
-| 4.2 | Cache the expensive analyze/advisor path per period (request-scoped/short TTL) | Advisor + scenario recompute everything | Fast AI on real portfolios | Responsiveness | Medium; cache keyed by period+data fingerprint | None | Staleness — short TTL |
-| 4.3 | Mask + allow clearing the AI key; validate base-URL host; show "what data is sent" | Plaintext key + any-host proxy is a trust risk | Privacy & safety | Higher trust | Settings UI + provider guard | Phase 1.4 | None |
-| 4.4 | Strict LLM response parsing with guaranteed rules fallback | Malformed LLM JSON must never break the page | Resilience | Reliability | Small (already conservative merge — strengthen) | None | None |
-| 4.5 | Scenario uses the cached data path (drop per-call recompute) | Only hot endpoint left after chat removal | Cheaper scenarios | Faster "what-if" | Medium | 4.2 | None |
+| 4.1 | **Honor `ai_analysis_level`, `ai_language`, `ai_enabled`** ✅ Done — `ai_analysis_level` trims report depth (summary vs detailed/expert); `ai_language` steers the BYOK LLM and is surfaced on the report; `ai_enabled` gates BYOK | Settings exist but are half-wired | Predictable AI behavior | Personalization | Medium | None | None |
+| 4.2 | **Cache the advisor path** ✅ Done — short-TTL in-process cache keyed by period + data fingerprint + AI settings | Advisor + scenario recompute everything | Fast AI on real portfolios | Responsiveness | Medium; cache keyed by period+data fingerprint | None | Staleness — short TTL |
+| 4.3 | **Mask/clear AI key + validate base URL + "what data is sent" note** ✅ Done — key masked in `GET /settings` (round-trip safe), clear button, http(s)-only base-URL guard, privacy note in AI settings | Plaintext key + any-host proxy is a trust risk | Privacy & safety | Higher trust | Settings UI + provider guard | Phase 1.4 | None |
+| 4.4 | **Strict LLM JSON parsing with rules fallback** ✅ Done — `_extract_json` handles fences/trailing commas; any failure → rules engine | Malformed LLM JSON must never break the page | Resilience | Reliability | Small (already conservative merge — strengthen) | None | None |
+| 4.5 | **Scenario uses cached data path** ✅ Done — annual report cached (same TTL + fingerprint) | Only hot endpoint left after chat removal | Cheaper scenarios | Faster "what-if" | Medium | 4.2 | None |
 
 **Expected outcome.** AI honors config, runs from cache, protects the key, and
 never breaks on bad LLM output. **DoD.** Advisor/scenario served from cache in
 E2E test; key masked in UI and absent from logs; a malformed-LLM test asserts
 rules fallback.
+
+**Executed so far (4.1–4.5).** `ai_analysis_level` (summary trims the report;
+detailed/expert are full depth) and `ai_language` (passed to the BYOK LLM and
+surfaced as `report["language"]`) are honored; advisor + scenario use a 60s
+TTL cache keyed by period + a data fingerprint (counts + max updated_at of
+the business tables) so imports invalidate it automatically; `ai_api_key` is
+masked on every public settings read (`GET /settings`) and round-trips safely
+(server keeps the real key), can be cleared, and `ai_base_url` must be a valid
+http(s) URL; LLM replies are parsed strictly (`_extract_json` — fences +
+trailing commas) with guaranteed rules fallback; the AI Settings tab now shows
+a "what data is sent" privacy note. Remaining: column-mapping UI, then
+Phase 5 (production readiness).
 
 ---
 

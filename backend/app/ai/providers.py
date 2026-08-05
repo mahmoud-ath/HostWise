@@ -78,11 +78,19 @@ class LLMProvider:
             return None
         return choices[0].get("message", {}).get("content")
 
-    async def advisor_report(self, settings: dict, input_data: dict) -> dict | None:
+    async def advisor_report(
+        self, settings: dict, input_data: dict, language: str = "English"
+    ) -> dict | None:
         """Send the real portfolio data (as JSON) to the configured LLM and get a
-        JSON report back, which then updates the advisor page."""
+        JSON report back, which then updates the advisor page.
+
+        The reply is parsed strictly (`_extract_json`); on ANY malformed output
+        this returns None and the orchestrator falls back to the rules engine
+        (roadmap 4.4). `language` (from `ai_language`) steers the LLM's tone.
+        """
         import json
 
+        lang_line = f" Respond in {language}." if language and language != "English" else ""
         system = (
             "You are HostWise, a vacation-rental financial advisor. "
             "You will receive a JSON object containing the host's REAL financial data. "
@@ -94,6 +102,7 @@ class LLMProvider:
             "achievements (array), recommended_goals (array), trend_explanations (array). "
             "Base every figure strictly on the provided data. Do not invent data that is absent. "
             "Format monetary amounts with the currency code included in the data (e.g. MAD, EUR, USD)."
+            + lang_line
         )
         user = (
             "Here is the real portfolio data as JSON:\n"
@@ -105,13 +114,42 @@ class LLMProvider:
             return None
         if not reply:
             return None
+        return self._extract_json(reply)
+
+    @staticmethod
+    def _extract_json(reply: str) -> dict | None:
+        """Robustly parse a JSON object from an LLM reply.
+
+        Handles markdown code fences and trailing commas; returns None on any
+        failure so the caller falls back to the rules engine (roadmap 4.4).
+        """
+        import json
+        import re
+
+        if not reply:
+            return None
+        text = reply.strip()
+        # Strip markdown code fences (```json ... ```).
+        fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+        if fence:
+            text = fence.group(1).strip()
+        # Direct parse first.
         try:
-            start = reply.find("{")
-            end = reply.rfind("}")
-            if start == -1 or end == -1 or end <= start:
-                return None
-            return json.loads(reply[start:end + 1])
-        except Exception:  # noqa: BLE001 - deliberate: malformed LLM reply → fall back to rules
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return parsed
+        except (ValueError, TypeError):
+            pass
+        # Fall back to first '{' → last '}', cleaning trailing commas.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        candidate = re.sub(r",\s*([}\]])", r"\1", text[start:end + 1])
+        try:
+            parsed = json.loads(candidate)
+            return parsed if isinstance(parsed, dict) else None
+        except (ValueError, TypeError):
             return None
 
     @staticmethod
@@ -176,7 +214,7 @@ class LLMProvider:
         """Validate the configured BYOK connection with a tiny prompt."""
         from app.settings.service import SettingsService
 
-        settings = await SettingsService(self.session).get_all()
+        settings = await SettingsService(self.session).get_all_internal()
         if not settings.get("ai_api_key"):
             return {"ok": False, "message": "No API key configured yet."}
         try:

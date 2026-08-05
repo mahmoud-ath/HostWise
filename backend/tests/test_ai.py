@@ -1,7 +1,14 @@
 """Tests for the AI Advisor module (rules engine + BYOK paths)."""
 from datetime import date
+from unittest.mock import patch
 
 YEAR = date.today().year
+
+
+async def _clear_caches():
+    from app.ai.cache import advisor_cache, annual_report_cache
+    advisor_cache.clear()
+    annual_report_cache.clear()
 
 
 async def _seed(client, seed_property):
@@ -91,3 +98,94 @@ async def test_test_connection_no_key(client):
     assert resp.status_code in (200, 400, 422)
     body = resp.json()
     assert "ok" in body or "error" in body or "detail" in body
+
+
+# ── Phase 4: caching, strict parsing, config honored ─────
+
+async def test_advisor_served_from_cache(client, seed_property):
+    """Two identical calls return the same cached object (roadmap 4.2)."""
+    from app.ai.service import AIAdvisorService
+    from app.core.database import async_session_factory
+
+    await _seed(client, seed_property)
+    await _clear_caches()
+    async with async_session_factory() as session:
+        svc = AIAdvisorService(session)
+        r1 = await svc.generate_advisor_report(year=YEAR)
+        r2 = await svc.generate_advisor_report(year=YEAR)
+        assert r2 is r1  # identical object → served from cache
+        assert r2["provider"] == "hostwise"
+    await _clear_caches()
+
+
+async def test_advisor_cache_invalidated_by_data_change(client, seed_property):
+    """A data change bumps the fingerprint, so the cache is bypassed (4.2)."""
+    from app.ai.service import AIAdvisorService
+    from app.core.database import async_session_factory
+
+    await _seed(client, seed_property)
+    await _clear_caches()
+    async with async_session_factory() as session:
+        svc = AIAdvisorService(session)
+        r1 = await svc.generate_advisor_report(year=YEAR)
+    # Add another revenue record → fingerprint changes.
+    await client.post(
+        "/api/v1/finance/revenue",
+        json={"property_id": seed_property, "date": f"{YEAR}-07-01",
+              "gross_amount": 500.0, "commission_amount": 50.0, "source": "direct"},
+    )
+    async with async_session_factory() as session:
+        svc = AIAdvisorService(session)
+        r2 = await svc.generate_advisor_report(year=YEAR)
+    assert r2 is not r1  # recomputed, not the stale cached object
+    assert r2["current_metrics"]["net_revenue"] != r1["current_metrics"]["net_revenue"]
+    await _clear_caches()
+
+
+async def test_malformed_llm_falls_back_to_rules(client, seed_property):
+    """Garbage LLM output must never break the page (roadmap 4.4)."""
+    from app.ai.service import AIAdvisorService
+    from app.core.database import async_session_factory
+
+    await _seed(client, seed_property)
+    await client.put("/api/v1/settings", json={"settings": {
+        "ai_provider": "openai", "ai_api_key": "sk-test-123456", "ai_enabled": True,
+    }})
+    await _clear_caches()
+    with patch("app.ai.providers.LLMProvider.call", return_value="this is definitely not json {{{"):
+        async with async_session_factory() as session:
+            svc = AIAdvisorService(session)
+            report = await svc.generate_advisor_report(year=YEAR)
+    assert report["provider"] == "hostwise"  # rules fallback
+    assert "health_score" in report and "score" in report["health_score"]
+    await _clear_caches()
+
+
+def test_extract_json_handles_fences_and_trailing_commas():
+    from app.ai.providers import LLMProvider
+
+    raw = '```json\n{"executive_summary": "Hi there", "health_score": {"score": 72, "status": "good",},}\n```'
+    parsed = LLMProvider._extract_json(raw)
+    assert parsed == {"executive_summary": "Hi there", "health_score": {"score": 72, "status": "good"}}
+
+
+def test_extract_json_garbage_returns_none():
+    from app.ai.providers import LLMProvider
+
+    assert LLMProvider._extract_json("no json here") is None
+    assert LLMProvider._extract_json("") is None
+    assert LLMProvider._extract_json(None) is None
+
+
+async def test_advisor_summary_level_trims(client, seed_property):
+    """`ai_analysis_level: summary` trims the report (roadmap 4.1)."""
+    await _seed(client, seed_property)
+    await client.put("/api/v1/settings", json={"settings": {"ai_analysis_level": "summary"}})
+    await _clear_caches()
+    resp = await client.get(f"/api/v1/ai/advisor?year={YEAR}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["analysis_level"] == "summary"
+    assert body["priority_actions"]["medium"] == []
+    assert body["priority_actions"]["low"] == []
+    await _clear_caches()

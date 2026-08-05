@@ -280,6 +280,7 @@ class HostWiseRulesEngine:
         year: int | None = None,
         start_date: date | None = None,
         end_date: date | None = None,
+        analysis_level: str = "detailed",
     ) -> tuple[dict, dict]:
         """
         Build the rule-based advisor report (no LLM).
@@ -287,6 +288,10 @@ class HostWiseRulesEngine:
         Returns a tuple of (report, llm_context) where llm_context holds the
         internal data (kpi growth, property ranking) the orchestrator sends to
         an external LLM when one is configured.
+
+        `analysis_level` (summary | detailed | expert) trims how much of the
+        report is populated. Sections are truncated (never emptied to an
+        incompatible shape) so the UI can never break.
         """
         from app.analytics.service import AnalyticsService
         from app.finance.service import FinancialReportingService
@@ -367,6 +372,21 @@ class HostWiseRulesEngine:
                 c.model_dump() for c in annual.expense_by_category
             ],
         }
+
+        # Analysis level trims depth without changing the report shape.
+        if analysis_level == "summary":
+            actions = base_report.get("priority_actions", {})
+            base_report["priority_actions"] = {
+                "critical": actions.get("critical", [])[:2],
+                "medium": [],
+                "low": [],
+            }
+            base_report["property_reviews"] = base_report["property_reviews"][:1]
+            base_report["risks"] = base_report["risks"][:1]
+            base_report["achievements"] = base_report["achievements"][:1]
+            base_report["recommended_goals"] = base_report["recommended_goals"][:1]
+            base_report["trend_explanations"] = base_report["trend_explanations"][:1]
+        base_report["analysis_level"] = analysis_level
 
         return base_report, {
             "kpi_growth": kpi,
