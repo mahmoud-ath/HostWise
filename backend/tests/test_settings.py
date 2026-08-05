@@ -106,3 +106,52 @@ async def test_invalid_base_url_rejected(client):
     )
     assert ok.status_code == 200
     assert ok.json()["ai_base_url"] == "https://api.deepseek.com/v1"
+
+
+# ── Phase 5: typed settings schema (roadmap 5.3) ────────
+
+async def test_setting_schema_rejects_out_of_range(client):
+    resp = await client.put(
+        "/api/v1/settings",
+        json={"settings": {"tax_rate": 150.0}},
+    )
+    assert resp.status_code == 422
+
+    resp = await client.put(
+        "/api/v1/settings",
+        json={"settings": {"fiscal_year_start": 13}},
+    )
+    assert resp.status_code == 422
+
+
+async def test_setting_schema_rejects_bad_enum(client):
+    resp = await client.put(
+        "/api/v1/settings",
+        json={"settings": {"ai_provider": "not-a-provider"}},
+    )
+    assert resp.status_code == 422
+
+    resp = await client.put(
+        "/api/v1/settings",
+        json={"settings": {"report_auto_generate": "sometimes"}},
+    )
+    assert resp.status_code == 422
+
+
+async def test_setting_schema_accepts_valid_values(client):
+    resp = await client.put(
+        "/api/v1/settings",
+        json={"settings": {"tax_rate": 12.5, "ai_analysis_level": "summary"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["tax_rate"] == 12.5
+    assert resp.json()["ai_analysis_level"] == "summary"
+
+
+async def test_maintenance_status_reports_security(client):
+    resp = await client.get("/api/v1/maintenance/status")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "security" in body
+    assert "cors_origins" in body["security"]
+    assert "default_jwt_secret" in body["security"]

@@ -52,8 +52,22 @@ def _find_log_file() -> Path | None:
 @router.get("/status")
 async def maintenance_status() -> dict:
     """Database + storage overview for the Maintenance section."""
+    from app.core.config import get_settings
+
     db = get_db_path()
     backups = list_backups()
+    cfg = get_settings()
+    security = {
+        "environment": cfg.ENVIRONMENT,
+        "cors_origins": list(cfg.CORS_ORIGINS),
+        "cors_restricted": "*" not in cfg.CORS_ORIGINS,
+        "default_jwt_secret": cfg.JWT_SECRET_KEY.startswith("change-me"),
+    }
+    # Verify the newest backup (if any) so the Maintenance screen can surface
+    # a broken backup before the user needs to restore it.
+    backup_verified = None
+    if backups:
+        backup_verified = _verify_backup_file(backups[0]["name"])
     return {
         "database_type": "sqlite",
         "database_path": str(db) if db else None,
@@ -62,7 +76,16 @@ async def maintenance_status() -> dict:
         "backups_size": sum(b["size"] for b in backups),
         "log_file_available": _find_log_file() is not None,
         "integrity": _integrity_check(db),
+        "security": security,
+        "latest_backup_verified": backup_verified,
     }
+
+
+def _verify_backup_file(name: str) -> dict:
+    """Integrity-check a backup file without importing the service (no cycles)."""
+    from app import backup_service
+
+    return backup_service.verify_backup(name)
 
 
 @router.post("/optimize")
@@ -116,6 +139,70 @@ async def get_logs(lines: int = Query(200, ge=10, le=2000)) -> dict:
             "content": f"Error reading log: {exc}",
             "path": str(log_file),
         }
+
+
+# Models with soft-delete support (children first so FK constraints never block).
+# Each table is purged defensively (per-table try/except) so a locked/referenced
+# row is skipped and reported instead of failing the whole cleanup.
+def _cleanup_models():
+    from app.finance.category_models import ExpenseCategory, RevenueCategory
+    from app.finance.models import Expense, Revenue
+    from app.notifications.models import Notification
+    from app.properties.models import Listing, Property
+    from app.reservations.models import Guest, Reservation
+    return (
+        Notification, Expense, Revenue, Guest, Listing,
+        Reservation, ExpenseCategory, RevenueCategory, Property,
+    )
+
+
+@router.post("/cleanup")
+async def cleanup_soft_deleted(days: int = Query(30, ge=0, le=3650)) -> dict:
+    """Permanently purge soft-deleted rows older than `days`.
+
+    Deletes (not soft-deletes) rows whose `is_deleted` is true and whose
+    `deleted_at` is older than the cutoff. Children are purged before parents;
+    if a row is still referenced and the delete fails, that table is skipped
+    and reported so the operation never corrupts the database.
+    """
+    from datetime import datetime, timedelta
+
+    from app.core.database import async_session_factory
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    purged: dict[str, int] = {}
+    skipped: dict[str, str] = {}
+    async with async_session_factory() as session:
+        for model in _cleanup_models():
+            table = model.__tablename__
+            try:
+                count = (
+                    await session.execute(
+                        select(func.count()).select_from(model).where(
+                            model.is_deleted == True,
+                            model.deleted_at < cutoff,
+                        )
+                    )
+                ).scalar() or 0
+                if not count:
+                    continue
+                await session.execute(
+                    delete(model).where(
+                        model.is_deleted == True,
+                        model.deleted_at < cutoff,
+                    )
+                )
+                purged[table] = int(count)
+            except Exception as exc:  # noqa: BLE001 - a referenced row is skipped, not fatal
+                skipped[table] = str(exc)[:200]
+                await session.rollback()
+        await session.commit()
+    return {
+        "purged": purged,
+        "skipped": skipped,
+        "cutoff": cutoff.isoformat(),
+        "days": days,
+    }
 
 
 @router.post("/reset-demo-data")

@@ -88,6 +88,15 @@ async def download_backup(backup_name: str):
     )
 
 
+@router.post("/{backup_name}/verify")
+async def verify_backup(backup_name: str):
+    """Verify a backup file's integrity (SQLite quick_check)."""
+    result = backup_service.verify_backup(backup_name)
+    if result.get("error") == "Backup not found":
+        raise HTTPException(status_code=404, detail="Backup not found")
+    return result
+
+
 @router.post("/restore/{backup_name}")
 async def restore_backup(backup_name: str):
     """Restore a backup by filename."""

@@ -18,6 +18,7 @@ import {
 import {
   useMaintenanceStatus,
   useOptimizeDatabase,
+  useCleanupData,
   useResetDemoData,
   useResetAllData,
   useBackendLogs,
@@ -32,6 +33,7 @@ export function MaintenanceSection() {
   const { data: status, isLoading } = useMaintenanceStatus();
   const { t } = useI18n();
   const optimize = useOptimizeDatabase();
+  const cleanup = useCleanupData();
   const reset = useResetDemoData();
   const resetAll = useResetAllData();
   const { status: backendStatus, isReady, restartBackend } = useBackend();
@@ -73,6 +75,19 @@ export function MaintenanceSection() {
     resetAll.mutate(undefined, {
       onSuccess: (res) => alert(`All data reset: ${Object.entries(res.deleted).map(([k, v]) => `${k} (${v})`).join(", ")}`),
       onError: () => alert("Failed to reset all data."),
+    });
+  };
+
+  const runCleanup = () => {
+    if (!confirm("Permanently delete records you soft-deleted more than 30 days ago? This frees space and cannot be undone.")) return;
+    cleanup.mutate(30, {
+      onSuccess: (res) => {
+        const total = Object.values(res.purged).reduce((s, n) => s + n, 0);
+        alert(total > 0
+          ? `Cleanup complete: permanently removed ${total} old record(s).`
+          : "Cleanup complete: nothing old to remove.");
+      },
+      onError: () => alert("Cleanup failed."),
     });
   };
 
@@ -135,12 +150,31 @@ export function MaintenanceSection() {
           <span className="text-muted-foreground">API URL</span>
           <span className="font-mono text-xs">{apiUrl}</span>
         </div>
+        <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
+          <span className="text-muted-foreground">Security</span>
+          <div className="flex items-center gap-1.5">
+            {status?.security?.cors_restricted ? (
+              <Badge variant="success">CORS restricted</Badge>
+            ) : (
+              <Badge variant="destructive">CORS open</Badge>
+            )}
+            {status?.security?.default_jwt_secret ? (
+              <Badge variant="destructive">Default JWT secret</Badge>
+            ) : (
+              <Badge variant="success">JWT secret set</Badge>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => optimize.mutate()} disabled={optimize.isPending}>
           {optimize.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Database className="mr-1.5 h-4 w-4" />}
           Optimize Database
+        </Button>
+        <Button variant="outline" size="sm" onClick={runCleanup} disabled={cleanup.isPending} title="Permanently remove soft-deleted records older than 30 days">
+          {cleanup.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+          Clean Up Deleted Records
         </Button>
         <Button variant="outline" size="sm" onClick={clearCache}>
           <Eraser className="mr-1.5 h-4 w-4" /> Clear Cache

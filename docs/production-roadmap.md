@@ -327,15 +327,24 @@ broad distribution. **Why now.** Sensitive financial data + real users.
 
 | # | Recommendation | Why | Problem solved | Business impact | Technical impact | Depends on | Risks |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 5.1 | Playwright e2e suite (8 core flows) | Backend-only tests miss UI regressions | Confident releases | Trust | Medium; CI runner | Phase 2 CI | Flaky selectors — use stable test ids |
-| 5.2 | Analytics/report caching + pagination on list endpoints | N+1 + unbounded lists at scale | Fast on large portfolios | Retention at scale | Medium | 4.2 | Cache invalidation — key by period |
-| 5.3 | Settings typed schema + secret redaction + `.env` hygiene + CORS audit | Config corruption + secret exposure | Safe config | Operational safety | Medium | 1.x | None |
-| 5.4 | Backup restore automation + integrity check + soft-delete cleanup policy | Recoverability + row growth | Guaranteed recovery | Confidence | Small | 2.4 | None |
-| 5.5 | Async report/AI generation with polling for heavy payloads | Expensive payloads block requests | UX on big data | Retention | Medium | 5.2 | None |
+| 5.1 | **Playwright e2e suite (8 core flows)** ✅ Harness + flows added — `frontend/e2e/` + `playwright.config.ts`, run with `bun run e2e` (servers up); dashboard flow validated green locally; full-suite CI run is the remaining bit | Backend-only tests miss UI regressions | Confident releases | Trust | Medium; CI runner | Phase 2 CI | Flaky selectors — use stable text/role selectors |
+| 5.2 | **Analytics/report caching + pagination** ✅ Done — `/analytics/portfolio` + `/property/{id}` cached (60s TTL, data-fingerprint keyed); finance + properties lists already support `skip`/`limit` pagination | N+1 + unbounded lists at scale | Fast on large portfolios | Retention at scale | Medium | 4.2 | Cache invalidation — key by period + fingerprint |
+| 5.3 | **Settings typed schema + secret redaction + CORS audit** ✅ Done — per-key `SETTINGS_SCHEMA` validation (bool/number/int/enum, 422 on bad values); API key masked (4.3); `/maintenance/status` reports CORS + default-JWT-secret audit; startup logs security warnings in production | Config corruption + secret exposure | Safe config | Operational safety | Medium | 1.x | None |
+| 5.4 | **Backup verify/restore + soft-delete cleanup** ✅ Done — `verify_backup` (quick_check) + `POST /backups/{name}/verify`; restore endpoint existed; `POST /maintenance/cleanup?days=` permanently purges old soft-deleted rows (children-first, per-table safety); `/maintenance/status` verifies the newest backup | Recoverability + row growth | Guaranteed recovery | Confidence | Small | 2.4 | None |
+| 5.5 | Async report/AI generation with polling for heavy payloads | Expensive payloads block requests | UX on big data | Retention | Medium | 5.2 | Remaining — local single-user + caching largely mitigate the blocking cost |
 
 **Expected outcome.** e2e green; lists fast; settings safe; recovery
 verifiable. **DoD.** 8 e2e flows green in CI; pagination + caching benchmarked;
 secret never in logs; restore-from-backup test passes.
+
+**Executed so far (5.1–5.4).** Playwright harness + 8 core-flow specs
+(dashboard/properties/finance/analytics/ai/reports/import/settings) with a
+stable-selector style and `domcontentloaded` navigation for Next dev;
+analytics endpoints cached; `SETTINGS_SCHEMA` typed validation with 422 on bad
+values; CORS + default-JWT-secret audit surfaced in `/maintenance/status` and
+as production startup warnings; `verify_backup` + cleanup endpoint + latest-
+backup verification in the Maintenance screen. Remaining: full e2e CI run,
+5.5 async heavy-payload generation, column-mapping UI, Phase 6 (commercial).
 
 ---
 

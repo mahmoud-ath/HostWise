@@ -19,6 +19,20 @@ export interface MaintenanceStatus {
   backups_size: number;
   log_file_available: boolean;
   integrity: "ok" | "error" | "unavailable";
+  security?: {
+    environment: string;
+    cors_origins: string[];
+    cors_restricted: boolean;
+    default_jwt_secret: boolean;
+  };
+  latest_backup_verified?: { ok: boolean; name?: string; size?: number; error?: string };
+}
+
+export interface CleanupResult {
+  purged: Record<string, number>;
+  skipped: Record<string, string>;
+  cutoff: string;
+  days: number;
 }
 
 export interface OptimizeResult {

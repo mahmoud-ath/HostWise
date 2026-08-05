@@ -100,6 +100,11 @@ Legend — `🔒` = requires auth (Bearer). `P` = consumer page.
 | --- | --- | --- | --- |
 | `GET /` | List backups | /settings | |
 | `GET /status` | Schedule overview (last/next, size, retention) | /settings | |
+| `POST /create` | On-demand backup | /settings | |
+| `POST /upload` | Upload a `.db` backup | /settings | |
+| `GET /download/{name}` | Download a backup | /settings | |
+| `POST /{name}/verify` | Integrity check (quick_check) | /settings | roadmap 5.4 |
+| `POST /restore/{name}` | Restore a backup | /settings | Creates a pre-restore safety backup |
 | `POST /create` | On-demand backup | /settings | file copy + VACUUM |
 | `GET /download/{name}` | Download backup file | /settings | |
 | `POST /upload` | Restore from a `.db` file | /settings | Saves into backups dir |
@@ -109,9 +114,10 @@ Legend — `🔒` = requires auth (Bearer). `P` = consumer page.
 ### Maintenance — `/api/v1/maintenance`
 | Method & Path | Purpose | Consumer | Notes |
 | --- | --- | --- | --- |
-| `GET /status` | DB size, backups, log availability | /settings | |
+| `GET /status` | DB size, backups, log availability, integrity, security audit (CORS/JWT) + newest-backup verification | /settings | roadmap 5.3/5.4 |
 | `POST /optimize` | VACUUM (returns freed bytes) | /settings | graceful when locked |
 | `GET /logs?lines` | Tail of backend log | /settings | min 10, max 2000 |
+| `POST /cleanup?days` | Permanently purge old soft-deleted rows | /settings | children-first, per-table safety; roadmap 5.4 |
 | `POST /reset-demo-data` | Clear revenues/expenses/reservations | /settings | destructive, double-confirmed |
 
 ### Notifications — `/api/v1/notifications`

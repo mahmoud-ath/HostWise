@@ -116,6 +116,29 @@ def restore_backup(backup_name: str) -> bool:
         return False
 
 
+def verify_backup(backup_name: str) -> dict:
+    """Check a backup file's integrity via SQLite `PRAGMA quick_check`."""
+    backup_dir = _get_backup_dir()
+    backup_path = backup_dir / backup_name
+    if not backup_path.exists():
+        return {"ok": False, "name": backup_name, "error": "Backup not found"}
+    try:
+        conn = sqlite3.connect(str(backup_path), timeout=3)
+        try:
+            row = conn.execute("PRAGMA quick_check").fetchone()
+            ok = bool(row) and row[0] == "ok"
+            return {
+                "ok": ok,
+                "name": backup_name,
+                "size": backup_path.stat().st_size,
+                "verified": ok,
+            }
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:
+        return {"ok": False, "name": backup_name, "error": str(exc)}
+
+
 def rotate_backups():
     """Remove old backups beyond retention limits."""
     backup_dir = _get_backup_dir()

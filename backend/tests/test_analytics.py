@@ -57,6 +57,31 @@ async def test_portfolio_analytics_no_occupancy(client, seed_property):
         assert key not in body, f"removed metric '{key}' still present in portfolio analytics"
 
 
+async def test_portfolio_analytics_cached(client, seed_property):
+    """Repeated portfolio calls are served from the short-TTL cache (5.2)."""
+    from unittest.mock import patch
+
+    from app.ai.cache import analytics_cache
+    from app.analytics.service import AnalyticsService
+
+    await _seed(client, seed_property)
+    analytics_cache.clear()
+
+    original = AnalyticsService.get_portfolio_analytics
+    calls = {"n": 0}
+
+    async def counting(*args, **kwargs):
+        calls["n"] += 1
+        return await original(*args, **kwargs)
+
+    with patch("app.analytics.router.AnalyticsService.get_portfolio_analytics", new=counting):
+        r1 = await client.get(f"/api/v1/analytics/portfolio?year={YEAR}")
+        r2 = await client.get(f"/api/v1/analytics/portfolio?year={YEAR}")
+    assert r1.status_code == 200 and r2.status_code == 200
+    assert calls["n"] == 1  # second call hit the cache
+    analytics_cache.clear()
+
+
 async def test_property_analytics_no_occupancy(client, seed_property):
     await _seed(client, seed_property)
     resp = await client.get(f"/api/v1/analytics/property/{seed_property}?year={YEAR}")

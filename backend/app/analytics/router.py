@@ -17,10 +17,17 @@ async def get_property_analytics(
     year: int = Query(..., ge=2020, le=2100),
     service: AnalyticsService = Depends(get_analytics_service),
 ):
-    """Get comprehensive property performance analytics."""
-    return await service.get_property_analytics(
-        uuid.UUID(property_id), year
-    )
+    """Get comprehensive property performance analytics (short-TTL cached)."""
+    from app.ai.cache import analytics_cache, data_fingerprint
+
+    fp = await data_fingerprint(service.session)
+    key = f"prop:{property_id}:{year}:{fp}"
+    cached = analytics_cache.get(key)
+    if cached is not None:
+        return cached
+    result = await service.get_property_analytics(uuid.UUID(property_id), year)
+    analytics_cache.set(key, result)
+    return result
 
 
 @router.get("/portfolio")
@@ -45,9 +52,18 @@ async def get_portfolio_analytics(
             status_code=422,
             detail="start_date must not be after end_date",
         )
-    return await service.get_portfolio_analytics(
+    from app.ai.cache import analytics_cache, data_fingerprint
+
+    fp = await data_fingerprint(service.session)
+    key = f"portfolio:{year}:{start_date}:{end_date}:{fp}"
+    cached = analytics_cache.get(key)
+    if cached is not None:
+        return cached
+    result = await service.get_portfolio_analytics(
         year=year, start_date=start_date, end_date=end_date
     )
+    analytics_cache.set(key, result)
+    return result
 
 
 @router.get("/property/{property_id}/health")

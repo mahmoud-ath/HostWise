@@ -100,6 +100,20 @@ async def lifespan(app: FastAPI):
         settings.APP_VERSION,
         settings.ENVIRONMENT,
     )
+    # Security audit on startup (roadmap 5.3) — warn, never fail.
+    if settings.ENVIRONMENT == "production":
+        if settings.JWT_SECRET_KEY.startswith("change-me"):
+            logger.warning(
+                "SECURITY: JWT_SECRET_KEY is the default value — set a strong "
+                "secret in your environment before shipping."
+            )
+        if "*" in settings.CORS_ORIGINS:
+            logger.warning(
+                "SECURITY: CORS_ORIGINS contains '*' — restrict it to your "
+                "actual frontend origin(s) in production."
+            )
+        elif not any("localhost" in o for o in settings.CORS_ORIGINS):
+            logger.info("CORS origins: %s", settings.CORS_ORIGINS)
     # Startup: create tables if using SQLite (desktop mode)
     if settings.DATABASE_TYPE == "sqlite":
         try:

@@ -10,6 +10,7 @@ import type {
   OptimizeResult,
   LogsResult,
   ResetDemoResult,
+  CleanupResult,
 } from "@/lib/settings-types";
 
 // ── Domain Types ───────────────────────────────────────
@@ -499,6 +500,24 @@ export function useOptimizeDatabase() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance-status"] });
     },
+  });
+}
+
+export function useCleanupData() {
+  const queryClient = useQueryClient();
+  return useMutation<CleanupResult, Error, number>({
+    mutationFn: (days = 30) => api.post(`/maintenance/cleanup?days=${days}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["maintenance-status"] });
+      queryClient.invalidateQueries({ queryKey: ["finance"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useVerifyBackup() {
+  return useMutation<{ ok: boolean; name?: string; size?: number; error?: string }, Error, string>({
+    mutationFn: (name) => api.post(`/backups/${encodeURIComponent(name)}/verify`),
   });
 }
 

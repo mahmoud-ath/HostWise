@@ -43,6 +43,9 @@ class TTLCache:
 # 60s TTL — short enough to stay fresh, long enough to make repeated loads cheap.
 advisor_cache = TTLCache(ttl_seconds=60)
 annual_report_cache = TTLCache(ttl_seconds=60)
+# Analytics endpoints (portfolio / per-property) — same TTL + fingerprint key
+# (roadmap 5.2) so repeated loads skip the per-property health N+1.
+analytics_cache = TTLCache(ttl_seconds=60)
 
 _FINGERPRINT_TABLES = (
     # Imported lazily inside the function to avoid circular imports at module load.

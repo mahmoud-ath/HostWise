@@ -23,6 +23,90 @@ MASKED_PREFIX = "••"
 # Sentinel returned by `_normalize_api_key` for a masked placeholder.
 _SKIP = object()
 
+# Per-key schema (roadmap 5.3). Each entry is one of:
+#   ("bool",)            → coerce to bool
+#   ("number", low, high) → coerce to float within [low, high]
+#   ("int", low, high)    → coerce to int within [low, high]
+#   ("enum", {...allowed}) → must be one of the allowed values
+# Unknown keys are stored as-is (forward compatibility).
+SETTINGS_SCHEMA: dict[str, tuple] = {
+    "profile_name": ("str",),
+    "profile_email": ("str",),
+    "business_name": ("str",),
+    "default_currency": ("enum", {"USD", "EUR", "GBP", "MAD", "AED", "CAD", "AUD", "CHF"}),
+    "tax_rate": ("number", 0.0, 100.0),
+    "fiscal_year_start": ("int", 1, 12),
+    "country": ("str",),
+    "timezone": ("str",),
+    "date_format": ("enum", {"DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"}),
+    "language": ("enum", {"English", "Français", "Español", "العربية", "Deutsch"}),
+    "ai_enabled": ("bool",),
+    "ai_provider": ("enum", {"hostwise", "openai", "deepseek", "anthropic", "ollama"}),
+    "ai_base_url": ("str",),
+    "ai_model": ("str",),
+    "ai_analysis_level": ("enum", {"summary", "detailed", "expert"}),
+    "ai_automatic_analysis": ("enum", {"daily", "weekly", "monthly", "off"}),
+    "ai_language": ("enum", {"English", "Français", "Español", "العربية", "Deutsch"}),
+    "notify_profit_drops": ("bool",),
+    "notify_revenue_increase": ("bool",),
+    "notify_occupancy_falls": ("bool",),
+    "notify_backup_completed": ("bool",),
+    "notify_monthly_report": ("bool",),
+    "appearance_theme": ("enum", {"light", "dark", "system"}),
+    "appearance_compact": ("bool",),
+    "appearance_animations": ("bool",),
+    "dashboard_show_ai_summary": ("bool",),
+    "dashboard_show_forecast": ("bool",),
+    "import_encoding": ("enum", {"UTF-8", "ISO-8859-1", "Windows-1252", "UTF-16"}),
+    "import_delimiter": ("str",),
+    "import_date_format": ("enum", {"DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"}),
+    "report_default_format": ("enum", {"pdf", "print"}),
+    "report_auto_generate": ("enum", {"off", "daily", "weekly", "monthly"}),
+    "report_send_email": ("bool",),
+}
+
+_KNOWN_BOOL_KEYS = {k for k, v in SETTINGS_SCHEMA.items() if v[0] == "bool"}
+
+
+def validate_setting(key: str, value):
+    """Coerce/validate a single setting against the schema (roadmap 5.3).
+
+    Returns the coerced value, or raises ValidationException for invalid input.
+    Unknown keys pass through unchanged.
+    """
+    spec = SETTINGS_SCHEMA.get(key)
+    if spec is None:
+        return value
+    kind = spec[0]
+    try:
+        if kind == "bool":
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                return value.strip().lower() in ("1", "true", "yes", "on")
+            return bool(value)
+        if kind in ("number", "int"):
+            num = float(value)
+            low, high = spec[1], spec[2]
+            if num < low or num > high:
+                raise ValidationException(
+                    f"Setting '{key}' must be between {low} and {high}."
+                )
+            return int(num) if kind == "int" else num
+        if kind == "enum":
+            allowed = spec[1]
+            s = str(value).strip()
+            if s not in allowed:
+                raise ValidationException(
+                    f"Setting '{key}' must be one of: {', '.join(sorted(allowed))}."
+                )
+            return s
+        if kind == "str":
+            return str(value)
+    except (ValueError, TypeError):
+        raise ValidationException(f"Setting '{key}' has an invalid value.")
+    return value
+
 
 def mask_secret(value: str) -> str:
     """Mask an API key for display: keep first 4 + last 4 when long enough."""
@@ -68,7 +152,11 @@ class SettingsService:
         return all_settings.get(key, default)
 
     async def update(self, updates: dict) -> dict:
-        """Upsert a partial set of settings and return the full merged map."""
+        """Upsert a partial set of settings and return the full merged map.
+
+        Values are validated against `SETTINGS_SCHEMA` (roadmap 5.3); invalid
+        values raise ValidationException (422) instead of corrupting the store.
+        """
         for key, value in updates.items():
             if key == "ai_api_key":
                 value = self._normalize_api_key(value)
@@ -76,6 +164,7 @@ class SettingsService:
                     continue  # masked placeholder → keep the stored secret
             if key == "ai_base_url":
                 self._validate_base_url(value)
+            value = validate_setting(key, value)
             row = await self.session.get(Setting, key)
             if row:
                 row.value = json.dumps(value)
