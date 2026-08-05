@@ -317,6 +317,27 @@ class ReportGenerationService:
         kpi: dict,
     ) -> dict:
         """Compute a portfolio health score (0-100) + component bars."""
+        # No properties and no financial records → there is nothing to score.
+        # Show "no data" instead of fabricated neutral scores (e.g. 50/100).
+        summary = annual.summary
+        has_data = (
+            summary.property_count > 0
+            or summary.net_revenue > 0
+            or summary.total_expenses > 0
+        )
+        if not has_data:
+            return {
+                "score": None,
+                "status": "no_data",
+                "components": {
+                    "revenue": None,
+                    "profit": None,
+                    "expenses": None,
+                    "revenue_change_pct": 0.0,
+                },
+                "distribution": {"excellent": 0, "good": 0, "average": 0, "poor": 0},
+            }
+
         # Component scores (used for the visual bars)
         rev_growth = kpi["revenue"]["change_pct"]
         # The Revenue bar scores GROWTH vs the previous period, not the revenue
@@ -331,13 +352,30 @@ class ReportGenerationService:
         expense_ratio = (annual.summary.total_expenses / net * 100) if net > 0 else 0.0
         expense_score = self._clamp(100 - expense_ratio * 0.8)
 
-        # Overall score: average property health when available,
-        # otherwise a weighted blend of the component scores.
+        # Overall score: average property health when available, otherwise a
+        # weighted blend of the component scores. Properties without any data
+        # (health_score None) are excluded — and if none have data yet, the
+        # portfolio shows "no data" rather than a fabricated score.
         ranking = portfolio.get("property_ranking", [])
-        if ranking:
-            score = round(
-                sum(r.get("health_score", 50) for r in ranking) / len(ranking), 1
-            )
+        valid_scores = [
+            r.get("health_score")
+            for r in ranking
+            if r.get("health_score") is not None
+        ]
+        if valid_scores:
+            score = round(sum(valid_scores) / len(valid_scores), 1)
+        elif ranking:
+            return {
+                "score": None,
+                "status": "no_data",
+                "components": {
+                    "revenue": None,
+                    "profit": None,
+                    "expenses": None,
+                    "revenue_change_pct": round(rev_growth or 0, 1),
+                },
+                "distribution": {"excellent": 0, "good": 0, "average": 0, "poor": 0},
+            }
         else:
             score = round(
                 revenue_score * 0.30

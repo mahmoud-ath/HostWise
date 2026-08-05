@@ -135,7 +135,7 @@ export interface PropertyRankingItem {
   property_name: string;
   net_revenue: number;
   reservation_count: number;
-  health_score: number;
+  health_score: number | null;
   profit_margin: number;
 }
 
@@ -182,7 +182,7 @@ export interface AIAnalysis {
 export interface PropertyHealth {
   property_id: string;
   property_name: string;
-  health_score: number;
+  health_score: number | null;
   status: string;
   profit_margin: number;
   cancellation_rate: number;

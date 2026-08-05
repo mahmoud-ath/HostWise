@@ -198,8 +198,8 @@ function PropertyCard({ property, onOpen, onEdit, onDelete }: {
           </div>
           <div className="flex items-center gap-1">
             {health && (
-              <Badge variant={health.status === "healthy" ? "success" : health.status === "average" ? "secondary" : "destructive"}>
-                {health.health_score}/100
+              <Badge variant={health.status === "no_data" ? "outline" : health.status === "healthy" ? "success" : health.status === "average" ? "secondary" : "destructive"}>
+                {health.health_score === null ? "No data" : `${health.health_score}/100`}
               </Badge>
             )}
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit(); }} title="Edit">
@@ -257,7 +257,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
     { label: "Avg Stay", value: `${avgStay} nights` },
     { label: "Cancellation", value: `${(analytics?.cancellation_rate as number) || 0}%` },
     { label: "Expense Ratio", value: `${(analytics?.expense_ratio as number) || 0}%` },
-    { label: "Health", value: health ? `${health.health_score}/100` : "—" },
+    { label: "Health", value: health && health.health_score !== null ? `${health.health_score}/100` : "—" },
   ];
 
   return (

@@ -403,6 +403,26 @@ class HostWiseRulesEngine:
         }
 
     def _build_health_score(self, ai, portfolio, annual, kpi) -> dict:
+        # No properties and no financial records → there is nothing to score.
+        # Show "no data" instead of fabricated neutral scores (e.g. 50/100).
+        summary = annual.summary
+        has_data = (
+            summary.property_count > 0
+            or summary.net_revenue > 0
+            or summary.total_expenses > 0
+        )
+        if not has_data:
+            return {
+                "score": None,
+                "status": "no_data",
+                "components": {
+                    "revenue": None,
+                    "expenses": None,
+                    "growth": None,
+                    "risk": None,
+                },
+            }
+
         growth = kpi["revenue"] or 0
         net = annual.summary.net_revenue
         expense_ratio = (annual.summary.total_expenses / net * 100) if net > 0 else 0
@@ -414,10 +434,25 @@ class HostWiseRulesEngine:
         risk_score = self._clamp(100 - risk_count)
 
         ranking = portfolio.get("property_ranking", [])
-        if ranking:
-            overall = round(
-                sum(r.get("health_score", 50) for r in ranking) / len(ranking), 1
-            )
+        valid_scores = [
+            r.get("health_score")
+            for r in ranking
+            if r.get("health_score") is not None
+        ]
+        if valid_scores:
+            overall = round(sum(valid_scores) / len(valid_scores), 1)
+        elif ranking:
+            # Properties exist but none have data yet.
+            return {
+                "score": None,
+                "status": "no_data",
+                "components": {
+                    "revenue": None,
+                    "expenses": None,
+                    "growth": None,
+                    "risk": None,
+                },
+            }
         else:
             overall = round(
                 revenue_score * 0.25

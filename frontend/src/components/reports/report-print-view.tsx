@@ -83,13 +83,23 @@ export function ReportPrintView({ report }: { report: PortfolioReport }) {
           {report.period?.label ?? report.year} closed with <strong>{formatCurrency(es.gross_revenue, cur)}</strong> gross revenue
           and a net profit of <strong>{formatCurrency(es.net_profit, cur)}</strong> ({es.profit_margin.toFixed(1)}%
           margin) across {es.property_count} properties. Portfolio health is{" "}
-          <strong>{es.portfolio_health_score}/100</strong> ({es.portfolio_health_status}).
+          {es.portfolio_health_score === null ? (
+            <strong>not scored yet</strong>
+          ) : (
+            <>
+              <strong>{es.portfolio_health_score}/100</strong> ({es.portfolio_health_status})
+            </>
+          )}.
         </SectionIntro>
         <div className="report-kpis">
           <KpiBox label="Gross Revenue" value={formatCurrency(es.gross_revenue, cur)} />
           <KpiBox label="Net Profit" value={formatCurrency(es.net_profit, cur)} tone={es.net_profit >= 0 ? "good" : "bad"} />
           <KpiBox label="Profit Margin" value={`${es.profit_margin.toFixed(1)}%`} tone={es.profit_margin >= 20 ? "good" : es.profit_margin >= 0 ? "warn" : "bad"} />
-          <KpiBox label="Portfolio Health" value={`${es.portfolio_health_score}/100`} tone={es.portfolio_health_score >= 70 ? "good" : es.portfolio_health_score >= 50 ? "warn" : "bad"} />
+          <KpiBox
+            label="Portfolio Health"
+            value={es.portfolio_health_score === null ? "N/A" : `${es.portfolio_health_score}/100`}
+            tone={es.portfolio_health_score === null ? "warn" : es.portfolio_health_score >= 70 ? "good" : es.portfolio_health_score >= 50 ? "warn" : "bad"}
+          />
         </div>
         {(es.best_property || es.worst_property) && (
           <div className="report-two-col">

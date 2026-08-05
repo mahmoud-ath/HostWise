@@ -264,7 +264,10 @@ class AnalyticsService:
             pid = uuid.UUID(pd["property_id"]) if isinstance(pd["property_id"], str) else pd["property_id"]
             health = await self.get_property_health_score(pid)
             h = health["health_score"]
-            if h >= 75:
+            if h is None:
+                # No data yet — don't count it as a healthy/unhealthy property.
+                pass
+            elif h >= 75:
                 health_distribution["excellent"] += 1
             elif h >= 50:
                 health_distribution["good"] += 1
@@ -352,6 +355,27 @@ class AnalyticsService:
         from app.properties.repository import PropertyRepository
         prop_repo = PropertyRepository(self.session)
         prop = await prop_repo.get_by_id(property_id)
+
+        # No financial activity → there is nothing to score yet.
+        res_count = sum(
+            m.get("reservation_count", 0) for m in analytics.get("monthly_breakdown", [])
+        )
+        if (
+            analytics["net_revenue"] == 0
+            and analytics["total_expenses"] == 0
+            and res_count == 0
+        ):
+            return {
+                "property_id": str(property_id),
+                "property_name": prop.name if prop else "Unknown",
+                "health_score": None,
+                "status": "no_data",
+                "target_annual_revenue": prop.target_annual_revenue if prop else None,
+                "profit_margin": 0.0,
+                "cancellation_rate": 0.0,
+                "expense_ratio": 0.0,
+                "net_revenue": 0.0,
+            }
 
         score = 50.0  # baseline
 

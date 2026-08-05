@@ -41,8 +41,15 @@ export function ExecutiveSummary({ report }: { report: PortfolioReport }) {
   const es = report.executive_summary;
   const currency = report.currency;
   const status = es.portfolio_health_status;
+  const hasHealth = es.portfolio_health_score !== null;
   const healthVariant =
-    status === "excellent" ? "success" : status === "good" ? "default" : "destructive";
+    !hasHealth
+      ? "secondary"
+      : status === "excellent"
+      ? "success"
+      : status === "good"
+      ? "default"
+      : "destructive";
 
   const stats = [
     { label: "Gross Revenue", value: formatCurrency(es.gross_revenue, currency) },
@@ -56,8 +63,8 @@ export function ExecutiveSummary({ report }: { report: PortfolioReport }) {
       icon={<CalendarRange className="h-5 w-5" />}
       description={`${report.organization} · ${new Date(report.period_start).toLocaleDateString("en-US", { month: "short" })} – ${new Date(report.period_end).toLocaleDateString("en-US", { month: "short", year: "numeric" })}`}
       action={
-        <Badge variant={healthVariant as "success" | "default" | "destructive"} className="capitalize">
-          {status} · {es.portfolio_health_score}/100
+        <Badge variant={healthVariant as "success" | "default" | "secondary" | "destructive"} className="capitalize">
+          {hasHealth ? `${status} · ${es.portfolio_health_score}/100` : "No data yet"}
         </Badge>
       }
     >

@@ -14,6 +14,22 @@ const COMPONENT_COLORS: Record<string, string> = {
 
 export function PortfolioHealth({ report }: { report: PortfolioReport }) {
   const health = report.portfolio_health;
+
+  // No properties/financial records yet → nothing to score (no fabricated 50s).
+  if (health.score === null || health.status === "no_data") {
+    return (
+      <ReportSection
+        title="Portfolio Health"
+        icon={<HeartPulse className="h-5 w-5" />}
+        description="Overall health across revenue, profit, occupancy and expenses"
+      >
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          No data yet — add properties, revenue or expenses to see your portfolio health.
+        </p>
+      </ReportSection>
+    );
+  }
+
   const { components, distribution } = health;
   const revenueGrowth = health.components.revenue_change_pct;
 
@@ -81,7 +97,7 @@ export function PortfolioHealth({ report }: { report: PortfolioReport }) {
                 </span>
                 <span className="text-muted-foreground">{components[b.key]}/100</span>
               </div>
-              <ProgressBar value={components[b.key]} color={COMPONENT_COLORS[b.key]} />
+              <ProgressBar value={components[b.key] ?? 0} color={COMPONENT_COLORS[b.key]} />
             </div>
           ))}
         </div>

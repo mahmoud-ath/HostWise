@@ -25,6 +25,26 @@ async def _seed(client, seed_property):
     )
 
 
+async def test_portfolio_report_health_no_data_when_empty(client):
+    """With an empty database the portfolio report shows 'no data', not 50/100."""
+    resp = await client.get(f"/api/v1/reports/portfolio?year={YEAR}")
+    assert resp.status_code == 200
+    body = resp.json()
+    health = body["portfolio_health"]
+    assert health["status"] == "no_data"
+    assert health["score"] is None
+    assert body["executive_summary"]["portfolio_health_score"] is None
+
+
+async def test_property_health_no_data_when_empty(client, seed_property):
+    """A property with no financial activity shows 'no data', not a fake 70."""
+    resp = await client.get(f"/api/v1/analytics/property/{seed_property}/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "no_data"
+    assert body["health_score"] is None
+
+
 async def test_portfolio_analytics_no_occupancy(client, seed_property):
     await _seed(client, seed_property)
     resp = await client.get(f"/api/v1/analytics/portfolio?year={YEAR}")
@@ -64,5 +84,6 @@ async def test_health_score_empty_property(client, seed_property):
     resp = await client.get(f"/api/v1/analytics/property/{seed_property}/health")
     assert resp.status_code == 200
     body = resp.json()
-    # Baseline score with no data (no negative penalties)
-    assert 0 <= body["health_score"] <= 100
+    # No financial activity → "no data" (not a fabricated baseline score)
+    assert body["status"] == "no_data"
+    assert body["health_score"] is None

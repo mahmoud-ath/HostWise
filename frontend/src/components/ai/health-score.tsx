@@ -14,6 +14,22 @@ const COMPONENT_COLORS: Record<string, string> = {
 
 export function BusinessHealthScore({ report }: { report: AdvisorReport }) {
   const health = report.health_score;
+
+  // No properties/financial records yet → nothing to score (no fabricated 50s).
+  if (health.score === null || health.status === "no_data") {
+    return (
+      <ReportSection
+        title="Business Health Score"
+        icon={<HeartPulse className="h-5 w-5" />}
+        description="Overall health from revenue, expenses, growth and risk"
+      >
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          No data yet — add properties, revenue or expenses to see your health score.
+        </p>
+      </ReportSection>
+    );
+  }
+
   const statusColor =
     health.status === "excellent"
       ? "text-success"
@@ -62,7 +78,7 @@ export function BusinessHealthScore({ report }: { report: AdvisorReport }) {
                   {health.components[b.key]}/100
                 </span>
               </div>
-              <ProgressBar value={health.components[b.key]} color={COMPONENT_COLORS[b.key]} />
+              <ProgressBar value={health.components[b.key] ?? 0} color={COMPONENT_COLORS[b.key]} />
             </div>
           ))}
         </div>

@@ -75,7 +75,7 @@ export interface PortfolioReport {
     property_count: number;
     best_property: PropertyCard | null;
     worst_property: PropertyCard | null;
-    portfolio_health_score: number;
+    portfolio_health_score: number | null;
     portfolio_health_status: string;
   };
   ai_insights: {
@@ -115,12 +115,12 @@ export interface PortfolioReport {
     confidence: number;
   };
   portfolio_health: {
-    score: number;
+    score: number | null;
     status: string;
     components: {
-      revenue: number;
-      profit: number;
-      expenses: number;
+      revenue: number | null;
+      profit: number | null;
+      expenses: number | null;
       revenue_change_pct: number;
     };
     distribution: {

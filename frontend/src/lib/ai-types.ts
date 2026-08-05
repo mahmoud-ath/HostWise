@@ -4,13 +4,13 @@
  */
 
 export interface HealthScore {
-  score: number;
+  score: number | null;
   status: string;
   components: {
-    revenue: number;
-    expenses: number;
-    growth: number;
-    risk: number;
+    revenue: number | null;
+    expenses: number | null;
+    growth: number | null;
+    risk: number | null;
   };
 }
 

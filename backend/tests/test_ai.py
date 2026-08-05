@@ -189,3 +189,15 @@ async def test_advisor_summary_level_trims(client, seed_property):
     assert body["priority_actions"]["medium"] == []
     assert body["priority_actions"]["low"] == []
     await _clear_caches()
+
+
+async def test_advisor_health_no_data_when_empty(client):
+    """With an empty database the advisor shows 'no data', not fabricated scores."""
+    await _clear_caches()
+    resp = await client.get(f"/api/v1/ai/advisor?year={YEAR}")
+    assert resp.status_code == 200
+    health = resp.json()["health_score"]
+    assert health["status"] == "no_data"
+    assert health["score"] is None
+    assert health["components"]["revenue"] is None
+    await _clear_caches()

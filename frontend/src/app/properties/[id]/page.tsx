@@ -47,7 +47,7 @@ export default function PropertyDeepDivePage() {
     { label: "Avg Stay", value: `${avgStay} nights` },
     { label: "Cancellation", value: `${(analytics?.cancellation_rate as number) || 0}%` },
     { label: "Expense Ratio", value: `${(analytics?.expense_ratio as number) || 0}%` },
-    { label: "Health", value: health ? `${health.health_score}/100` : "—" },
+    { label: "Health", value: health && health.health_score !== null ? `${health.health_score}/100` : "—" },
   ];
 
   return (
@@ -63,8 +63,8 @@ export default function PropertyDeepDivePage() {
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight">{property?.name || "Property"}</h1>
             {health && (
-              <Badge variant={health.status === "healthy" ? "success" : health.status === "average" ? "secondary" : "destructive"}>
-                <Gauge className="mr-1 h-3 w-3" /> {health.health_score}/100
+              <Badge variant={health.status === "no_data" ? "outline" : health.status === "healthy" ? "success" : health.status === "average" ? "secondary" : "destructive"}>
+                <Gauge className="mr-1 h-3 w-3" /> {health.health_score === null ? "No data" : `${health.health_score}/100`}
               </Badge>
             )}
           </div>
