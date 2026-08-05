@@ -172,8 +172,9 @@ Generate Report → download the PDF → send to owner/accountant
 ## Future Evolution
 
 - Add caching / a report "rendered at" timestamp to make repeat loads cheap.
-- Wire `report_auto_generate` + `report_send_email` settings to a real
-  scheduler + email service.
+- `report_auto_generate` now drives an in-app "report ready" notification
+  (notifications engine); a real email service for `report_send_email` is
+  still planned (in-app first for the local-first app).
 - Add jurisdiction-aware tax logic and official tax-filing exports.
 - Add owner-facing white-labeled report branding (business name/logo from
   settings).

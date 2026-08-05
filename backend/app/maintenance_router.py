@@ -123,11 +123,12 @@ async def reset_demo_data() -> dict:
     """Delete transactional demo data (revenues, expenses, reservations)."""
     from app.core.database import async_session_factory
     from app.finance.models import Expense, Revenue
+    from app.notifications.models import Notification
     from app.reservations.models import Reservation
 
     deleted: dict[str, int] = {}
     async with async_session_factory() as session:
-        for model in (Revenue, Expense, Reservation):
+        for model in (Revenue, Expense, Reservation, Notification):
             table = model.__tablename__
             count = (await session.execute(
                 select(func.count(model.id))
@@ -149,13 +150,14 @@ async def reset_all_data() -> dict:
     from app.core.database import async_session_factory
     from app.finance.category_models import ExpenseCategory, RevenueCategory
     from app.finance.models import Expense, Revenue
+    from app.notifications.models import Notification
     from app.properties.models import Listing, Property
     from app.reservations.models import Guest, Reservation
 
     # Children before parents so FK constraints never block the delete.
     models = (
         Reservation, Revenue, Expense, Guest, Listing,
-        Property, ExpenseCategory, RevenueCategory,
+        Property, ExpenseCategory, RevenueCategory, Notification,
     )
     deleted: dict[str, int] = {}
     async with async_session_factory() as session:

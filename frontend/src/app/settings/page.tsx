@@ -12,6 +12,7 @@ import { BackupSection } from "@/components/settings/backup-section";
 import { ImportSection } from "@/components/settings/import-section";
 import { AppearanceSection } from "@/components/settings/appearance-section";
 import { SecuritySection } from "@/components/settings/security-section";
+import { NotificationsSection } from "@/components/settings/notifications-section";
 import { MaintenanceSection } from "@/components/settings/maintenance-section";
 import { AboutSection } from "@/components/settings/about-section";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -30,6 +31,7 @@ import {
   Upload,
   Wrench,
   Info,
+  Bell,
 } from "lucide-react";
 
 const TABS = [
@@ -38,6 +40,7 @@ const TABS = [
   { id: "appearance", label: "Appearance", icon: Palette, content: <AppearanceSection /> },
   { id: "security", labelKey: "settings.security", label: "Security", icon: Shield, content: <SecuritySection /> },
   { id: "backup", labelKey: "settings.backup", label: "Backup", icon: Database, content: <BackupSection /> },
+  { id: "notifications", labelKey: "settings.notifications", label: "Notifications", icon: Bell, content: <NotificationsSection /> },
   { id: "import", labelKey: "settings.dataImport", label: "Import", icon: Upload, content: <ImportSection /> },
   { id: "maintenance", labelKey: "settings.maintenance", label: "Maintenance", icon: Wrench, content: <MaintenanceSection /> },
   { id: "about", labelKey: "settings.aboutTitle", label: "About", icon: Info, content: <AboutSection /> },

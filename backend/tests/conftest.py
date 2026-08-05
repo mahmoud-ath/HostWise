@@ -27,6 +27,7 @@ app = create_app()
 async def _create_tables():
     # Import every model module so `Base.metadata` is fully populated.
     from app.finance import models  # noqa: F401
+    from app.notifications import models  # noqa: F401
     from app.properties import models  # noqa: F401
     from app.reservations import models  # noqa: F401
     from app.settings import models  # noqa: F401

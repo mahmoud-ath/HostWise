@@ -114,6 +114,16 @@ Legend — `🔒` = requires auth (Bearer). `P` = consumer page.
 | `GET /logs?lines` | Tail of backend log | /settings | min 10, max 2000 |
 | `POST /reset-demo-data` | Clear revenues/expenses/reservations | /settings | destructive, double-confirmed |
 
+### Notifications — `/api/v1/notifications`
+| Method & Path | Purpose | Consumer | Notes |
+| --- | --- | --- | --- |
+| `GET ""?limit` | List notifications (unread first) + unread count | AppShell bell | |
+| `GET /summary` | Unread count for the badge | AppShell bell | Polled every 60s |
+| `POST /refresh` | Recompute from data + `notify_*` settings | AppShell bell on load | Deduped by fingerprint; partial unique index |
+| `POST /read-all` | Mark all read | AppShell bell | |
+| `POST /{id}/read` | Mark one read | AppShell bell | |
+| `DELETE ""` | Archive all notifications | AppShell bell | |
+
 ### Settings — `/api/v1/settings`
 | Method & Path | Purpose | Consumer | Notes |
 | --- | --- | --- | --- |

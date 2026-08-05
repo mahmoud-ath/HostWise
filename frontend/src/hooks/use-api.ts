@@ -559,6 +559,14 @@ export function useProperties() {
   });
 }
 
+export function useProperty(propertyId?: string) {
+  return useQuery<Property>({
+    queryKey: ["property", propertyId],
+    queryFn: () => api.get(`/properties/${propertyId}`),
+    enabled: !!propertyId,
+  });
+}
+
 export function useCreateProperty() {
   const queryClient = useQueryClient();
   return useMutation<Property, Error, Partial<Property>>({
@@ -622,5 +630,89 @@ export function usePropertyHealth(propertyId?: string) {
     queryKey: ["property-health", propertyId],
     queryFn: () => api.get(`/analytics/property/${propertyId}/health`),
     enabled: !!propertyId,
+  });
+}
+
+// ── Notifications ──────────────────────────────────────
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  severity: "info" | "success" | "warning" | "error";
+  is_read: boolean;
+  created_at: string | null;
+}
+
+export interface NotificationsResult {
+  notifications: AppNotification[];
+  unread: number;
+}
+
+export interface RefreshNotificationsResult {
+  created: number;
+  unread: number;
+  total: number;
+}
+
+export function useNotifications(limit = 50) {
+  return useQuery<NotificationsResult>({
+    queryKey: ["notifications", limit],
+    queryFn: () => api.get(`/notifications?limit=${limit}`),
+    staleTime: 30_000,
+  });
+}
+
+export function useNotificationsSummary() {
+  return useQuery<{ unread: number }>({
+    queryKey: ["notifications-summary"],
+    queryFn: () => api.get("/notifications/summary"),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useRefreshNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation<RefreshNotificationsResult, Error>({
+    mutationFn: () => api.post("/notifications/refresh"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-summary"] });
+    },
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation<{ updated: boolean }, Error, string>({
+    mutationFn: (id) => api.post(`/notifications/${id}/read`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-summary"] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation<{ updated: number }, Error>({
+    mutationFn: () => api.post("/notifications/read-all"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-summary"] });
+    },
+  });
+}
+
+export function useClearNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation<{ deleted: number }, Error>({
+    mutationFn: () => api.delete("/notifications"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-summary"] });
+    },
   });
 }

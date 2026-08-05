@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -218,7 +219,13 @@ function PropertyCard({ property, onOpen, onEdit, onDelete }: {
             <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {property.max_guests} guests</span>
           </div>
         </div>
-        <p className="mt-2 text-xs text-primary">Click for analytics →</p>
+        <Link
+          href={`/properties/${property.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          View analytics <TrendingUp className="h-3 w-3" />
+        </Link>
       </CardContent>
     </Card>
   );

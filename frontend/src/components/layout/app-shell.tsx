@@ -5,6 +5,7 @@ import { Sidebar } from "./sidebar";
 import { ConnectionBanner } from "./connection-banner";
 import { ErrorBoundary } from "./error-boundary";
 import { WelcomeWizard } from "./welcome-wizard";
+import { NotificationBell } from "./notification-bell";
 import { useBackend } from "@/contexts/backend-context";
 import { useI18n } from "@/lib/i18n";
 import { Home, Loader2 } from "lucide-react";
@@ -29,6 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <WelcomeWizard />
       <div className="min-h-screen bg-background">
         <ConnectionBanner />
+        <NotificationBell />
         <Sidebar />
         <div className="lg:hidden flex items-center h-14 px-4 border-b">
           <Link href="/" className="flex items-center">

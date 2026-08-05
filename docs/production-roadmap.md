@@ -263,23 +263,28 @@ gaps. **Why now.** These are the features hosts actually ask for.
 | 3.2 | **Per-record currency** ✅ Done (editable per-row currency; display-only, no FX) | Mixed-currency hosts compute wrong totals | Correct multi-currency books | Real correctness for global users | Schema + formatting changes | 2.2 | FX handling — keep display-only, no auto-convert in v1 |
 | 3.3 | **Import idempotency + encoding/delimiter** ✅ Done (column-mapping UI deferred) | Duplicate imports corrupt data; settings unused | Safe re-imports | Data integrity | Service-level dedupe by natural key | 2.2 | Defining the natural key per type |
 | 3.4 | **iCal connector** ✅ Done — Airbnb/Booking calendar-export path (no official host API) | Product story is "analytics over booking data"; CSV-only limits it | Feeds data automatically | Retention, less manual entry | `ConnectorRegistry` + iCal parser + sync UI | 2.2 | Scrape/API ToS — prefer official APIs |
-| 3.5 | **Notifications + report scheduler** wired to stored settings | Settings already promise them | Proactive insights | "The app tells me" | Lightweight scheduler + email (local SMTP/OS) | 2.2 | Email delivery needs a server — keep local notify first |
-| 3.6 | Promote property modal → optional deep-dive route | Shareable, book-markable analytics | Better UX on problem properties | Small | New route reusing `/analytics/property/{id}` | None | None |
+| 3.5 | **Notifications + report scheduler** ✅ Done — in-app notifications engine wired to `notify_*` settings; `refresh()` is the local scheduler tick (deduped by fingerprint, partial unique index) | Settings already promise them | Proactive insights | "The app tells me" | Lightweight scheduler + email (local SMTP/OS) | 2.2 | Email delivery needs a server — keep local notify first (email still planned) |
+| 3.6 | **Property deep-dive route** ✅ Done — `/properties/[id]` reusing `/analytics/property/{id}` + health; "View analytics" link on property cards | Promote property modal → optional deep-dive route | Shareable, book-markable analytics | Better UX on problem properties | Small | New route reusing `/analytics/property/{id}` | None | None |
 
 **Expected outcome.** Categories manageable; correct multi-currency display;
 safe re-imports; at least one automatic connector; scheduled/notify basics.
 **DoD.** 3.1–3.6 shipped with tests; mixed-currency report shows correct
 per-currency totals; importing the same file twice inserts once.
 
-**Executed so far (3.1–3.4).** Category manager UI + auto-categorization on
+**Executed so far (3.1–3.6).** Category manager UI + auto-categorization on
 create and on description edit; per-record currency (editable + per-row
 badge, display-only); idempotent CSV/JSON import (natural-key dedupe for
 reservations by confirmation code, revenues by property+date+amount+source,
 expenses by property+date+amount+vendor+category) with `import_encoding` /
 `import_delimiter` honored; iCal connector (`POST /connectors/ical/upload` +
 `/import`) that turns Airbnb/Booking calendar VEVENTs into reservations and
-skips re-imported UIDs. Remaining: 3.5 notifications/scheduler, 3.6
-property deep-dive route, column-mapping UI.
+skips re-imported UIDs; in-app **notifications engine** (`/api/v1/notifications`)
+wired to the `notify_*` settings — profit-drop / revenue-up / occupancy-fall /
+backup-done / report-ready events, deduped by fingerprint with a partial
+unique index, bell UI in the app shell, Notifications settings tab;
+**property deep-dive route** `/properties/[id]` with KPI cards, health badge
+and a monthly revenue/expense chart, linked from each property card.
+Remaining: column-mapping UI, then Phase 4 (AI).
 
 ---
 

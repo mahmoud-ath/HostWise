@@ -177,6 +177,7 @@ def create_app() -> FastAPI:
     from app.connectors.router import router as connectors_router
     from app.finance.router import router as finance_router
     from app.maintenance_router import router as maintenance_router
+    from app.notifications.router import router as notifications_router
     from app.properties.router import router as property_router
     from app.reports.router import router as reports_router
     from app.settings.router import router as settings_router
@@ -190,6 +191,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI Advisor"])
     app.include_router(reports_router, prefix="/api/v1/reports", tags=["Reports"])
     app.include_router(connectors_router, prefix="/api/v1/connectors", tags=["Connectors"])
+    app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["Notifications"])
     app.include_router(backup_router, prefix="/api/v1", tags=["Backups"])
     app.include_router(maintenance_router, prefix="/api/v1", tags=["Maintenance"])
     app.include_router(settings_router, prefix="/api/v1/settings", tags=["Settings"])

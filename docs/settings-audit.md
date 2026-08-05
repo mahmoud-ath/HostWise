@@ -150,9 +150,10 @@ Maintenance (optimize DB, clear cache, read logs, restart backend, copy diagnost
 
 ## Weaknesses
 
-- Some settings are stored but **not yet consumed** (dashboard prefs,
-  notifications, report auto-generate, AI analysis level/language).
-- No notifications engine / scheduler yet.
+- Some settings are stored but **not yet consumed** (dashboard prefs, AI
+  analysis level/language).
+- Notifications engine exists and consumes `notify_*` + `report_auto_generate`
+  (in-app, deduped); `report_send_email` (email delivery) is still planned.
 - Security actions (change password, export/delete account) are placeholders.
 
 ## Technical Debt
@@ -164,9 +165,9 @@ Maintenance (optimize DB, clear cache, read logs, restart backend, copy diagnost
 
 ## Future Evolution
 
-- Wire stored settings into their consumers (dashboard prefs, notifications,
-  scheduler, AI level/language, email reports).
-- Add a notifications engine and a report scheduler (using stored
-  `report_auto_generate`/`report_send_email`).
+- Wire stored settings into their consumers (dashboard prefs, AI
+  level/language, email reports).
+- Notifications engine + report-ready scheduler are **done** (in-app); email
+  delivery via `report_send_email` remains.
 - Per-key validation + typing for settings.
 - Multi-tenant organization settings (business identity → `organizations`).
