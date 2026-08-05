@@ -4,10 +4,12 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import { useSettings } from "@/contexts/settings-context";
 import { useI18n } from "@/lib/i18n";
-import { Upload, FileText, Database, Download, Info } from "lucide-react";
+import { useProperties } from "@/hooks/use-api";
+import { Upload, FileText, Database, Download, Info, Calendar } from "lucide-react";
 import { useState } from "react";
 
 type ImportType = "auto" | "reservations" | "revenues" | "expenses";
@@ -24,8 +26,17 @@ interface ImportResult {
   format?: string;
   import_type: string;
   imported: number;
+  skipped?: number;
   properties_created: number;
   errors?: string[];
+  error?: string;
+}
+
+interface ICalUploadResponse {
+  filename: string;
+  format?: string;
+  events: number;
+  preview_rows?: { uid: string; summary: string; check_in: string; check_out: string; nights: number }[];
   error?: string;
 }
 
@@ -74,6 +85,22 @@ export default function ImportPage() {
               </CardHeader>
               <CardContent>
                 <CSVUploadSection defaultType={activeType} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" /> Calendar Import (iCal)
+                </CardTitle>
+                <CardDescription>
+                  Import reservations from an Airbnb / Booking calendar export (.ics). Each calendar entry becomes
+                  a reservation for the selected property. Re-importing the same calendar is safe — already-known
+                  entries are skipped.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ICALSection />
               </CardContent>
             </Card>
 
@@ -175,11 +202,11 @@ export default function ImportPage() {
             <CardContent>
               <div className="space-y-2">
                 {[
-                  ["CSV Import", "Active"],
-                  ["Airbnb API", "Planned"],
-                  ["Booking.com", "Planned"],
+                  ["CSV / JSON Import", "Active"],
+                  ["iCal (Airbnb / Booking)", "Active"],
+                  ["Airbnb API", "Not available"],
+                  ["Booking.com API", "Not available"],
                   ["Vrbo", "Planned"],
-                  ["iCal", "Planned"],
                 ].map(([c, status]) => (
                   <div key={c} className="flex items-center justify-between py-2 px-3 rounded border">
                     <span className="text-sm">{c}</span>
@@ -188,6 +215,10 @@ export default function ImportPage() {
                     </span>
                   </div>
                 ))}
+                <p className="pt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Airbnb and Booking.com don&apos;t offer a public API for hosts — use their calendar export (.ics)
+                  via the iCal connector above.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -306,6 +337,7 @@ function CSVUploadSection({ defaultType }: { defaultType: ImportType }) {
               {importResult.error
                 ? `❌ ${importResult.error}`
                 : `✅ Imported ${importResult.imported} ${importResult.import_type} rows` +
+                  (importResult.skipped ? ` · ${importResult.skipped} skipped (already imported)` : "") +
                   (importResult.properties_created ? ` (${importResult.properties_created} new properties created)` : "")}
               {importResult.errors && importResult.errors.length > 0 && (
                 <details className="mt-1 text-xs">
@@ -314,6 +346,143 @@ function CSVUploadSection({ defaultType }: { defaultType: ImportType }) {
                 </details>
               )}
             </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ICALSection() {
+  const { data: properties } = useProperties();
+  const [file, setFile] = useState<File | null>(null);
+  const [propertyId, setPropertyId] = useState("");
+  const [preview, setPreview] = useState<ICalUploadResponse | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    setImportResult(null);
+    try {
+      const data = await api.upload<ICalUploadResponse>("/connectors/ical/upload", file);
+      setPreview(data);
+    } catch (e) {
+      console.error(e);
+      setImportResult({ import_type: "ical", imported: 0, properties_created: 0, error: e instanceof Error ? e.message : "Upload failed" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!preview?.filename || !propertyId) return;
+    setImporting(true);
+    try {
+      const data = await api.post<ImportResult>(
+        `/connectors/ical/import?filename=${encodeURIComponent(preview.filename)}&property_id=${propertyId}`
+      );
+      setImportResult(data);
+    } catch (e) {
+      console.error(e);
+      setImportResult({ import_type: "ical", imported: 0, properties_created: 0, error: e instanceof Error ? e.message : "Import failed" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border-2 border-dashed p-6 text-center">
+        <Calendar className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+        <p className="mb-3 text-sm text-muted-foreground">
+          Upload a .ics file from your Airbnb or Booking.com calendar export.
+        </p>
+        <input
+          type="file"
+          accept=".ics"
+          onChange={(e) => {
+            setFile(e.target.files?.[0] || null);
+            setPreview(null);
+            setImportResult(null);
+          }}
+          className="text-sm"
+        />
+      </div>
+
+      {file && (
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="min-w-[220px] flex-1 space-y-1">
+            <Label className="text-xs">Property</Label>
+            <select
+              value={propertyId}
+              onChange={(e) => setPropertyId(e.target.value)}
+              className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              required
+            >
+              <option value="">Select property...</option>
+              {(properties || []).map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+            </select>
+          </div>
+          <Button size="sm" onClick={handleUpload} disabled={uploading}>
+            {uploading ? "..." : "Preview calendar"}
+          </Button>
+        </div>
+      )}
+
+      {preview && (
+        <div className="mt-4 space-y-3">
+          <div className="rounded-lg bg-muted/50 p-3">
+            {preview.error ? (
+              <p className="text-xs text-destructive">Parse error: {preview.error}</p>
+            ) : (
+              <>
+                <p className="mb-2 text-xs font-medium">{preview.events} calendar entries detected</p>
+                {preview.events > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr>
+                          <th className="p-1 text-left">Guest</th>
+                          <th className="p-1 text-left">Check-in</th>
+                          <th className="p-1 text-left">Check-out</th>
+                          <th className="p-1 text-left">Nights</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(preview.preview_rows || []).map((r, i) => (
+                          <tr key={i}>
+                            <td className="p-1">{r.summary || "—"}</td>
+                            <td className="p-1">{r.check_in}</td>
+                            <td className="p-1">{r.check_out}</td>
+                            <td className="p-1">{r.nights}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <Button size="sm" onClick={handleImport} disabled={importing || !propertyId}>
+            {importing ? "Importing..." : "Import as reservations"}
+          </Button>
+        </div>
+      )}
+
+      {importResult && (
+        <div className={`rounded-lg p-3 text-sm ${importResult.error ? "bg-red-50 text-red-700" : "bg-muted/50"}`}>
+          {importResult.error ? (
+            <p>{`❌ ${importResult.error}`}</p>
+          ) : (
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">{`✅ ${importResult.imported} imported`}</span>
+              {importResult.skipped ? ` · ${importResult.skipped} skipped (already imported)` : ""}
+              {importResult.errors?.length ? ` · ${importResult.errors.join("; ")}` : ""}
+            </p>
           )}
         </div>
       )}

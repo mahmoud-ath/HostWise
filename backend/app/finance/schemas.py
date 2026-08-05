@@ -31,6 +31,7 @@ class RevenueUpdateRequest(BaseModel):
     category_id: str | None = None
     gross_amount: float | None = None
     commission_amount: float | None = None
+    currency: str | None = None
     description: str | None = None
     notes: str | None = None
 
@@ -74,6 +75,7 @@ class ExpenseUpdateRequest(BaseModel):
     category_id: str | None = None
     date: datetime.date | None = None
     amount: float | None = Field(None, ge=0)
+    currency: str | None = None
     vendor: str | None = None
     payment_method: PaymentMethod | None = None
     description: str | None = None

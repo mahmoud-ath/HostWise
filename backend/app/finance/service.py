@@ -132,8 +132,16 @@ class RevenueService:
             r.net_amount = r.gross_amount - r.commission_amount
         if data.category_id is not None:
             r.category_id = uuid.UUID(data.category_id)
+        if data.currency is not None:
+            r.currency = data.currency
         if data.description is not None:
+            new_desc = data.description.strip()
             r.description = data.description
+            # Re-categorize on description-only edits when no category is set.
+            if r.category_id is None and new_desc:
+                r.category_id = await _find_or_create_category(
+                    self.session, RevenueCategory, new_desc
+                )
         if data.notes is not None:
             r.notes = data.notes
 
@@ -218,6 +226,15 @@ class ExpenseService:
                 setattr(e, field, bool(value))
             elif value is not None:
                 setattr(e, field, value)
+        # Re-categorize on description-only edits when no category is set.
+        if (
+            e.category_id is None
+            and not data.get("category_id")
+            and (data.get("description") or "").strip()
+        ):
+            e.category_id = await _find_or_create_category(
+                self.session, ExpenseCategory, data["description"].strip()
+            )
         return ExpenseResponse.model_validate(e)
 
     async def delete(self, expense_id: uuid.UUID) -> None:

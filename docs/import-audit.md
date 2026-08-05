@@ -123,9 +123,8 @@ Decision: fix property names in future CSVs for cleaner matching
   entry.
 - **Dashboard / Analytics / Reports / AI:** all downstream consumers light up
   once data exists.
-- **Settings:** `import_date_format` and `default_currency` are honored by the
-  importer; `import_encoding` / `import_delimiter` are stored but not yet
-  consumed (a gap).
+- **Settings:** `import_date_format`, `default_currency`, `import_encoding`
+  and `import_delimiter` are all honored by the importer.
 
 ## Architectural Decisions
 
@@ -141,23 +140,29 @@ Decision: fix property names in future CSVs for cleaner matching
 
 - Fast cold-start; the fastest path from "I have a CSV" to "I have insights."
 - The normalization layer is future-proof for real platform connectors.
+- Imports are **idempotent**: re-importing the same file skips rows whose
+  natural key already exists (reservations by confirmation code; revenues by
+  property+date+amount+source; expenses by property+date+amount+vendor+category),
+  and the result reports `skipped` counts.
+- An **iCal connector** (`POST /connectors/ical/upload` + `/import`) turns
+  Airbnb/Booking calendar VEVENTs into reservations and skips re-imported UIDs.
 
 ## Weaknesses
 
-- Import settings `import_encoding` / `import_delimiter` are stored but not yet
-  consumed (date format and default currency are honored).
 - Limited error feedback (a generic "Import failed" in some paths).
+- No per-column mapping UI yet (column names must match the documented samples).
 
 ## Technical Debt
 
-- Honor `import_encoding` / `import_delimiter`; add per-column mapping UI.
-- Add transaction rollback reporting (partial import counts) and idempotency
-  (avoid duplicate imports of the same file).
+- Add per-column mapping UI (column names must match the documented samples).
+- Add transaction rollback reporting (partial import counts) on failure.
 
 ## Future Evolution
 
-- Real connectors (Airbnb/Booking/VRBO APIs, iCal) behind the `ConnectorRegistry`
-  seam already present in `connectors/base.py`.
+- Airbnb/Booking/VRBO connectors behind the `ConnectorRegistry` seam already
+  present in `connectors/base.py`. **Note:** Airbnb and Booking expose no
+  official public reservations API for hosts — iCal calendar export is the
+  supported integration path, and it is already implemented.
 - Scheduled auto-sync.
 - Column-mapping wizard for non-standard CSVs.
 - Import history + undo.

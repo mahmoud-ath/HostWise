@@ -139,3 +139,57 @@ async def test_revenue_description_auto_creates_category(client, seed_property):
     cats = (await client.get("/api/v1/finance/revenue-categories")).json()
     assert [c["name"] for c in cats] == ["Early Check-in Fee"]
     assert cats[0]["revenue_count"] == 1
+
+
+async def test_expense_description_edit_auto_categorizes_when_unset(client, seed_property):
+    # Create an expense with no category and no description.
+    exp = await client.post(
+        "/api/v1/finance/expense",
+        json={
+            "property_id": seed_property,
+            "date": "2025-06-12",
+            "amount": 45.0,
+            "currency": "EUR",
+        },
+    )
+    assert exp.status_code == 201, exp.text
+    assert exp.json()["category_id"] is None
+
+    # Editing the description (with no category set) re-categorizes it.
+    resp = await client.patch(
+        f"/api/v1/finance/expense/{exp.json()['id']}",
+        json={"description": "Garden Maintenance"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["category_id"] is not None
+
+    cats = (await client.get("/api/v1/finance/expense-categories")).json()
+    assert [c["name"] for c in cats] == ["Garden Maintenance"]
+    assert cats[0]["expense_count"] == 1
+
+
+async def test_revenue_description_edit_auto_categorizes_when_unset(client, seed_property):
+    rev = await client.post(
+        "/api/v1/finance/revenue",
+        json={
+            "property_id": seed_property,
+            "date": "2025-06-10",
+            "gross_amount": 400.0,
+            "commission_amount": 40.0,
+            "source": "manual",
+            "currency": "EUR",
+        },
+    )
+    assert rev.status_code == 201, rev.text
+    assert rev.json()["category_id"] is None
+
+    resp = await client.patch(
+        f"/api/v1/finance/revenue/{rev.json()['id']}",
+        json={"description": "Pet Fee"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["category_id"] is not None
+
+    cats = (await client.get("/api/v1/finance/revenue-categories")).json()
+    assert [c["name"] for c in cats] == ["Pet Fee"]
+    assert cats[0]["revenue_count"] == 1

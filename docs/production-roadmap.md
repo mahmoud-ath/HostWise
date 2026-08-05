@@ -91,12 +91,13 @@ migrations precede connectors and the AI polish.
 
 ### 2.3 Still missing (carried forward — these are the real backlog)
 
-1. **Category management UI** (create/rename/merge expense + revenue
-   categories) — the single biggest data-accuracy gap. Categories are
-   created implicitly on import only.
-2. **Real platform connectors** — `ConnectorRegistry` still only has CSV.
-3. **Import idempotency + encoding/delimiter + column-mapping UI** — encoding
-   and delimiter settings are still stored but unused.
+1. **Category management UI** — **Done** (create/rename/merge expense +
+   revenue categories; auto-categorization on create and on description edit).
+2. **Real platform connectors** — **Partially done**: iCal connector shipped
+   (the Airbnb/Booking calendar-export path); no official host APIs exist.
+3. **Import idempotency + encoding/delimiter** — **Done** (natural-key dedupe
+   for reservations/revenues/expenses; importer honors `import_encoding` /
+   `import_delimiter`). Column-mapping UI still pending.
 4. **Notifications engine + report scheduler** — `notify_*`,
    `report_auto_generate`, `report_send_email` settings still unwired.
 5. **AI settings honored fully** — `ai_analysis_level`, `ai_language`,
@@ -112,8 +113,9 @@ migrations precede connectors and the AI polish.
 10. **Pagination + server-side filtering** on growing list endpoints.
 11. **E2E UI tests** — pytest covers backend; no Playwright flows.
 12. **Backup verification/restore automation + DB integrity check**.
-13. **Mixed-currency support** — single default currency; a host with MAD +
-   EUR + USD records cannot represent it (found in this re-verification).
+13. **Mixed-currency support** — **Partially done**: per-record `currency`
+   column is editable in the finance form and surfaced per-row in the lists
+   (display-only; no FX conversion yet).
 
 ### 2.4 New technical debt introduced since the audit
 
@@ -257,10 +259,10 @@ gaps. **Why now.** These are the features hosts actually ask for.
 
 | # | Recommendation | Why | Problem solved | Business impact | Technical impact | Depends on | Risks |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 3.1 | **Category management UI** (create/rename/merge expense + revenue categories) | The #1 data-accuracy gap; categories exist only via import | "Where does money go" becomes trustworthy | Higher insight quality, retention | Backend CRUD + UI; reuse category models | Phase 2 (migrations) | Merge semantics — keep soft-delete |
-| 3.2 | **Per-record currency** (currency column + display conversion) | Mixed-currency hosts compute wrong totals | Correct multi-currency books | Real correctness for global users | Schema + formatting changes | 2.2 | FX handling — keep display-only, no auto-convert in v1 |
-| 3.3 | **Import idempotency + encoding/delimiter + column-mapping** | Duplicate imports corrupt data; settings unused | Safe re-imports | Data integrity | Service-level dedupe by natural key | 2.2 | Defining the natural key per type |
-| 3.4 | **One real connector — iCal first** (then Booking/Airbnb later) | Product story is "analytics over booking data"; CSV-only limits it | Feeds data automatically | Retention, less manual entry | `ConnectorRegistry` + iCal parser + sync UI | 2.2 | Scrape/API ToS — prefer official APIs |
+| 3.1 | **Category management UI** ✅ Done (create/rename/merge expense + revenue categories) | The #1 data-accuracy gap; categories exist only via import | "Where does money go" becomes trustworthy | Higher insight quality, retention | Backend CRUD + UI; reuse category models | Phase 2 (migrations) | Merge semantics — keep soft-delete |
+| 3.2 | **Per-record currency** ✅ Done (editable per-row currency; display-only, no FX) | Mixed-currency hosts compute wrong totals | Correct multi-currency books | Real correctness for global users | Schema + formatting changes | 2.2 | FX handling — keep display-only, no auto-convert in v1 |
+| 3.3 | **Import idempotency + encoding/delimiter** ✅ Done (column-mapping UI deferred) | Duplicate imports corrupt data; settings unused | Safe re-imports | Data integrity | Service-level dedupe by natural key | 2.2 | Defining the natural key per type |
+| 3.4 | **iCal connector** ✅ Done — Airbnb/Booking calendar-export path (no official host API) | Product story is "analytics over booking data"; CSV-only limits it | Feeds data automatically | Retention, less manual entry | `ConnectorRegistry` + iCal parser + sync UI | 2.2 | Scrape/API ToS — prefer official APIs |
 | 3.5 | **Notifications + report scheduler** wired to stored settings | Settings already promise them | Proactive insights | "The app tells me" | Lightweight scheduler + email (local SMTP/OS) | 2.2 | Email delivery needs a server — keep local notify first |
 | 3.6 | Promote property modal → optional deep-dive route | Shareable, book-markable analytics | Better UX on problem properties | Small | New route reusing `/analytics/property/{id}` | None | None |
 
@@ -268,6 +270,16 @@ gaps. **Why now.** These are the features hosts actually ask for.
 safe re-imports; at least one automatic connector; scheduled/notify basics.
 **DoD.** 3.1–3.6 shipped with tests; mixed-currency report shows correct
 per-currency totals; importing the same file twice inserts once.
+
+**Executed so far (3.1–3.4).** Category manager UI + auto-categorization on
+create and on description edit; per-record currency (editable + per-row
+badge, display-only); idempotent CSV/JSON import (natural-key dedupe for
+reservations by confirmation code, revenues by property+date+amount+source,
+expenses by property+date+amount+vendor+category) with `import_encoding` /
+`import_delimiter` honored; iCal connector (`POST /connectors/ical/upload` +
+`/import`) that turns Airbnb/Booking calendar VEVENTs into reservations and
+skips re-imported UIDs. Remaining: 3.5 notifications/scheduler, 3.6
+property deep-dive route, column-mapping UI.
 
 ---
 

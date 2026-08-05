@@ -323,6 +323,7 @@ function EntryForm({
     description: initial?.description || "",
     vendor: (initial as Expense)?.vendor || "",
     is_recurring: (initial as Expense)?.is_recurring || false,
+    currency: initial?.currency || currency,
   });
 
   const submit = (e: React.FormEvent) => {
@@ -331,7 +332,7 @@ function EntryForm({
       property_id: form.property_id,
       date: form.date,
       description: form.description,
-      currency,
+      currency: form.currency || currency,
     };
     if (kind === "revenue") {
       base.gross_amount = parseFloat(form.gross_amount);
@@ -357,15 +358,23 @@ function EntryForm({
         <div><Label className="text-xs">Date</Label><Input type="date" className="mt-1" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></div>
         {kind === "revenue" ? (
           <>
-            <div><Label className="text-xs">Gross ({currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.gross_amount} onChange={(e) => setForm({ ...form, gross_amount: e.target.value })} required /></div>
-            <div><Label className="text-xs">Commission ({currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.commission_amount} onChange={(e) => setForm({ ...form, commission_amount: e.target.value })} /></div>
+            <div><Label className="text-xs">Gross ({form.currency || currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.gross_amount} onChange={(e) => setForm({ ...form, gross_amount: e.target.value })} required /></div>
+            <div><Label className="text-xs">Commission ({form.currency || currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.commission_amount} onChange={(e) => setForm({ ...form, commission_amount: e.target.value })} /></div>
           </>
         ) : (
           <>
-            <div><Label className="text-xs">Amount ({currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
+            <div><Label className="text-xs">Amount ({form.currency || currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
             <div><Label className="text-xs">Vendor</Label><Input className="mt-1" value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /></div>
           </>
         )}
+      </div>
+      <div>
+        <Label className="text-xs">Currency</Label>
+        <select className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.currency || currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+          {["MAD", "EUR", "USD", "GBP", "CAD", "AUD", "CHF"].map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </div>
       <div className="flex items-end gap-2">
         <div className="flex-1"><Label className="text-xs">Description</Label><Input className="mt-1" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>

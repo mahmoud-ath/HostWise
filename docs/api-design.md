@@ -91,7 +91,9 @@ Legend — `🔒` = requires auth (Bearer). `P` = consumer page.
 | `GET /guide` | Expected columns per import type | /import | Drives the in-page guide |
 | `GET /available` | List connectors | /import | `ConnectorRegistry` seam |
 | `POST /csv/upload` | Save CSV **or JSON** + preview | /import | Returns `format` + columns + first 5 rows |
-| `POST /csv/import` | Detect type + insert normalized rows | /import | `ConnectorService` layer; honors `import_date_format` + `default_currency` |
+| `POST /csv/import` | Detect type + insert normalized rows | /import | `ConnectorService` layer; honors `import_date_format`, `default_currency`, `import_encoding`, `import_delimiter`; idempotent — returns `imported`/`skipped` counts |
+| `POST /ical/upload` | Save .ics calendar export + VEVENT preview | /import | Airbnb/Booking calendar export path |
+| `POST /ical/import` | Import VEVENTs as reservations for a property | /import | Requires `property_id`; skips already-imported UIDs; source `ical`, zero amounts |
 
 ### Backups — `/api/v1/backups`
 | Method & Path | Purpose | Consumer | Notes |

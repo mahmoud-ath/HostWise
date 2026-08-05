@@ -5,6 +5,7 @@ Data ingestion logic for CSV and JSON files. Routers stay thin; all
 parsing, normalization and inserts live here. Honors import settings
 (date format, default currency) from the settings store.
 """
+import asyncio
 import csv
 import json
 import logging
@@ -42,6 +43,23 @@ def _parse_date(value: str, fmt: str) -> object:
     raise ValueError(f"unparseable date: {value}")
 
 
+def _resolve_encoding(label: str) -> str:
+    """Map the settings encoding label to a Python codec name.
+
+    'UTF-8' is opened as utf-8-sig so an optional BOM is handled transparently.
+    """
+    codecs = {
+        "utf-8": "utf-8-sig",
+        "utf-8 bom": "utf-8-sig",
+        "utf8": "utf-8-sig",
+        "latin-1": "latin-1",
+        "iso-8859-1": "latin-1",
+        "windows-1252": "cp1252",
+        "cp1252": "cp1252",
+    }
+    return codecs.get((label or "").strip().lower(), (label or "utf-8-sig").strip() or "utf-8-sig")
+
+
 class ConnectorService:
     """Handles file preview and import for CSV and JSON data."""
 
@@ -50,10 +68,19 @@ class ConnectorService:
         self._props_created = 0
 
     @staticmethod
-    def read_file(file_path: str) -> tuple[str, list[str], list[dict]]:
-        """Read a file, returning (format, columns, rows)."""
+    def read_file(
+        file_path: str,
+        encoding: str | None = None,
+        delimiter: str | None = None,
+    ) -> tuple[str, list[str], list[dict]]:
+        """Read a file, returning (format, columns, rows).
+
+        `encoding` and `delimiter` honor the import settings
+        (import_encoding / import_delimiter) when provided.
+        """
+        codec = _resolve_encoding(encoding or "UTF-8")
         if file_path.lower().endswith(".json"):
-            with open(file_path, encoding="utf-8") as f:
+            with open(file_path, encoding=codec) as f:
                 payload = json.load(f)
             if isinstance(payload, dict) and isinstance(payload.get("rows"), list):
                 rows = payload["rows"]
@@ -64,8 +91,8 @@ class ConnectorService:
             columns = list(rows[0].keys()) if rows else []
             return "json", columns, rows
 
-        with open(file_path, encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
+        with open(file_path, encoding=codec) as f:
+            reader = csv.DictReader(f, delimiter=delimiter or ",")
             columns = [c.lower().strip() for c in (reader.fieldnames or [])]
             rows = list(reader)
         return "csv", columns, rows
@@ -122,10 +149,15 @@ class ConnectorService:
         settings = await SettingsService(self.session).get_all()
         date_fmt = settings.get("import_date_format", "DD/MM/YYYY")
         currency = settings.get("default_currency", "EUR")
+        enc = settings.get("import_encoding", "UTF-8")
+        delim = settings.get("import_delimiter", ",")
 
-        fmt, columns, rows = self.read_file(file_path)
+        fmt, columns, rows = self.read_file(file_path, encoding=enc, delimiter=delim)
         if not rows:
-            return {"import_type": import_type, "imported": 0, "properties_created": 0, "errors": ["File is empty."]}
+            return {
+                "import_type": import_type, "imported": 0, "skipped": 0,
+                "properties_created": 0, "errors": ["File is empty."],
+            }
 
         # Build property map from existing properties
         result = await self.session.execute(
@@ -170,13 +202,56 @@ class ConnectorService:
 
         detected = self.detect_type(import_type, columns)
         imported = 0
+        skipped = 0
         errors: list[str] = []
+
+        # Idempotency — build natural-key sets so re-importing the same file
+        # skips rows that already exist instead of creating duplicates.
+        if detected == "reservations":
+            existing_res_codes = {
+                code for (code,) in (
+                    await self.session.execute(
+                        select(Reservation.confirmation_code).where(
+                            Reservation.is_deleted == False,
+                            Reservation.confirmation_code.is_not(None),
+                        )
+                    )
+                ).all()
+            }
+        elif detected == "revenues":
+            existing_rev_keys = {
+                (str(p), str(d), float(g), float(n), s.value)
+                for p, d, g, n, s in (
+                    await self.session.execute(
+                        select(
+                            Revenue.property_id, Revenue.date, Revenue.gross_amount,
+                            Revenue.net_amount, Revenue.source,
+                        ).where(Revenue.is_deleted == False)
+                    )
+                ).all()
+            }
+        elif detected == "expenses":
+            existing_exp_keys = {
+                (str(p), str(d), float(a), (v or "").strip(), (desc or "").strip())
+                for p, d, a, v, desc in (
+                    await self.session.execute(
+                        select(
+                            Expense.property_id, Expense.date, Expense.amount,
+                            Expense.vendor, Expense.description,
+                        ).where(Expense.is_deleted == False)
+                    )
+                ).all()
+            }
 
         if detected == "reservations":
             for row in rows:
                 try:
                     prop_id = await resolve_property(row)
                     if not prop_id:
+                        continue
+                    code = (row.get("reservation_id") or row.get("confirmation_code") or "").strip()
+                    if code and code in existing_res_codes:
+                        skipped += 1
                         continue
                     check_in = _parse_date(row.get("check_in") or row.get("Check-in") or "", date_fmt)
                     check_out = _parse_date(row.get("check_out") or row.get("Check-out") or "", date_fmt)
@@ -190,7 +265,7 @@ class ConnectorService:
                     status = status_map.get(row.get("status", "Confirmed"), ReservationStatus.CONFIRMED)
                     self.session.add(Reservation(
                         property_id=prop_id,
-                        confirmation_code=(row.get("reservation_id") or row.get("confirmation_code") or "").strip() or None,
+                        confirmation_code=code or None,
                         status=status,
                         source=ReservationSource.CSV,
                         check_in=check_in,
@@ -206,6 +281,8 @@ class ConnectorService:
                         number_of_guests=2,
                         property_name=(row.get("property_name") or "").strip() or None,
                     ))
+                    if code:
+                        existing_res_codes.add(code)
                     imported += 1
                 except Exception as exc:  # noqa: BLE001 - per-row import errors are collected and surfaced
                     errors.append(str(exc))
@@ -223,6 +300,10 @@ class ConnectorService:
                     source_map = {"airbnb": RevenueSource.AIRBNB, "booking": RevenueSource.BOOKING,
                                   "direct": RevenueSource.DIRECT, "csv": RevenueSource.CSV}
                     source = source_map.get((row.get("source", "csv") or "csv").strip().lower(), RevenueSource.CSV)
+                    key = (str(prop_id), str(rev_date), float(gross), float(net), source.value)
+                    if key in existing_rev_keys:
+                        skipped += 1
+                        continue
                     self.session.add(Revenue(
                         property_id=prop_id,
                         date=rev_date,
@@ -232,6 +313,7 @@ class ConnectorService:
                         source=source,
                         currency=currency,
                     ))
+                    existing_rev_keys.add(key)
                     imported += 1
                 except Exception as exc:  # noqa: BLE001 - per-row import errors are collected and surfaced
                     errors.append(str(exc))
@@ -245,6 +327,11 @@ class ConnectorService:
                     exp_date = _parse_date(row.get("date") or "", date_fmt)
                     amount = float(row.get("amount", 0) or 0)
                     cat_name = (row.get("category") or "").strip()
+                    vendor = (row.get("vendor") or "").strip()
+                    key = (str(prop_id), str(exp_date), float(amount), vendor, cat_name)
+                    if key in existing_exp_keys:
+                        skipped += 1
+                        continue
                     category = await resolve_expense_category(cat_name) if cat_name else None
                     self.session.add(Expense(
                         property_id=prop_id,
@@ -253,8 +340,9 @@ class ConnectorService:
                         currency=currency,
                         category_id=category.id if category else None,
                         description=cat_name or None,
-                        vendor=(row.get("vendor") or "").strip() or None,
+                        vendor=vendor or None,
                     ))
+                    existing_exp_keys.add(key)
                     imported += 1
                 except Exception as exc:  # noqa: BLE001 - per-row import errors are collected and surfaced
                     errors.append(str(exc))
@@ -265,6 +353,100 @@ class ConnectorService:
             "format": fmt,
             "import_type": detected,
             "imported": imported,
+            "skipped": skipped,
             "properties_created": self._props_created,
             "errors": errors[:10],
+        }
+
+    async def import_ical(self, file_path: str, property_id: uuid.UUID) -> dict:
+        """Import reservations from an .ics calendar export.
+
+        Airbnb and Booking don't expose a public reservations API for hosts,
+        but they do offer calendar export (.ics) links — this is the supported
+        integration path. Each VEVENT becomes a reservation (guest name from
+        SUMMARY, dates from DTSTART/DTEND).
+        """
+        from app.connectors.ical import parse_ics
+        from app.settings.service import SettingsService
+
+        def _read_ics() -> str:
+            with open(file_path, encoding="utf-8", errors="replace") as f:
+                return f.read()
+
+        events = parse_ics(await asyncio.to_thread(_read_ics))
+
+        if not events:
+            return {
+                "format": "ics", "import_type": "ical", "imported": 0,
+                "skipped": 0, "properties_created": 0,
+                "errors": ["No VEVENT entries found in the calendar file."],
+            }
+
+        prop = (
+            await self.session.execute(
+                select(Property).where(
+                    Property.id == property_id,
+                    Property.is_deleted == False,
+                )
+            )
+        ).scalar_one_or_none()
+        if not prop:
+            return {
+                "format": "ics", "import_type": "ical", "imported": 0,
+                "skipped": 0, "properties_created": 0,
+                "errors": ["Property not found."],
+            }
+
+        settings = await SettingsService(self.session).get_all()
+        currency = settings.get("default_currency", "EUR")
+
+        # Idempotency — skip UIDs already imported for this property's calendar.
+        existing_uids = {
+            uid for (uid,) in (
+                await self.session.execute(
+                    select(Reservation.external_id).where(
+                        Reservation.external_id.is_not(None),
+                        Reservation.property_id == property_id,
+                    )
+                )
+            ).all()
+        }
+
+        imported = 0
+        skipped = 0
+        for ev in events:
+            uid = ev["uid"] or ""
+            if uid and uid in existing_uids:
+                skipped += 1
+                continue
+            self.session.add(Reservation(
+                property_id=property_id,
+                external_id=uid or None,
+                confirmation_code=uid or None,
+                status=ReservationStatus.CONFIRMED,
+                source=ReservationSource.ICAL,
+                check_in=ev["check_in"],
+                check_out=ev["check_out"],
+                nights=ev["nights"],
+                guest_name=ev["summary"] or None,
+                gross_revenue=0.0,
+                net_revenue=0.0,
+                cleaning_fee=0,
+                platform_fee=0.0,
+                taxes=0,
+                currency=currency,
+                number_of_guests=1,
+                property_name=prop.name,
+            ))
+            if uid:
+                existing_uids.add(uid)
+            imported += 1
+
+        return {
+            "format": "ics",
+            "import_type": "ical",
+            "imported": imported,
+            "skipped": skipped,
+            "properties_created": 0,
+            "errors": [],
         }

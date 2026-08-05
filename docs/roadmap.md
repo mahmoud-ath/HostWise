@@ -31,11 +31,11 @@ Features that complete the promised product.
 
 | Item | Why now | Business value |
 | --- | --- | --- |
-| **Real connectors** (Airbnb/Booking/VRBO APIs, iCal) via `ConnectorRegistry` seam | The product story is "analytics over booking data" — connectors feed it | Removes manual CSV entry; retention |
+| **Real connectors** — iCal ✅ Done (Airbnb/Booking calendar-export path, `/connectors/ical/*`); official APIs for Airbnb/Booking/VRBO don't exist for hosts, so iCal is the supported route | The product story is "analytics over booking data" — connectors feed it | Removes manual CSV entry; retention |
 | **Notifications engine** + report scheduler wired to stored settings (`notify_*`, `report_auto_generate`, `report_send_email`) | Settings already define them | Proactive insights |
 | Honor **AI settings** (`ai_analysis_level`, `ai_language`, `ai_enabled`) in the AI generator | Settings exist but are only partially wired (`ai_enabled` gates BYOK LLM) | Personalization |
 | ~~**LLM swap** behind the existing AI interface (OpenAI/Claude/Ollama), rules as offline fallback~~ — ✅ **Done (v2)** as BYOK (`ai_api_key`/`ai_base_url`/`ai_model` + `/ai/test-connection`) | The seam exists; LLMs give richer chat/scenarios | Flagship feature upgrade |
-| ~~Make **import settings** (date format/currency) actually used~~ — ✅ **Done (v2)** — `ConnectorService` honors `import_date_format` + `default_currency`; JSON supported; remaining: encoding/delimiter + column-mapping wizard | Stored but unused | Better import reliability |
+| ~~Make **import settings** actually used~~ — ✅ **Done (v3)** — `ConnectorService` honors `import_date_format`, `default_currency`, `import_encoding` and `import_delimiter`; JSON supported; imports are **idempotent** (natural-key dedupe, re-imports skip); remaining: column-mapping wizard | Stored but unused | Better import reliability |
 | Per-property **deep-dive** page (uses existing `/analytics/property/{id}`) | Data exists, UI doesn't | Clarity on problem properties |
 | **Optimize AI cost:** per-intent chat data path + request-scoped analytics caching | Chat recomputes everything per question | Responsiveness on real portfolios |
 
