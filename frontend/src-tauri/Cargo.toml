@@ -1,6 +1,6 @@
 [package]
 name = "hostwise"
-version = "0.4.0"
+version = "0.6.0"
 description = "HostWise — vacation rental financial intelligence (desktop shell)"
 authors = ["HostWise"]
 edition = "2021"
