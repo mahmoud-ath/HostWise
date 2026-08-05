@@ -116,7 +116,7 @@ export default function SettingsPage() {
                 className="justify-start gap-2 rounded-md px-3 py-2 text-sm"
               >
                 <tab.icon className="h-4 w-4 shrink-0" />
-                {tab.labelKey ? t(tab.labelKey) : tab.label}
+                {"labelKey" in tab ? t(tab.labelKey) : tab.label}
               </TabsTrigger>
             ))}
           </TabsList>

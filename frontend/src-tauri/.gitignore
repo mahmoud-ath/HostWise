@@ -1,0 +1,6 @@
+# Rust build artifacts
+/target/
+/gen/
+
+# Bundled backend binary (built by scripts/CI, not committed)
+/resources/hostwise-backend/

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -15,6 +14,7 @@ import {
 import { ArrowLeft, Gauge, TrendingUp } from "lucide-react";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,9 +22,7 @@ import { useProperty, usePropertyAnalytics, usePropertyHealth } from "@/hooks/us
 import { useSettings } from "@/contexts/settings-context";
 import { formatCurrency, formatMonth } from "@/lib/utils";
 
-export default function PropertyDeepDivePage() {
-  const params = useParams<{ id: string }>();
-  const id = params.id;
+export function PropertyDeepDive({ id }: { id: string }) {
   const year = new Date().getFullYear();
 
   const { data: property } = useProperty(id);

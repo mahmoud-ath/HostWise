@@ -220,7 +220,7 @@ function PropertyCard({ property, onOpen, onEdit, onDelete }: {
           </div>
         </div>
         <Link
-          href={`/properties/${property.id}`}
+          href={`/properties/detail?id=${property.id}`}
           onClick={(e) => e.stopPropagation()}
           className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
         >

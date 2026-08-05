@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the main window — lets the webview call the local backend via IPC and use core APIs.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

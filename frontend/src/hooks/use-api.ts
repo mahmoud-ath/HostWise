@@ -2,7 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { PortfolioReport, ReportPeriod } from "@/lib/report-types";
+import type { PortfolioReport } from "@/lib/report-types";
+import type { ReportPeriod } from "@/lib/report-period";
 import type { AdvisorReport, ChatResult, ScenarioResult } from "@/lib/ai-types";
 import type {
   BackupStatus,

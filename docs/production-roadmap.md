@@ -366,6 +366,23 @@ promise. **Why now.** The product is complete and hardened.
 optional sync and a docs site. **DoD.** v1.0 released on all three OSes;
 licensing works offline; sync beta opt-in; docs published.
 
+**Executed so far (6.0 desktop shell + CI).** Created the **Tauri v2 shell**
+(`frontend/src-tauri/`: `Cargo.toml`, `tauri.conf.json`, `build.rs`,
+`capabilities`, icons, `src/main.rs` + `lib.rs` + `backend.rs`). The shell
+spawns the Python backend — the repo venv launcher in dev, the PyInstaller
+bundle (`resources/hostwise-backend`) in release — waits for the API port,
+exposes `get_backend_url` to the webview, and stops the backend on window
+close (`cargo check` passes). Frontend builds as a static export for Tauri:
+re-enabled `output: 'export'`, moved the property deep-dive to a static route
+(`/properties/detail?id=…`) and fixed three pre-existing TS errors so the
+build is clean. **Separate GitHub Actions workflows per OS** bundle the
+backend (PyInstaller), export the frontend, and build the installer:
+`.github/workflows/build-windows.yml` (NSIS), `build-macos.yml` (dmg,
+signing/notarization stubbed), `build-linux.yml` (AppImage + deb + WeasyPrint
+system libs). Added `docs/BUILD.md` + `scripts/build-backend.sh`. Remaining
+(6.x): licensing/activation, real code-signing certs, opt-in crash reporting,
+optional cloud sync (deferred per decision — "cloud not now"), docs site.
+
 ---
 
 ## 7. Sequencing summary (the answer)

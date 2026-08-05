@@ -28,15 +28,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { ReportPeriod, isCustomPeriod, periodLabel } from "@/lib/report-period";
 
-interface AIRecommendation {
-  type: "critical" | "warning" | "positive" | "info";
-  title: string;
-  cause: string;
-  business_impact: string;
-  suggested_action: string;
-  confidence_score: number;
-}
-
 export default function Home() {
   return (
     <AppShell>
@@ -238,7 +229,7 @@ function DashboardContent() {
                     ...(aiAnalysis.priority_actions?.low || []),
                   ]
                     .slice(0, 5)
-                    .map((rec: AIRecommendation, i: number) => (
+                    .map((rec, i) => (
                     <div
                       key={i}
                       className="flex items-start gap-3 p-3 rounded-lg border bg-card"
