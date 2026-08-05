@@ -24,16 +24,23 @@ import {
 import { useSettings } from "@/contexts/settings-context";
 import { useI18n } from "@/lib/i18n";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Plus, TrendingUp, TrendingDown, Pencil, Trash2, Filter, X } from "lucide-react";
+import { CategoryManager } from "@/components/finance/category-manager";
+import { Plus, TrendingUp, TrendingDown, Pencil, Trash2, Filter, X, Tags } from "lucide-react";
 
 export default function FinancePage() {
   const { t } = useI18n();
+  const [showCategories, setShowCategories] = useState(false);
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("pages.finance.title")}</h1>
-          <p className="mt-1 text-muted-foreground">{t("pages.finance.subtitle")}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{t("pages.finance.title")}</h1>
+            <p className="mt-1 text-muted-foreground">{t("pages.finance.subtitle")}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowCategories(true)}>
+            <Tags className="mr-1.5 h-4 w-4" /> Manage Categories
+          </Button>
         </div>
         <SummaryCards />
         <div className="grid gap-6 lg:grid-cols-2">
@@ -41,6 +48,7 @@ export default function FinancePage() {
           <ExpenseSection />
         </div>
       </div>
+      {showCategories && <CategoryManager onClose={() => setShowCategories(false)} />}
     </AppShell>
   );
 }

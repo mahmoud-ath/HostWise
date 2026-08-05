@@ -6,28 +6,34 @@ All KPI calculations happen here — never in the router.
 """
 import uuid
 from calendar import monthrange
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from fastapi import Depends
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.finance.category_models import ExpenseCategory, RevenueCategory
 from app.finance.models import Expense, Revenue
 from app.finance.repository import ExpenseRepository, RevenueRepository
 from app.finance.schemas import (
     AnnualReport,
     CategoryBreakdown,
+    CategoryCreateRequest,
+    CategoryUpdateRequest,
+    ExpenseCategoryResponse,
     ExpenseCreateRequest,
     ExpenseResponse,
     FinancialSummary,
     MonthlyBreakdown,
     MonthlyReport,
     PropertyFinancialSummary,
+    RevenueCategoryResponse,
     RevenueCreateRequest,
     RevenueResponse,
     RevenueUpdateRequest,
 )
-from app.shared.exceptions import NotFoundException
+from app.shared.exceptions import NotFoundException, ValidationException
 
 
 class RevenueService:
@@ -622,6 +628,247 @@ class FinancialReportingService:
         )
 
 
+class CategoryService:
+    """Business logic for expense & revenue categories
+    (create / rename / merge / delete).
+    """
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    # ── Helpers ──────────────────────────────────────────────
+
+    async def _get_expense_category(self, category_id: uuid.UUID) -> ExpenseCategory:
+        cat = (await self.session.execute(
+            select(ExpenseCategory).where(
+                ExpenseCategory.id == category_id,
+                ExpenseCategory.is_deleted == False,
+            )
+        )).scalar_one_or_none()
+        if not cat:
+            raise NotFoundException("Expense category", str(category_id))
+        return cat
+
+    async def _get_revenue_category(self, category_id: uuid.UUID) -> RevenueCategory:
+        cat = (await self.session.execute(
+            select(RevenueCategory).where(
+                RevenueCategory.id == category_id,
+                RevenueCategory.is_deleted == False,
+            )
+        )).scalar_one_or_none()
+        if not cat:
+            raise NotFoundException("Revenue category", str(category_id))
+        return cat
+
+    async def _expense_counts(self) -> dict[uuid.UUID, int]:
+        rows = await self.session.execute(
+            select(Expense.category_id, func.count(Expense.id))
+            .where(Expense.is_deleted == False, Expense.category_id.is_not(None))
+            .group_by(Expense.category_id)
+        )
+        return {cid: int(n) for cid, n in rows.all()}
+
+    async def _revenue_counts(self) -> dict[uuid.UUID, int]:
+        rows = await self.session.execute(
+            select(Revenue.category_id, func.count(Revenue.id))
+            .where(Revenue.is_deleted == False, Revenue.category_id.is_not(None))
+            .group_by(Revenue.category_id)
+        )
+        return {cid: int(n) for cid, n in rows.all()}
+
+    async def _expense_name_exists(self, name: str, exclude_id: uuid.UUID | None = None) -> bool:
+        stmt = select(ExpenseCategory.id).where(
+            ExpenseCategory.is_deleted == False,
+            func.lower(ExpenseCategory.name) == name.lower(),
+        )
+        if exclude_id:
+            stmt = stmt.where(ExpenseCategory.id != exclude_id)
+        return (await self.session.execute(stmt)).scalar_one_or_none() is not None
+
+    async def _revenue_name_exists(self, name: str, exclude_id: uuid.UUID | None = None) -> bool:
+        stmt = select(RevenueCategory.id).where(
+            RevenueCategory.is_deleted == False,
+            func.lower(RevenueCategory.name) == name.lower(),
+        )
+        if exclude_id:
+            stmt = stmt.where(RevenueCategory.id != exclude_id)
+        return (await self.session.execute(stmt)).scalar_one_or_none() is not None
+
+    # ── Expense categories ───────────────────────────────────
+
+    async def list_expense_categories(self) -> list[ExpenseCategoryResponse]:
+        cats = (await self.session.execute(
+            select(ExpenseCategory)
+            .where(ExpenseCategory.is_deleted == False)
+            .order_by(ExpenseCategory.sort_order, ExpenseCategory.name)
+        )).scalars().all()
+        counts = await self._expense_counts()
+        result = []
+        for cat in cats:
+            resp = ExpenseCategoryResponse.model_validate(cat)
+            resp.expense_count = counts.get(cat.id, 0)
+            result.append(resp)
+        return result
+
+    async def create_expense_category(self, data: CategoryCreateRequest) -> ExpenseCategoryResponse:
+        name = data.name.strip()
+        if not name:
+            raise ValidationException("Category name is required")
+        if await self._expense_name_exists(name):
+            raise ValidationException(f"A category named '{name}' already exists")
+        cat = ExpenseCategory(
+            name=name,
+            description=(data.description or "").strip() or None,
+        )
+        self.session.add(cat)
+        await self.session.flush()
+        return ExpenseCategoryResponse.model_validate(cat)
+
+    async def update_expense_category(
+        self, category_id: uuid.UUID, data: CategoryUpdateRequest
+    ) -> ExpenseCategoryResponse:
+        cat = await self._get_expense_category(category_id)
+        if data.name is not None:
+            name = data.name.strip()
+            if not name:
+                raise ValidationException("Category name cannot be empty")
+            if await self._expense_name_exists(name, exclude_id=category_id):
+                raise ValidationException(f"A category named '{name}' already exists")
+            cat.name = name
+        if data.description is not None:
+            cat.description = data.description.strip() or None
+        await self.session.flush()
+        resp = ExpenseCategoryResponse.model_validate(cat)
+        resp.expense_count = (await self._expense_counts()).get(category_id, 0)
+        return resp
+
+    async def merge_expense_category(
+        self, category_id: uuid.UUID, target_id: uuid.UUID
+    ) -> ExpenseCategoryResponse:
+        if category_id == target_id:
+            raise ValidationException("Cannot merge a category into itself")
+        await self._get_expense_category(category_id)
+        target = await self._get_expense_category(target_id)
+        await self.session.execute(
+            update(Expense)
+            .where(Expense.category_id == category_id, Expense.is_deleted == False)
+            .values(category_id=target_id)
+        )
+        await self.session.execute(
+            update(ExpenseCategory)
+            .where(ExpenseCategory.id == category_id)
+            .values(is_deleted=True, deleted_at=datetime.now(timezone.utc))
+        )
+        await self.session.flush()
+        resp = ExpenseCategoryResponse.model_validate(target)
+        resp.expense_count = (await self._expense_counts()).get(target_id, 0)
+        return resp
+
+    async def delete_expense_category(self, category_id: uuid.UUID) -> dict:
+        cat = await self._get_expense_category(category_id)
+        if cat.is_default:
+            raise ValidationException("Default categories cannot be deleted — merge them instead.")
+        await self.session.execute(
+            update(Expense)
+            .where(Expense.category_id == category_id, Expense.is_deleted == False)
+            .values(category_id=None)
+        )
+        await self.session.execute(
+            update(ExpenseCategory)
+            .where(ExpenseCategory.id == category_id)
+            .values(is_deleted=True, deleted_at=datetime.now(timezone.utc))
+        )
+        await self.session.flush()
+        return {"deleted": True, "name": cat.name}
+
+    # ── Revenue categories ───────────────────────────────────
+
+    async def list_revenue_categories(self) -> list[RevenueCategoryResponse]:
+        cats = (await self.session.execute(
+            select(RevenueCategory)
+            .where(RevenueCategory.is_deleted == False)
+            .order_by(RevenueCategory.sort_order, RevenueCategory.name)
+        )).scalars().all()
+        counts = await self._revenue_counts()
+        result = []
+        for cat in cats:
+            resp = RevenueCategoryResponse.model_validate(cat)
+            resp.revenue_count = counts.get(cat.id, 0)
+            result.append(resp)
+        return result
+
+    async def create_revenue_category(self, data: CategoryCreateRequest) -> RevenueCategoryResponse:
+        name = data.name.strip()
+        if not name:
+            raise ValidationException("Category name is required")
+        if await self._revenue_name_exists(name):
+            raise ValidationException(f"A category named '{name}' already exists")
+        cat = RevenueCategory(
+            name=name,
+            description=(data.description or "").strip() or None,
+        )
+        self.session.add(cat)
+        await self.session.flush()
+        return RevenueCategoryResponse.model_validate(cat)
+
+    async def update_revenue_category(
+        self, category_id: uuid.UUID, data: CategoryUpdateRequest
+    ) -> RevenueCategoryResponse:
+        cat = await self._get_revenue_category(category_id)
+        if data.name is not None:
+            name = data.name.strip()
+            if not name:
+                raise ValidationException("Category name cannot be empty")
+            if await self._revenue_name_exists(name, exclude_id=category_id):
+                raise ValidationException(f"A category named '{name}' already exists")
+            cat.name = name
+        if data.description is not None:
+            cat.description = data.description.strip() or None
+        await self.session.flush()
+        resp = RevenueCategoryResponse.model_validate(cat)
+        resp.revenue_count = (await self._revenue_counts()).get(category_id, 0)
+        return resp
+
+    async def merge_revenue_category(
+        self, category_id: uuid.UUID, target_id: uuid.UUID
+    ) -> RevenueCategoryResponse:
+        if category_id == target_id:
+            raise ValidationException("Cannot merge a category into itself")
+        await self._get_revenue_category(category_id)
+        target = await self._get_revenue_category(target_id)
+        await self.session.execute(
+            update(Revenue)
+            .where(Revenue.category_id == category_id, Revenue.is_deleted == False)
+            .values(category_id=target_id)
+        )
+        await self.session.execute(
+            update(RevenueCategory)
+            .where(RevenueCategory.id == category_id)
+            .values(is_deleted=True, deleted_at=datetime.now(timezone.utc))
+        )
+        await self.session.flush()
+        resp = RevenueCategoryResponse.model_validate(target)
+        resp.revenue_count = (await self._revenue_counts()).get(target_id, 0)
+        return resp
+
+    async def delete_revenue_category(self, category_id: uuid.UUID) -> dict:
+        cat = await self._get_revenue_category(category_id)
+        if cat.is_default:
+            raise ValidationException("Default categories cannot be deleted — merge them instead.")
+        await self.session.execute(
+            update(Revenue)
+            .where(Revenue.category_id == category_id, Revenue.is_deleted == False)
+            .values(category_id=None)
+        )
+        await self.session.execute(
+            update(RevenueCategory)
+            .where(RevenueCategory.id == category_id)
+            .values(is_deleted=True, deleted_at=datetime.now(timezone.utc))
+        )
+        await self.session.flush()
+        return {"deleted": True, "name": cat.name}
+
+
 # FastAPI dependencies
 async def get_revenue_service(
     session: AsyncSession = Depends(get_db),
@@ -639,3 +886,9 @@ async def get_reporting_service(
     session: AsyncSession = Depends(get_db),
 ) -> FinancialReportingService:
     return FinancialReportingService(session)
+
+
+async def get_category_service(
+    session: AsyncSession = Depends(get_db),
+) -> CategoryService:
+    return CategoryService(session)

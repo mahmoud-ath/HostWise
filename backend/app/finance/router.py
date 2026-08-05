@@ -10,19 +10,26 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.finance.schemas import (
     AnnualReport,
+    CategoryCreateRequest,
+    CategoryMergeRequest,
+    CategoryUpdateRequest,
+    ExpenseCategoryResponse,
     ExpenseCreateRequest,
     ExpenseResponse,
     ExpenseUpdateRequest,
     FinancialSummary,
     MonthlyReport,
+    RevenueCategoryResponse,
     RevenueCreateRequest,
     RevenueResponse,
     RevenueUpdateRequest,
 )
 from app.finance.service import (
+    CategoryService,
     ExpenseService,
     FinancialReportingService,
     RevenueService,
+    get_category_service,
     get_expense_service,
     get_reporting_service,
     get_revenue_service,
@@ -186,3 +193,99 @@ async def get_annual_report(
         return await service.get_range_annual_report(start_date, end_date)
     y = year or date.today().year
     return await service.get_annual_report(y)
+
+
+# ── Expense Category Endpoints ─────────────────────────────
+
+@router.get("/expense-categories", response_model=list[ExpenseCategoryResponse])
+async def list_expense_categories(
+    service: CategoryService = Depends(get_category_service),
+):
+    """List expense categories with per-category expense counts."""
+    return await service.list_expense_categories()
+
+
+@router.post("/expense-categories", response_model=ExpenseCategoryResponse, status_code=201)
+async def create_expense_category(
+    data: CategoryCreateRequest,
+    service: CategoryService = Depends(get_category_service),
+):
+    """Create a new expense category."""
+    return await service.create_expense_category(data)
+
+
+@router.patch("/expense-categories/{category_id}", response_model=ExpenseCategoryResponse)
+async def update_expense_category(
+    category_id: str,
+    data: CategoryUpdateRequest,
+    service: CategoryService = Depends(get_category_service),
+):
+    """Rename / re-describe an expense category."""
+    return await service.update_expense_category(uuid.UUID(category_id), data)
+
+
+@router.post("/expense-categories/{category_id}/merge", response_model=ExpenseCategoryResponse)
+async def merge_expense_category(
+    category_id: str,
+    data: CategoryMergeRequest,
+    service: CategoryService = Depends(get_category_service),
+):
+    """Merge one expense category into another (reassigns its expenses)."""
+    return await service.merge_expense_category(uuid.UUID(category_id), uuid.UUID(data.target_id))
+
+
+@router.delete("/expense-categories/{category_id}")
+async def delete_expense_category(
+    category_id: str,
+    service: CategoryService = Depends(get_category_service),
+):
+    """Soft-delete an expense category (expenses become 'Uncategorized')."""
+    return await service.delete_expense_category(uuid.UUID(category_id))
+
+
+# ── Revenue Category Endpoints ─────────────────────────────
+
+@router.get("/revenue-categories", response_model=list[RevenueCategoryResponse])
+async def list_revenue_categories(
+    service: CategoryService = Depends(get_category_service),
+):
+    """List revenue categories with per-category revenue counts."""
+    return await service.list_revenue_categories()
+
+
+@router.post("/revenue-categories", response_model=RevenueCategoryResponse, status_code=201)
+async def create_revenue_category(
+    data: CategoryCreateRequest,
+    service: CategoryService = Depends(get_category_service),
+):
+    """Create a new revenue category."""
+    return await service.create_revenue_category(data)
+
+
+@router.patch("/revenue-categories/{category_id}", response_model=RevenueCategoryResponse)
+async def update_revenue_category(
+    category_id: str,
+    data: CategoryUpdateRequest,
+    service: CategoryService = Depends(get_category_service),
+):
+    """Rename / re-describe a revenue category."""
+    return await service.update_revenue_category(uuid.UUID(category_id), data)
+
+
+@router.post("/revenue-categories/{category_id}/merge", response_model=RevenueCategoryResponse)
+async def merge_revenue_category(
+    category_id: str,
+    data: CategoryMergeRequest,
+    service: CategoryService = Depends(get_category_service),
+):
+    """Merge one revenue category into another (reassigns its revenue)."""
+    return await service.merge_revenue_category(uuid.UUID(category_id), uuid.UUID(data.target_id))
+
+
+@router.delete("/revenue-categories/{category_id}")
+async def delete_revenue_category(
+    category_id: str,
+    service: CategoryService = Depends(get_category_service),
+):
+    """Soft-delete a revenue category (revenue becomes 'Uncategorized')."""
+    return await service.delete_revenue_category(uuid.UUID(category_id))

@@ -52,6 +52,24 @@ export interface Expense {
   is_recurring: boolean;
 }
 
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  is_default: boolean;
+  sort_order: number;
+  expense_count: number;
+}
+
+export interface RevenueCategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  is_default: boolean;
+  sort_order: number;
+  revenue_count: number;
+}
+
 export interface Property {
   id: string;
   name: string;
@@ -331,6 +349,86 @@ export function useDeleteExpense() {
     onSuccess: () => {
       INVALIDATE_FINANCE.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
+  });
+}
+
+// ── Expense / Revenue Categories ───────────────────────
+
+export function useExpenseCategories() {
+  return useQuery<ExpenseCategory[]>({
+    queryKey: ["expense-categories"],
+    queryFn: () => api.get("/finance/expense-categories"),
+  });
+}
+
+export function useRevenueCategories() {
+  return useQuery<RevenueCategory[]>({
+    queryKey: ["revenue-categories"],
+    queryFn: () => api.get("/finance/revenue-categories"),
+  });
+}
+
+export function useCreateExpenseCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<ExpenseCategory, Error, { name: string; description?: string }>({
+    mutationFn: (data) => api.post("/finance/expense-categories", data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expense-categories"] }),
+  });
+}
+
+export function useUpdateExpenseCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<ExpenseCategory, Error, { id: string; data: { name?: string; description?: string } }>({
+    mutationFn: ({ id, data }) => api.patch(`/finance/expense-categories/${id}`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expense-categories"] }),
+  });
+}
+
+export function useDeleteExpenseCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => deleteAllowMissing(`/finance/expense-categories/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expense-categories"] }),
+  });
+}
+
+export function useMergeExpenseCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<ExpenseCategory, Error, { id: string; target_id: string }>({
+    mutationFn: ({ id, target_id }) => api.post(`/finance/expense-categories/${id}/merge`, { target_id }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expense-categories"] }),
+  });
+}
+
+export function useCreateRevenueCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<RevenueCategory, Error, { name: string; description?: string }>({
+    mutationFn: (data) => api.post("/finance/revenue-categories", data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["revenue-categories"] }),
+  });
+}
+
+export function useUpdateRevenueCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<RevenueCategory, Error, { id: string; data: { name?: string; description?: string } }>({
+    mutationFn: ({ id, data }) => api.patch(`/finance/revenue-categories/${id}`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["revenue-categories"] }),
+  });
+}
+
+export function useDeleteRevenueCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => deleteAllowMissing(`/finance/revenue-categories/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["revenue-categories"] }),
+  });
+}
+
+export function useMergeRevenueCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<RevenueCategory, Error, { id: string; target_id: string }>({
+    mutationFn: ({ id, target_id }) => api.post(`/finance/revenue-categories/${id}/merge`, { target_id }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["revenue-categories"] }),
   });
 }
 

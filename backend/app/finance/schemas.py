@@ -166,3 +166,35 @@ class AnnualReport(BaseModel):
     best_month: MonthlyBreakdown | None = None
     worst_month: MonthlyBreakdown | None = None
     yoy_growth: float | None = None
+
+
+# ── Categories ──────────────────────────────────────────────
+
+class CategoryCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str | None = None
+
+
+class CategoryUpdateRequest(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = None
+
+
+class CategoryMergeRequest(BaseModel):
+    target_id: str
+
+
+class ExpenseCategoryResponse(BaseResponse):
+    name: str
+    description: str | None = None
+    is_default: bool = False
+    sort_order: int = 0
+    expense_count: int = 0
+
+
+class RevenueCategoryResponse(BaseResponse):
+    name: str
+    description: str | None = None
+    is_default: bool = False
+    sort_order: int = 0
+    revenue_count: int = 0
