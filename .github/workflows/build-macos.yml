@@ -2,6 +2,8 @@ name: Build macOS
 
 # Build the HostWise .dmg for macOS (Apple Silicon + Intel universal if
 # building on a universal setup; GitHub runners are arm64 by default).
+permissions:
+  contents: write
 on:
   workflow_dispatch:
   push:

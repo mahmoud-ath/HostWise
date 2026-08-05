@@ -2,6 +2,8 @@ name: Build Windows
 
 # Build the HostWise desktop installer for Windows.
 # Run manually, or automatically when a `v*` tag is pushed.
+permissions:
+  contents: write
 on:
   workflow_dispatch:
   push:

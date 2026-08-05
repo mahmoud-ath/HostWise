@@ -3,6 +3,8 @@ name: Build Linux
 # Build HostWise as an AppImage + .deb for Linux.
 # Needs the Tauri (webkit2gtk) system deps AND the WeasyPrint native libs
 # (pango/cairo/gdk-pixbuf) that the backend PDF exporter requires.
+permissions:
+  contents: write
 on:
   workflow_dispatch:
   push:
