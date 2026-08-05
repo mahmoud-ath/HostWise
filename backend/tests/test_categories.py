@@ -81,3 +81,61 @@ async def test_revenue_categories_create_rename(client):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["name"] == "Short Stays"
+
+
+async def test_expense_description_auto_creates_category(client, seed_property):
+    # No category chosen → the description becomes the category.
+    exp = await client.post(
+        "/api/v1/finance/expense",
+        json={
+            "property_id": seed_property,
+            "date": "2025-06-12",
+            "amount": 90.0,
+            "currency": "EUR",
+            "description": "Pool Cleaning",
+        },
+    )
+    assert exp.status_code == 201, exp.text
+    assert exp.json()["category_id"] is not None
+
+    cats = (await client.get("/api/v1/finance/expense-categories")).json()
+    assert [c["name"] for c in cats] == ["Pool Cleaning"]
+    assert cats[0]["expense_count"] == 1
+
+    # Same description (case-insensitive) reuses the existing category.
+    exp2 = await client.post(
+        "/api/v1/finance/expense",
+        json={
+            "property_id": seed_property,
+            "date": "2025-06-13",
+            "amount": 10.0,
+            "currency": "EUR",
+            "description": "pool cleaning",
+        },
+    )
+    assert exp2.status_code == 201, exp2.text
+    assert exp2.json()["category_id"] == exp.json()["category_id"]
+    cats = (await client.get("/api/v1/finance/expense-categories")).json()
+    assert len(cats) == 1
+    assert cats[0]["expense_count"] == 2
+
+
+async def test_revenue_description_auto_creates_category(client, seed_property):
+    rev = await client.post(
+        "/api/v1/finance/revenue",
+        json={
+            "property_id": seed_property,
+            "date": "2025-06-10",
+            "gross_amount": 500.0,
+            "commission_amount": 50.0,
+            "source": "manual",
+            "currency": "EUR",
+            "description": "Early Check-in Fee",
+        },
+    )
+    assert rev.status_code == 201, rev.text
+    assert rev.json()["category_id"] is not None
+
+    cats = (await client.get("/api/v1/finance/revenue-categories")).json()
+    assert [c["name"] for c in cats] == ["Early Check-in Fee"]
+    assert cats[0]["revenue_count"] == 1

@@ -36,6 +36,29 @@ from app.finance.schemas import (
 from app.shared.exceptions import NotFoundException, ValidationException
 
 
+async def _find_or_create_category(
+    session: AsyncSession,
+    model: type[ExpenseCategory] | type[RevenueCategory],
+    name: str,
+) -> uuid.UUID:
+    """Find a category by name (case-insensitive) or create it.
+
+    Mirrors the CSV importer: a record's free-text description becomes its
+    category when the user didn't pick one explicitly.
+    """
+    cat = (await session.execute(
+        select(model).where(
+            model.is_deleted == False,
+            func.lower(model.name) == name.lower(),
+        )
+    )).scalar_one_or_none()
+    if not cat:
+        cat = model(name=name)
+        session.add(cat)
+        await session.flush()
+    return cat.id
+
+
 class RevenueService:
     """Business logic for revenue records."""
 
@@ -48,11 +71,15 @@ class RevenueService:
     ) -> RevenueResponse:
         """Create a revenue record. Auto-calculates net_amount."""
         net = data.gross_amount - data.commission_amount
+        category_id = uuid.UUID(data.category_id) if data.category_id else None
+        desc = (data.description or "").strip()
+        if not category_id and desc:
+            category_id = await _find_or_create_category(self.session, RevenueCategory, desc)
 
         revenue = Revenue(
             property_id=uuid.UUID(data.property_id),
             reservation_id=uuid.UUID(data.reservation_id) if data.reservation_id else None,
-            category_id=uuid.UUID(data.category_id) if data.category_id else None,
+            category_id=category_id,
             date=data.date,
             gross_amount=data.gross_amount,
             commission_amount=data.commission_amount,
@@ -132,9 +159,14 @@ class ExpenseService:
     async def create(
         self, data: ExpenseCreateRequest
     ) -> ExpenseResponse:
+        category_id = uuid.UUID(data.category_id) if data.category_id else None
+        desc = (data.description or "").strip()
+        if not category_id and desc:
+            category_id = await _find_or_create_category(self.session, ExpenseCategory, desc)
+
         expense = Expense(
             property_id=uuid.UUID(data.property_id),
-            category_id=uuid.UUID(data.category_id) if data.category_id else None,
+            category_id=category_id,
             date=data.date,
             amount=data.amount,
             currency=data.currency,
