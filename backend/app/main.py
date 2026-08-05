@@ -105,8 +105,13 @@ async def lifespan(app: FastAPI):
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                # WAL journal improves read concurrency and backup consistency.
+                await conn.execute(__import__("sqlalchemy").text("PRAGMA journal_mode=WAL"))
+            # Record/apply versioned migrations (non-fatal — falls back to create_all).
+            from app.core.migrations import run_migrations
+            run_migrations()
             logger.info("Database tables verified.")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - intentional: degrade startup gracefully when DB is down
             logger.warning("Database unavailable: %s", e)
     yield
     # Shutdown
@@ -168,14 +173,14 @@ def create_app() -> FastAPI:
     from app.ai.router import router as ai_router
     from app.analytics.router import router as analytics_router
     from app.auth.router import router as auth_router
-    from app.connectors.router import router as connectors_router
     from app.backup_router import router as backup_router
-    from app.setup_router import router as setup_router
+    from app.connectors.router import router as connectors_router
     from app.finance.router import router as finance_router
+    from app.maintenance_router import router as maintenance_router
     from app.properties.router import router as property_router
     from app.reports.router import router as reports_router
-    from app.maintenance_router import router as maintenance_router
     from app.settings.router import router as settings_router
+    from app.setup_router import router as setup_router
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -200,7 +205,7 @@ def create_app() -> FastAPI:
                     __import__("sqlalchemy").text("SELECT 1")
                 )
             db_status = "connected"
-        except Exception:
+        except Exception:  # noqa: BLE001 - intentional: health check reports disconnected on any error
             db_status = "disconnected"
 
         return {

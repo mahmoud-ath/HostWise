@@ -19,6 +19,7 @@ import {
   useMaintenanceStatus,
   useOptimizeDatabase,
   useResetDemoData,
+  useResetAllData,
   useBackendLogs,
 } from "@/hooks/use-api";
 import { useBackend } from "@/contexts/backend-context";
@@ -32,6 +33,7 @@ export function MaintenanceSection() {
   const { t } = useI18n();
   const optimize = useOptimizeDatabase();
   const reset = useResetDemoData();
+  const resetAll = useResetAllData();
   const { status: backendStatus, isReady, restartBackend } = useBackend();
   const [showLogs, setShowLogs] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -65,6 +67,15 @@ export function MaintenanceSection() {
     });
   };
 
+  const resetAllData = () => {
+    if (!confirm("Reset ALL data?\nThis deletes properties, reservations, revenues, expenses and categories. Your settings (currency, AI, business name) are kept. This cannot be undone.")) return;
+    if (!confirm("Are you absolutely sure? This is destructive.")) return;
+    resetAll.mutate(undefined, {
+      onSuccess: (res) => alert(`All data reset: ${Object.entries(res.deleted).map(([k, v]) => `${k} (${v})`).join(", ")}`),
+      onError: () => alert("Failed to reset all data."),
+    });
+  };
+
   const copyDiagnostics = async () => {
     const text = [
       "HostWise Diagnostics",
@@ -95,6 +106,10 @@ export function MaintenanceSection() {
           <p className="text-xs text-muted-foreground">Database Size</p>
           <p className="mt-0.5 text-sm font-semibold">
             {isLoading ? "—" : formatBytes(status?.database_size ?? 0)}
+          </p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Integrity:{" "}
+            {isLoading ? "…" : status?.integrity === "ok" ? "OK" : status?.integrity === "error" ? "ERROR" : "—"}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 p-3">
@@ -143,6 +158,10 @@ export function MaintenanceSection() {
         <Button variant="destructive" size="sm" onClick={resetDemo} disabled={reset.isPending}>
           {reset.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
           Reset Demo Data
+        </Button>
+        <Button variant="destructive" size="sm" onClick={resetAllData} disabled={resetAll.isPending}>
+          {resetAll.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Database className="mr-1.5 h-4 w-4" />}
+          Reset All Data
         </Button>
       </div>
 

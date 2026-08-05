@@ -9,15 +9,18 @@ external LLM providers (`app/ai/providers.py`):
     the configured API (OpenAI / DeepSeek / Anthropic / Ollama) receives the
     real data as JSON and its response is merged into the report.
 """
+import logging
 from calendar import month_name
 from datetime import date
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.ai.rules import HostWiseRulesEngine
 from app.ai.providers import LLMProvider
+from app.ai.rules import HostWiseRulesEngine
+from app.core.database import get_db
+
+log = logging.getLogger("hostwise.ai")
 
 
 class AIAdvisorService:
@@ -85,14 +88,14 @@ class AIAdvisorService:
 
     # ── AI Chat Assistant ──────────────────────────────────────────
 
-    SUGGESTED_QUESTIONS = [
+    SUGGESTED_QUESTIONS: tuple[str, ...] = (
         "What is my least profitable property?",
         "Why did revenue decrease in June?",
         "How can I increase revenue?",
         "Which expenses should I reduce?",
         "What pricing strategy do you recommend?",
         "What does next month look like?",
-    ]
+    )
 
     async def answer_question(self, question: str, year: int) -> dict:
         """Q&A over the advisor report. Uses the user's LLM (BYOK) when
@@ -131,9 +134,9 @@ class AIAdvisorService:
                         "suggested_questions": self.SUGGESTED_QUESTIONS,
                         "mode": "llm",
                     }
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 - deliberate: any LLM error → rules engine
                 # Fall through to the deterministic rule engine.
-                pass
+                log.warning("LLM chat failed, falling back to rules engine: %s", exc)
 
         intent = "general"
         answer = ""
@@ -387,13 +390,10 @@ class AIAdvisorService:
         self, scenario: str, params: dict | None, year: int
     ) -> dict:
         """Estimate the financial impact of a 'what-if' scenario."""
-        from app.analytics.service import AnalyticsService
         from app.finance.service import FinancialReportingService
 
-        analytics = AnalyticsService(self.session)
         finance = FinancialReportingService(self.session)
         annual = await finance.get_annual_report(year)
-        portfolio = await analytics.get_portfolio_analytics(year)
         params = params or {}
 
         base_rev = annual.summary.net_revenue

@@ -18,6 +18,7 @@ export interface MaintenanceStatus {
   backup_count: number;
   backups_size: number;
   log_file_available: boolean;
+  integrity: "ok" | "error" | "unavailable";
 }
 
 export interface OptimizeResult {

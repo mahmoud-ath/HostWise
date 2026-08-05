@@ -66,7 +66,7 @@ class AuthService:
             if payload.get("type") != "refresh":
                 raise UnauthorizedException("Invalid token type")
             user_id = payload.get("sub")
-        except Exception:
+        except Exception:  # noqa: BLE001 - retired auth: any decode failure → invalid refresh token
             raise UnauthorizedException("Invalid refresh token")
 
         user = await self.user_repo.get_by_id(user_id)

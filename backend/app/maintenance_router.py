@@ -1,7 +1,8 @@
 """
-Maintenance API — database status, optimization, logs, and demo data reset.
+Maintenance API — database status, optimization, logs, and data reset.
 """
 import os
+import sqlite3
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
@@ -10,6 +11,21 @@ from sqlalchemy import delete, func, select
 from app.backup_service import get_db_path, list_backups
 
 router = APIRouter(prefix="/maintenance", tags=["Maintenance"])
+
+
+def _integrity_check(db: Path) -> str:
+    """Run SQLite quick_check; return 'ok', 'error', or 'unavailable'."""
+    if not db:
+        return "unavailable"
+    try:
+        conn = sqlite3.connect(str(db), timeout=3)
+        try:
+            row = conn.execute("PRAGMA quick_check").fetchone()
+            return "ok" if row and row[0] == "ok" else "error"
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return "unavailable"
 
 
 def _find_log_file() -> Path | None:
@@ -45,6 +61,7 @@ async def maintenance_status() -> dict:
         "backup_count": len(backups),
         "backups_size": sum(b["size"] for b in backups),
         "log_file_available": _find_log_file() is not None,
+        "integrity": _integrity_check(db),
     }
 
 
@@ -93,7 +110,7 @@ async def get_logs(lines: int = Query(200, ge=10, le=2000)) -> dict:
         content = log_file.read_text(errors="replace")
         tail = "\n".join(content.splitlines()[-lines:])
         return {"available": True, "content": tail, "path": str(log_file)}
-    except Exception as exc:  # pragma: no cover
+    except OSError as exc:  # pragma: no cover
         return {
             "available": True,
             "content": f"Error reading log: {exc}",
@@ -111,6 +128,38 @@ async def reset_demo_data() -> dict:
     deleted: dict[str, int] = {}
     async with async_session_factory() as session:
         for model in (Revenue, Expense, Reservation):
+            table = model.__tablename__
+            count = (await session.execute(
+                select(func.count(model.id))
+            )).scalar() or 0
+            await session.execute(delete(model))
+            deleted[table] = int(count)
+        await session.commit()
+    return {"deleted": deleted}
+
+
+@router.post("/reset-all-data")
+async def reset_all_data() -> dict:
+    """Delete ALL business data (properties, reservations, revenues, expenses,
+    categories) while keeping the schema, settings, and users.
+
+    This is the scripted equivalent of `clean_db.py` (default mode) exposed as
+    a maintenance action for the desktop app.
+    """
+    from app.core.database import async_session_factory
+    from app.finance.category_models import ExpenseCategory, RevenueCategory
+    from app.finance.models import Expense, Revenue
+    from app.properties.models import Listing, Property
+    from app.reservations.models import Guest, Reservation
+
+    # Children before parents so FK constraints never block the delete.
+    models = (
+        Reservation, Revenue, Expense, Guest, Listing,
+        Property, ExpenseCategory, RevenueCategory,
+    )
+    deleted: dict[str, int] = {}
+    async with async_session_factory() as session:
+        for model in models:
             table = model.__tablename__
             count = (await session.execute(
                 select(func.count(model.id))

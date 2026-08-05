@@ -86,9 +86,6 @@ class AnalyticsService:
         cancelled = canc_result.scalar() or 0
 
         total_res = res_row.total or 0
-        total_nights = res_row.nights or 0
-        avg_rev = float(res_row.avg_revenue or 0)
-        avg_nights = float(res_row.avg_nights or 0)
 
         # KPIs (occupancy/ADR/RevPAR intentionally removed from scope)
         cancellation_rate = round(
@@ -199,8 +196,9 @@ class AnalyticsService:
                 exp_by_month[(y, em["month"])] = em
 
         # Reservation stats
-        from app.reservations.models import Reservation, ReservationStatus
         from sqlalchemy import func as sa_func
+
+        from app.reservations.models import Reservation, ReservationStatus
 
         res_stmt = (
             select(
@@ -282,13 +280,6 @@ class AnalyticsService:
                 "health_score": h,
                 "profit_margin": health.get("profit_margin", 0),
             })
-
-        # Revenue forecast (simple: average of the last 3 months with data)
-        recent_months = [
-            m for m in rev_by_month.values() if m["net"] > 0
-        ][-3:]
-        avg_monthly = sum(m["net"] for m in recent_months) / max(len(recent_months), 1)
-        forecast_next_month = round(avg_monthly, 2)
 
         # Seasonality — every month in the range, so partial ranges stay honest
         seasonality = []

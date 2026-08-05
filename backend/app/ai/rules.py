@@ -12,7 +12,6 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 CURRENCY_SYMBOL = {
     "USD": "$", "EUR": "€", "GBP": "£",
     "MAD": "MAD ", "AED": "AED ", "CAD": "C$", "AUD": "A$", "CHF": "CHF ",
@@ -642,7 +641,7 @@ class HostWiseRulesEngine:
         if annual.summary.profit_margin > 60:
             achievements.append({
                 "icon": "trending-up",
-                "title": f"Profit margin exceeded 60%",
+                "title": "Profit margin exceeded 60%",
                 "detail": f"{annual.summary.profit_margin:.0f}% margin achieved",
             })
         if (

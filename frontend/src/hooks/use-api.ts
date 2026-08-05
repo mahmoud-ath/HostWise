@@ -414,6 +414,16 @@ export function useResetDemoData() {
   });
 }
 
+export function useResetAllData() {
+  const queryClient = useQueryClient();
+  return useMutation<WipeResult, Error>({
+    mutationFn: () => api.post<WipeResult>("/maintenance/reset-all-data"),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+}
+
 export interface WipeResult {
   deleted: Record<string, number>;
 }

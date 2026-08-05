@@ -6,7 +6,6 @@ parsing, normalization and inserts live here. Honors import settings
 (date format, default currency) from the settings store.
 """
 import csv
-import io
 import json
 import logging
 import uuid
@@ -208,7 +207,7 @@ class ConnectorService:
                         property_name=(row.get("property_name") or "").strip() or None,
                     ))
                     imported += 1
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - per-row import errors are collected and surfaced
                     errors.append(str(exc))
 
         elif detected == "revenues":
@@ -234,7 +233,7 @@ class ConnectorService:
                         currency=currency,
                     ))
                     imported += 1
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - per-row import errors are collected and surfaced
                     errors.append(str(exc))
 
         elif detected == "expenses":
@@ -257,7 +256,7 @@ class ConnectorService:
                         vendor=(row.get("vendor") or "").strip() or None,
                     ))
                     imported += 1
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - per-row import errors are collected and surfaced
                     errors.append(str(exc))
         else:
             errors.append(f"Unsupported import type: {detected}")

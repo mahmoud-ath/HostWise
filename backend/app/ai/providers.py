@@ -101,7 +101,7 @@ class LLMProvider:
         )
         try:
             reply = await self.call(settings, system, user)
-        except Exception:
+        except Exception:  # noqa: BLE001 - deliberate: any LLM/network error → fall back to rules
             return None
         if not reply:
             return None
@@ -111,7 +111,7 @@ class LLMProvider:
             if start == -1 or end == -1 or end <= start:
                 return None
             return json.loads(reply[start:end + 1])
-        except Exception:
+        except Exception:  # noqa: BLE001 - deliberate: malformed LLM reply → fall back to rules
             return None
 
     @staticmethod
@@ -148,8 +148,10 @@ class LLMProvider:
         m = report["current_metrics"]
         lines = [
             f"Year: {report['year']}",
-            f"Net revenue: {m['net_revenue']:.2f} EUR; profit: {m['profit']:.2f} EUR; "
-            f"profit margin: {m['profit_margin']:.1f}%; expenses: {m['total_expenses']:.2f} EUR",
+            (
+                f"Net revenue: {m['net_revenue']:.2f} EUR; profit: {m['profit']:.2f} EUR; "
+                f"profit margin: {m['profit_margin']:.1f}%; expenses: {m['total_expenses']:.2f} EUR"
+            ),
             f"Cancellation rate: {m['cancellation_rate']:.1f}%; properties: {m['property_count']}",
         ]
         reviews = report["property_reviews"][:5]
@@ -186,5 +188,5 @@ class LLMProvider:
             if reply:
                 return {"ok": True, "message": f"Connected! Model replied: {reply.strip()[:60]}"}
             return {"ok": False, "message": "Connected but got an empty reply."}
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - intentional: surface any connection error to the user
             return {"ok": False, "message": f"Connection failed: {exc}"}

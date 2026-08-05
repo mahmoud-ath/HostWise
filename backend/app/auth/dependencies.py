@@ -37,7 +37,7 @@ async def get_current_user(
         user_id = payload.get("sub")
         if not user_id:
             raise UnauthorizedException("Invalid token payload")
-    except Exception:
+    except Exception:  # noqa: BLE001 - retired auth: any decode failure → invalid token
         raise UnauthorizedException("Invalid or expired token")
 
     repo = UserRepository(session)

@@ -8,20 +8,29 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
+from app.core.config import get_settings
+from app.core.database import Base
+from app.auth.models import User
+from app.properties.models import Property, Listing
+from app.reservations.models import Reservation, Guest
+from app.finance.models import Revenue, Expense
+from app.finance.category_models import ExpenseCategory, RevenueCategory
+
 # Alembic Config object
 config = context.config
+
+# Point Alembic at the SAME database the app uses (SQLite for the desktop
+# build, Postgres for cloud) instead of the placeholder in alembic.ini.
+_settings = get_settings()
+if _settings.DATABASE_TYPE == "sqlite":
+    _url = f"sqlite:///{_settings.SQLITE_PATH.replace(chr(92), '/')}"
+else:
+    _url = _settings.DATABASE_URL
+config.set_main_option("sqlalchemy.url", _url)
 
 # Logger
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-
-# Import ALL models so Alembic can detect them
-from app.core.database import Base
-from app.auth.models import User, OrganizationMember
-from app.organizations.models import Organization, RevenueCategory, ExpenseCategory
-from app.properties.models import Property, Listing
-from app.reservations.models import Reservation, Guest
-from app.finance.models import Revenue, Expense
 
 target_metadata = Base.metadata
 

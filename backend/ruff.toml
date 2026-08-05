@@ -1,0 +1,10 @@
+# Ruff configuration for the HostWise backend.
+#
+# Rules ignored here are deliberate, with justification:
+#   B008  - `Field(...)` / `Query(...)` defaults in FastAPI/Pydantic signatures
+#           are idiomatic; not a bug.
+#   DTZ*  - naive local datetime is a deliberate choice for a local-first
+#           desktop app (backups, reports, and timestamps use local wall-clock;
+#           TZ-aware time adds no value on-device).
+[lint]
+ignore = ["B008", "DTZ003", "DTZ005", "DTZ006", "DTZ007", "DTZ011"]

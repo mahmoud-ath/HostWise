@@ -3,7 +3,6 @@ Auth Module — Repository
 
 Data access for User entities.
 """
-import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

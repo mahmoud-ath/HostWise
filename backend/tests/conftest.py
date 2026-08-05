@@ -14,12 +14,11 @@ os.environ["UPLOAD_DIR"] = os.path.join(TEST_DIR, "uploads")
 os.environ["ENVIRONMENT"] = "test"
 os.environ["JWT_SECRET_KEY"] = "test-secret-key"
 
-import pytest  # noqa: E402
-import pytest_asyncio  # noqa: E402
-from httpx import ASGITransport, AsyncClient  # noqa: E402
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 
-from app.core.database import Base, engine  # noqa: E402
-from app.main import create_app  # noqa: E402
+from app.core.database import Base, engine
+from app.main import create_app
 
 app = create_app()
 

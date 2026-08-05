@@ -7,13 +7,12 @@ Creates automatic SQLite backups with rotation.
 - Monthly backups (keep 3)
 - On-demand backup/restore API
 """
+import logging
 import os
 import shutil
-import time
-import logging
+import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 log = logging.getLogger("hostwise.backup")
 
@@ -29,7 +28,7 @@ def _get_backup_dir() -> Path:
     return backup_dir
 
 
-def get_db_path() -> Optional[Path]:
+def get_db_path() -> Path | None:
     """Get the active database path."""
     db_path = os.environ.get("SQLITE_PATH", "")
     if db_path:
@@ -49,7 +48,7 @@ def get_db_path() -> Optional[Path]:
     return None
 
 
-def create_backup(label: str = "manual") -> Optional[Path]:
+def create_backup(label: str = "manual") -> Path | None:
     """Create a backup of the current database."""
     db_path = get_db_path()
     if not db_path:
@@ -71,7 +70,7 @@ def create_backup(label: str = "manual") -> Optional[Path]:
         conn.close()
         log.info("Backup created: %s (%d bytes)", backup_path, backup_path.stat().st_size)
         return backup_path
-    except Exception as e:
+    except (OSError, sqlite3.Error) as e:
         log.error("Failed to create backup: %s", e)
         return None
 
@@ -112,7 +111,7 @@ def restore_backup(backup_name: str) -> bool:
         shutil.copy2(str(backup_path), str(db_path))
         log.info("Database restored from: %s", backup_name)
         return True
-    except Exception as e:
+    except (OSError, sqlite3.Error) as e:
         log.error("Failed to restore backup: %s", e)
         return False
 
