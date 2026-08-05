@@ -163,17 +163,26 @@ export default function ImportPage() {
                   {
                     type: "Reservations",
                     file: "reservations.csv",
+                    ext: "csv",
                     cols: "property_name, check_in, check_out, nights, guest_name, gross_amount, ...",
                   },
                   {
                     type: "Revenues",
                     file: "revenues.csv",
+                    ext: "csv",
                     cols: "property_name, date, gross_revenue, management_commission, net_revenue, source",
                   },
                   {
                     type: "Expenses",
                     file: "expenses.csv",
+                    ext: "csv",
                     cols: "property_name, date, amount, category, vendor",
+                  },
+                  {
+                    type: "Calendar (iCal)",
+                    file: "calendar.ics",
+                    ext: "ics",
+                    cols: "VEVENT: UID, DTSTART, DTEND, SUMMARY (guest name) — export from your Airbnb / Booking calendar",
                   },
                 ].map((s) => (
                   <div key={s.file} className="flex items-center justify-between gap-3 rounded-lg border p-3">
@@ -186,7 +195,7 @@ export default function ImportPage() {
                       download={s.file}
                       className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                     >
-                      <Download className="h-3.5 w-3.5" /> .csv
+                      <Download className="h-3.5 w-3.5" /> .{s.ext || "csv"}
                     </a>
                   </div>
                 ))}
@@ -204,8 +213,8 @@ export default function ImportPage() {
                 {[
                   ["CSV / JSON Import", "Active"],
                   ["iCal (Airbnb / Booking)", "Active"],
-                  ["Airbnb API", "Not available"],
-                  ["Booking.com API", "Not available"],
+                  ["Airbnb API", "Planned"],
+                  ["Booking.com API", "Planned"],
                   ["Vrbo", "Planned"],
                 ].map(([c, status]) => (
                   <div key={c} className="flex items-center justify-between py-2 px-3 rounded border">
@@ -216,8 +225,8 @@ export default function ImportPage() {
                   </div>
                 ))}
                 <p className="pt-2 text-[11px] leading-relaxed text-muted-foreground">
-                  Airbnb and Booking.com don&apos;t offer a public API for hosts — use their calendar export (.ics)
-                  via the iCal connector above.
+                  Airbnb and Booking.com don&apos;t offer a public API for hosts today — use their calendar export
+                  (.ics) via the iCal connector above. Native API connectors are planned.
                 </p>
               </div>
             </CardContent>
