@@ -14,7 +14,13 @@ use tauri::Manager;
 /// Where the webview talks to the backend (the FastAPI app binds here).
 pub const BACKEND_URL: &str = "http://127.0.0.1:8000";
 const BACKEND_PORT: u16 = 8000;
-const STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
+// First-run resilience: Windows Defender (or other AV) can briefly hold the
+// freshly-extracted backend DLLs, and the process dies at the bootloader level
+// (before any Python code, so the launcher's retry can't help). Retry the whole
+// spawn a few times with a backoff.
+const SPAWN_ATTEMPTS: u32 = 3;
+const PER_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(25);
+const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 fn exe_name() -> &'static str {
     if cfg!(target_os = "windows") {
@@ -25,14 +31,16 @@ fn exe_name() -> &'static str {
 }
 
 /// Wait until the backend accepts a TCP connection on the API port.
-fn wait_for_backend(timeout: Duration) {
+/// Returns true if it became reachable within `timeout`.
+fn wait_for_backend(timeout: Duration) -> bool {
     let start = Instant::now();
     while start.elapsed() < timeout {
         if std::net::TcpStream::connect(("127.0.0.1", BACKEND_PORT)).is_ok() {
-            return;
+            return true;
         }
         std::thread::sleep(Duration::from_millis(300));
     }
+    false
 }
 
 /// Dev mode: run `backend/launcher.py` with the repo virtualenv Python.
@@ -83,15 +91,37 @@ pub fn spawn(app: &tauri::AppHandle) -> Option<Child> {
         release_binary_command(app)?
     };
 
-    let mut command = Command::new(&program);
-    command.args(&args);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
+    for attempt in 1..=SPAWN_ATTEMPTS {
+        let mut command = Command::new(&program);
+        command.args(&args);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(_) => {
+                // Could not start the process at all (e.g. Defender still
+                // holding the just-extracted exe). Retry shortly.
+                std::thread::sleep(RETRY_DELAY);
+                continue;
+            }
+        };
+
+        if wait_for_backend(PER_ATTEMPT_TIMEOUT) {
+            return Some(child);
+        }
+
+        // The backend never came up — it may have crashed because Defender was
+        // still scanning the freshly-extracted DLLs. Kill it and retry.
+        let _ = child.kill();
+        let _ = child.wait();
+        if attempt < SPAWN_ATTEMPTS {
+            std::thread::sleep(RETRY_DELAY);
+        }
     }
-    let child = command.spawn().ok()?;
-    wait_for_backend(STARTUP_TIMEOUT);
-    Some(child)
+    None
 }

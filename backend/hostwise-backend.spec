@@ -1,5 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 from PyInstaller.utils.hooks import collect_all
+
+# WARNING (Windows): do NOT strip PE binaries. The MinGW/Git-for-Windows `strip`
+# on the CI Windows runner corrupts python312.dll / _ssl.pyd / libssl / libcrypto,
+# and real Windows then fails to load them with "Invalid access to memory
+# location" (PyInstaller issue #5933). Wine tolerates the corruption, which is
+# why local Wine builds pass while the CI release crashes. Stripping is safe on
+# ELF/Mach-O, so we only disable it on win32.
+_strip = sys.platform != "win32"
 
 datas = [('app', 'app')]
 binaries = []
@@ -37,7 +46,7 @@ exe = EXE(
     name='hostwise-backend',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=True,
+    strip=_strip,
     upx=False,
     console=False,
     disable_windowed_traceback=False,
@@ -50,7 +59,7 @@ coll = COLLECT(
     exe,
     a.binaries,
     a.datas,
-    strip=True,
+    strip=_strip,
     upx=False,
     upx_exclude=[],
     name='hostwise-backend',
