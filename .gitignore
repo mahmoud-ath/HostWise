@@ -43,7 +43,8 @@ frontend/playwright-report/
 # PyInstaller
 backend/build/
 backend/dist/
-backend/*.spec
+# hostwise-backend.spec is intentionally VERSIONED (CI builds need it);
+# ignore only auto-generated PyInstaller specs (e.g. from `pyi-makespec`).
 backend/hostwise.db
 
 # Logs
