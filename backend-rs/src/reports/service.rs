@@ -11,6 +11,7 @@ use crate::analytics::service as analytics;
 use crate::core::error::AppError;
 use crate::finance::service::FinanceService;
 use crate::settings::service as settings;
+use std::collections::HashMap;
 
 fn round2(v: f64) -> f64 {
     (v * 100.0).round() / 100.0
@@ -228,23 +229,45 @@ impl ReportGenerationService {
             },
         });
 
-        let property_performance: Vec<Value> = portfolio["properties"]
+        // Per-property gross revenue map (for PropertyCard objects).
+        let gross_map: HashMap<String, f64> = sqlx::query_as::<_, (String, f64)>(
+            "SELECT p.id, COALESCE((SELECT SUM(r.gross_amount) FROM revenues r \
+             WHERE r.property_id = p.id AND r.is_deleted = 0 AND r.date BETWEEN ? AND ?), 0.0) \
+             FROM properties p WHERE p.is_deleted = 0",
+        )
+        .bind(&s)
+        .bind(&e)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .collect();
+
+        let ranking = portfolio["property_ranking"]
             .as_array()
             .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|p| {
-                json!({
-                    "property_id": p["property_id"],
-                    "property_name": p["name"],
-                    "net_revenue": p["net_revenue"],
-                    "total_expenses": p["expenses"],
-                    "profit": p["profit"],
-                    "profit_margin": p["profit_margin"],
-                    "reservation_count": p["reservations"],
-                })
+            .unwrap_or_default();
+
+        // Build a PropertyPerformance/PropertyCard from a ranking entry.
+        let prop_perf = |entry: &Value| -> Value {
+            let pid = entry["property_id"].as_str().unwrap_or("").to_string();
+            let pnet = entry["net_revenue"].as_f64().unwrap_or(0.0);
+            let pprofit = entry["profit"].as_f64().unwrap_or(0.0);
+            json!({
+                "property_id": entry["property_id"],
+                "property_name": entry["property_name"],
+                "gross_revenue": gross_map.get(&pid).copied().unwrap_or(0.0),
+                "net_revenue": pnet,
+                "total_expenses": (pnet - pprofit).max(0.0),
+                "profit": pprofit,
+                "profit_margin": entry["profit_margin"],
+                "health_score": entry["health_score"],
+                "reservation_count": entry["reservation_count"],
             })
-            .collect();
+        };
+        let property_performance: Vec<Value> = ranking.iter().map(&prop_perf).collect();
+        let best = ranking.first().map(&prop_perf);
+        let worst = ranking.last().map(&prop_perf);
+        let best_worst_properties = json!({ "best": best.clone(), "worst": worst.clone() });
 
         let exp_categories = portfolio["expense_categories"]
             .as_array()
@@ -257,27 +280,135 @@ impl ReportGenerationService {
             "fastest_growing": null,
         });
 
-        let ranking = portfolio["property_ranking"]
+        // Health scoring + distribution.
+        let health = ai["health_score"].clone();
+        let score = health["score"].as_i64().unwrap_or(0);
+        let status = health["status"].as_str().unwrap_or("no_data").to_string();
+        let components = health["components"].clone();
+        let growth = portfolio["revenue_growth_yoy"].as_f64().unwrap_or(0.0);
+        let property_count = portfolio["property_count"].as_i64().unwrap_or(0);
+        let has_data = property_count > 0 || net > 0.0 || expenses > 0.0;
+
+        let mut dist: HashMap<String, i64> = HashMap::new();
+        for d in portfolio["health_distribution"]
             .as_array()
             .cloned()
-            .unwrap_or_default();
-        let best_worst_properties = json!({
-            "best": ranking.first().cloned(),
-            "worst": ranking.last().cloned(),
+            .unwrap_or_default()
+        {
+            let st = d["status"].as_str().unwrap_or("").to_string();
+            let c = d["count"].as_i64().unwrap_or(0);
+            *dist.entry(st).or_insert(0) += c;
+        }
+        let distribution = json!({
+            "excellent": dist.get("excellent").copied().unwrap_or(0),
+            "good": dist.get("good").copied().unwrap_or(0),
+            "average": dist.get("average").copied().unwrap_or(0)
+                + dist.get("fair").copied().unwrap_or(0),
+            "poor": dist.get("poor").copied().unwrap_or(0),
         });
 
-        let health = ai["health_score"].clone();
-        let portfolio_health = json!({
-            "score": health["score"],
-            "status": health["status"],
-            "components": health["components"],
-            "distribution": portfolio["health_distribution"],
+        let executive_summary = json!({
+            "period_start": s.clone(),
+            "period_end": e.clone(),
+            "gross_revenue": portfolio["total_gross_revenue"],
+            "net_profit": profit,
+            "profit_margin": round2(profit_margin),
+            "property_count": property_count,
+            "best_property": best,
+            "worst_property": worst,
+            "portfolio_health_score": if has_data { Some(score) } else { None },
+            "portfolio_health_status": status.clone(),
+        });
+
+        let portfolio_health = if has_data {
+            json!({
+                "score": score,
+                "status": status,
+                "components": {
+                    "revenue": components["revenue"],
+                    "profit": components["revenue"],
+                    "expenses": components["expenses"],
+                    "revenue_change_pct": growth,
+                },
+                "distribution": distribution,
+            })
+        } else {
+            json!({
+                "score": null,
+                "status": "no_data",
+                "components": {
+                    "revenue": null,
+                    "profit": null,
+                    "expenses": null,
+                    "revenue_change_pct": growth,
+                },
+                "distribution": { "excellent": 0, "good": 0, "average": 0, "poor": 0 },
+            })
+        };
+
+        // Risks in the frontend RiskItem shape.
+        let risks: Vec<Value> = ai["risks"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|r| {
+                let conf = r["confidence"].as_f64().unwrap_or(0.5);
+                json!({
+                    "level": if conf >= 0.85 { "high" } else { "medium" },
+                    "title": r["risk"],
+                    "detail": r["impact"],
+                })
+            })
+            .collect();
+
+        // AI insights in the frontend shape.
+        let opportunities = ai["opportunities"].as_array().cloned().unwrap_or_default();
+        let mut drivers: Vec<Value> = opportunities
+            .iter()
+            .map(|o| json!({ "label": o["title"], "detail": o["cause"] }))
+            .collect();
+        if drivers.is_empty() {
+            drivers.push(json!({
+                "label": "Revenue",
+                "detail": format!("{}% year over year", growth),
+            }));
+        }
+        let recs_flat = flatten_actions(&ai);
+        let biggest_risk = ai["risks"]
+            .as_array()
+            .and_then(|a| a.first())
+            .map(|r| {
+                let conf = r["confidence"].as_f64().unwrap_or(0.5);
+                json!({
+                    "level": if conf >= 0.85 { "high" } else { "medium" },
+                    "title": r["risk"],
+                    "cause": r["impact"],
+                    "suggested_action": Value::Null,
+                })
+            })
+            .unwrap_or(Value::Null);
+        let recommendation = recs_flat
+            .first()
+            .and_then(|r| r["suggested_action"].as_str().map(|s| s.to_string()))
+            .unwrap_or_else(|| {
+                "Review the detailed recommendations below for the highest-impact next steps."
+                    .to_string()
+            });
+        let ai_insights = json!({
+            "provider": ai["provider"],
+            "summary": ai["executive_summary"],
+            "revenue_change_pct": growth,
+            "drivers": drivers,
+            "biggest_risk": biggest_risk,
+            "recommendation": recommendation,
+            "recommendations": recs_flat,
         });
 
         let forecast_next = portfolio["forecast_next_month"].as_f64().unwrap_or(0.0);
         let forecast = json!({
             "next_quarter_revenue": round2(forecast_next * 3.0),
-            "confidence": 0.6,
+            "confidence": 60,
         });
 
         let revenue_goal = all["annual_revenue_goal"].as_f64().unwrap_or(0.0);
@@ -306,33 +437,41 @@ impl ReportGenerationService {
             .unwrap_or("HostWise")
             .to_string();
 
+        let parse_day =
+            |x: &str| chrono::NaiveDate::parse_from_str(x, "%Y-%m-%d").unwrap_or_default();
+        let days = (parse_day(&e) - parse_day(&s)).num_days() + 1;
+        let prev_days = (parse_day(&prev_e) - parse_day(&prev_s)).num_days() + 1;
+        let period = json!({
+            "start": s.clone(),
+            "end": e.clone(),
+            "label": format!("{s} — {e}"),
+            "days": days,
+        });
+        let previous_period = json!({
+            "start": prev_s.clone(),
+            "end": prev_e.clone(),
+            "label": format!("{prev_s} — {prev_e}"),
+            "days": prev_days,
+        });
+
         Ok(json!({
             "report_type": "portfolio",
             "year": year,
-            "period": format!("{s} to {e}"),
-            "previous_period": format!("{prev_s} to {prev_e}"),
+            "period": period,
+            "previous_period": previous_period,
             "period_start": s,
             "period_end": e,
             "generated_at": today.format("%Y-%m-%d").to_string(),
             "organization": org,
             "currency": cur,
-            "executive_summary": {
-                "summary": ai["executive_summary"],
-                "provider": ai["provider"],
-                "health_status": health["status"],
-            },
-            "ai_insights": {
-                "recommendations": flatten_actions(&ai),
-                "opportunities": ai["opportunities"],
-                "risks": ai["risks"],
-                "forecast": forecast,
-            },
+            "executive_summary": executive_summary,
+            "ai_insights": ai_insights,
             "kpi_comparison": kpi_comparison,
             "property_performance": property_performance,
             "monthly_breakdown": serde_json::to_value(&annual.monthly_breakdown)?,
             "expense_analysis": expense_analysis,
             "best_worst_properties": best_worst_properties,
-            "risks": ai["risks"],
+            "risks": risks,
             "opportunities": ai["opportunities"],
             "goals": goals,
             "forecast": forecast,
