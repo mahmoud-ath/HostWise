@@ -1,0 +1,384 @@
+//! Analytics service: computes KPIs dynamically from normalized data.
+//! Never stores calculated metrics — generates them on demand (CID).
+//! Mirrors `backend/app/analytics/service.py` + the analytics_cache in
+//! `backend/app/ai/cache.py`.
+
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use chrono::Datelike;
+use serde_json::{json, Value};
+use sqlx::SqlitePool;
+
+use crate::core::error::AppError;
+
+// ── In-process analytics cache (60s TTL, keyed by data fingerprint) ──
+
+struct CacheEntry {
+    at: Instant,
+    value: Value,
+}
+
+fn cache() -> &'static Mutex<HashMap<String, CacheEntry>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, CacheEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+const CACHE_TTL: Duration = Duration::from_secs(60);
+
+/// Coarse data fingerprint so cached analytics invalidate when data changes.
+pub async fn data_fingerprint(pool: &SqlitePool) -> Result<String, AppError> {
+    let (r, re, e, p): (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM reservations WHERE is_deleted = 0), \
+                (SELECT COUNT(*) FROM revenues WHERE is_deleted = 0), \
+                (SELECT COUNT(*) FROM expenses WHERE is_deleted = 0), \
+                (SELECT COUNT(*) FROM properties WHERE is_deleted = 0)",
+    )
+    .fetch_one(pool)
+    .await?;
+    let max_rev: String = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(updated_at),'') FROM revenues WHERE is_deleted = 0",
+    )
+    .fetch_one(pool)
+    .await?;
+    let max_exp: String = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(updated_at),'') FROM expenses WHERE is_deleted = 0",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(format!("{r}:{re}:{e}:{p}:{max_rev}:{max_exp}"))
+}
+
+pub fn cache_get(key: &str) -> Option<Value> {
+    let mut guard = cache().lock().unwrap_or_else(|e| e.into_inner());
+    guard.retain(|_, e| e.at.elapsed() < CACHE_TTL);
+    guard.get(key).map(|e| e.value.clone())
+}
+
+pub fn cache_set(key: &str, value: Value) {
+    let mut guard = cache().lock().unwrap_or_else(|e| e.into_inner());
+    guard.insert(
+        key.to_string(),
+        CacheEntry {
+            at: Instant::now(),
+            value,
+        },
+    );
+}
+
+// ── KPI helpers ───────────────────────────────────────────
+
+fn round2(v: f64) -> f64 {
+    (v * 100.0).round() / 100.0
+}
+fn round1(v: f64) -> f64 {
+    (v * 10.0).round() / 10.0
+}
+
+fn year_bounds(year: i32) -> (String, String) {
+    (format!("{year:04}-01-01"), format!("{year:04}-12-31"))
+}
+
+/// Comprehensive property performance analytics for a year.
+pub async fn get_property_analytics(
+    pool: &SqlitePool,
+    property_id: &str,
+    year: i32,
+) -> Result<Value, AppError> {
+    let (start, end) = year_bounds(year);
+
+    // Revenue
+    let (gross, net): (f64, f64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(gross_amount),0.0), COALESCE(SUM(net_amount),0.0) FROM revenues \
+         WHERE property_id = ? AND is_deleted = 0 AND date >= ? AND date <= ?",
+    )
+    .bind(property_id)
+    .bind(&start)
+    .bind(&end)
+    .fetch_one(pool)
+    .await?;
+
+    // Reservations (confirmed + completed)
+    let (total, _nights, avg_rev, avg_nights): (i64, i64, f64, f64) = sqlx::query_as(
+        "SELECT COUNT(*), COALESCE(SUM(nights),0), COALESCE(AVG(gross_revenue),0.0), \
+                COALESCE(AVG(nights),0.0) \
+         FROM reservations WHERE property_id = ? AND is_deleted = 0 \
+         AND status IN ('confirmed','completed') AND check_in >= ? AND check_in <= ?",
+    )
+    .bind(property_id)
+    .bind(&start)
+    .bind(&end)
+    .fetch_one(pool)
+    .await?;
+
+    let cancelled: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM reservations WHERE property_id = ? AND is_deleted = 0 \
+         AND status = 'cancelled' AND check_in >= ? AND check_in <= ?",
+    )
+    .bind(property_id)
+    .bind(&start)
+    .bind(&end)
+    .fetch_one(pool)
+    .await?;
+
+    let cancellation_rate = if total + cancelled > 0 {
+        round2((cancelled as f64 / (total + cancelled) as f64) * 100.0)
+    } else {
+        0.0
+    };
+
+    // Booking window (avg days between booked_at and check_in)
+    let avg_booking_window: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(AVG(julianday(check_in) - julianday(booked_at)), 0.0) FROM reservations \
+         WHERE property_id = ? AND is_deleted = 0 AND booked_at IS NOT NULL \
+         AND check_in >= ? AND check_in <= ?",
+    )
+    .bind(property_id)
+    .bind(&start)
+    .bind(&end)
+    .fetch_one(pool)
+    .await?;
+    let avg_booking_window = round1(avg_booking_window);
+
+    // Monthly breakdown (revenue from reservations + expenses)
+    let monthly: Vec<(i64, f64, f64, i64, i64)> = sqlx::query_as(
+        "SELECT CAST(substr(check_in,6,2) AS INTEGER) AS month, \
+                COALESCE(SUM(gross_revenue),0.0), COALESCE(SUM(net_revenue),0.0), \
+                COUNT(*), COALESCE(SUM(nights),0) \
+         FROM reservations WHERE property_id = ? AND is_deleted = 0 \
+         AND status IN ('confirmed','completed') AND check_in >= ? AND check_in <= ? \
+         GROUP BY month ORDER BY month",
+    )
+    .bind(property_id)
+    .bind(&start)
+    .bind(&end)
+    .fetch_all(pool)
+    .await?;
+
+    let monthly_exp: Vec<(i64, f64)> = sqlx::query_as(
+        "SELECT CAST(substr(date,6,2) AS INTEGER) AS month, COALESCE(SUM(amount),0.0) \
+         FROM expenses WHERE property_id = ? AND is_deleted = 0 AND date >= ? AND date <= ? \
+         GROUP BY month ORDER BY month",
+    )
+    .bind(property_id)
+    .bind(&start)
+    .bind(&end)
+    .fetch_all(pool)
+    .await?;
+
+    let mut exp_by_month: HashMap<i64, f64> = HashMap::new();
+    for (m, t) in monthly_exp {
+        exp_by_month.insert(m, t);
+    }
+    let mut months: Vec<i64> = monthly.iter().map(|m| m.0).collect();
+    for m in exp_by_month.keys() {
+        if !months.contains(m) {
+            months.push(*m);
+        }
+    }
+    months.sort_unstable();
+
+    let mut breakdown = Vec::with_capacity(months.len());
+    for m in months {
+        let (_, mgross, mnet, mcount, mnights) = monthly
+            .iter()
+            .find(|x| x.0 == m)
+            .copied()
+            .unwrap_or((m, 0.0, 0.0, 0, 0));
+        breakdown.push(json!({
+            "month": m,
+            "gross_revenue": round2(mgross),
+            "net_revenue": round2(mnet),
+            "reservation_count": mcount,
+            "nights": mnights,
+            "total_expenses": round2(exp_by_month.get(&m).copied().unwrap_or(0.0)),
+        }));
+    }
+
+    let total_expenses: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(amount),0.0) FROM expenses WHERE property_id = ? \
+         AND is_deleted = 0 AND date >= ? AND date <= ?",
+    )
+    .bind(property_id)
+    .bind(&start)
+    .bind(&end)
+    .fetch_one(pool)
+    .await?;
+
+    let expense_ratio = if gross > 0.0 { round2((total_expenses / gross) * 100.0) } else { 0.0 };
+    let profit = round2(net - total_expenses);
+    let profit_margin = if net > 0.0 {
+        round2(((net - total_expenses) / net) * 100.0)
+    } else {
+        0.0
+    };
+
+    Ok(json!({
+        "property_id": property_id,
+        "year": year,
+        "gross_revenue": round2(gross),
+        "net_revenue": round2(net),
+        "total_expenses": round2(total_expenses),
+        "profit": profit,
+        "profit_margin": profit_margin,
+        "cancellation_rate": cancellation_rate,
+        "cancelled_reservations": cancelled,
+        "avg_booking_window_days": avg_booking_window,
+        "avg_booking_value": round2(avg_rev),
+        "avg_stay_nights": round2(avg_nights),
+        "expense_ratio": expense_ratio,
+        "monthly_breakdown": breakdown,
+    }))
+}
+
+/// Portfolio-wide analytics (all properties) for a year or date range.
+pub async fn get_portfolio_analytics(
+    pool: &SqlitePool,
+    year: Option<i32>,
+    start: Option<&str>,
+    end: Option<&str>,
+) -> Result<Value, AppError> {
+    let (start_s, end_s) = match (start, end) {
+        (Some(s), Some(e)) => (s.to_string(), e.to_string()),
+        _ => {
+            let y = year.unwrap_or_else(|| chrono::Local::now().year());
+            year_bounds(y)
+        }
+    };
+
+    let (gross, net): (f64, f64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(gross_amount),0.0), COALESCE(SUM(net_amount),0.0) FROM revenues \
+         WHERE is_deleted = 0 AND date >= ? AND date <= ?",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_one(pool)
+    .await?;
+
+    let (total, nights): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COALESCE(SUM(nights),0) FROM reservations WHERE is_deleted = 0 \
+         AND status IN ('confirmed','completed') AND check_in >= ? AND check_in <= ?",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_one(pool)
+    .await?;
+
+    let cancelled: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM reservations WHERE is_deleted = 0 AND status = 'cancelled' \
+         AND check_in >= ? AND check_in <= ?",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_one(pool)
+    .await?;
+    let cancellation_rate = if total + cancelled > 0 {
+        round2((cancelled as f64 / (total + cancelled) as f64) * 100.0)
+    } else {
+        0.0
+    };
+
+    let total_expenses: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(amount),0.0) FROM expenses WHERE is_deleted = 0 AND date >= ? AND date <= ?",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_one(pool)
+    .await?;
+
+    let per_prop: Vec<(String, String, f64, f64, i64)> = sqlx::query_as(
+        "SELECT p.id, p.name, \
+                COALESCE((SELECT SUM(net_amount) FROM revenues r WHERE r.property_id = p.id \
+                          AND r.is_deleted = 0 AND r.date BETWEEN ? AND ?), 0.0) AS net, \
+                COALESCE((SELECT SUM(amount) FROM expenses e WHERE e.property_id = p.id \
+                          AND e.is_deleted = 0 AND e.date BETWEEN ? AND ?), 0.0) AS expenses, \
+                (SELECT COUNT(*) FROM reservations rs WHERE rs.property_id = p.id \
+                 AND rs.is_deleted = 0 AND rs.status IN ('confirmed','completed') \
+                 AND rs.check_in BETWEEN ? AND ?) AS reservations \
+         FROM properties p WHERE p.is_deleted = 0 ORDER BY net DESC",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .bind(&start_s)
+    .bind(&end_s)
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_all(pool)
+    .await?;
+
+    let properties: Vec<Value> = per_prop
+        .iter()
+        .map(|(id, name, net, exp, count)| {
+            let profit = round2(net - exp);
+            let margin = if *net > 0.0 {
+                round2(((net - exp) / net) * 100.0)
+            } else {
+                0.0
+            };
+            json!({
+                "property_id": id,
+                "name": name,
+                "net_revenue": round2(*net),
+                "expenses": round2(*exp),
+                "profit": profit,
+                "profit_margin": margin,
+                "reservations": count,
+            })
+        })
+        .collect();
+
+    let profit = round2(net - total_expenses);
+    let profit_margin = if net > 0.0 {
+        round2(((net - total_expenses) / net) * 100.0)
+    } else {
+        0.0
+    };
+
+    Ok(json!({
+        "start_date": start_s,
+        "end_date": end_s,
+        "total_gross_revenue": round2(gross),
+        "total_net_revenue": round2(net),
+        "total_expenses": round2(total_expenses),
+        "profit": profit,
+        "profit_margin": profit_margin,
+        "reservation_count": total,
+        "nights": nights,
+        "cancellation_rate": cancellation_rate,
+        "properties": properties,
+    }))
+}
+
+/// Property health score (0-100), mirroring the spirit of the Python heuristic.
+pub async fn get_property_health_score(
+    pool: &SqlitePool,
+    property_id: &str,
+) -> Result<Value, AppError> {
+    let year = chrono::Local::now().year();
+    let pa = get_property_analytics(pool, property_id, year).await?;
+    let pm = pa["profit_margin"].as_f64().unwrap_or(0.0);
+    let cr = pa["cancellation_rate"].as_f64().unwrap_or(0.0);
+
+    let mut score = 50.0 + (pm.clamp(0.0, 25.0) / 25.0) * 40.0 - (cr / 100.0) * 25.0;
+    score = score.clamp(0.0, 100.0).round();
+
+    let label = if score >= 80.0 {
+        "excellent"
+    } else if score >= 60.0 {
+        "good"
+    } else if score >= 40.0 {
+        "fair"
+    } else {
+        "poor"
+    };
+
+    Ok(json!({
+        "property_id": property_id,
+        "year": year,
+        "score": score as i64,
+        "label": label,
+        "profit_margin": pm,
+        "cancellation_rate": cr,
+    }))
+}

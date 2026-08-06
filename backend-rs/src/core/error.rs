@@ -38,6 +38,9 @@ pub enum AppError {
     Io(#[from] std::io::Error),
 
     #[error(transparent)]
+    Json(#[from] serde_json::Error),
+
+    #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
 
@@ -67,6 +70,9 @@ impl IntoResponse for AppError {
                 "Could not hash or verify password".to_string(),
             ),
             AppError::Io(_) => (StatusCode::INTERNAL_SERVER_ERROR, "I/O error".to_string()),
+            AppError::Json(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Serialization error".to_string())
+            }
             AppError::Internal(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
             }

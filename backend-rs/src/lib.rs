@@ -3,12 +3,14 @@
 //! Builds an `axum` router that can run standalone (`main.rs`) or embedded
 //! inside the Tauri desktop shell (planned integration).
 
+pub mod analytics;
 pub mod api;
 pub mod auth;
 pub mod core;
 pub mod finance;
 pub mod properties;
 pub mod reservations;
+pub mod settings;
 
 use std::sync::Arc;
 
