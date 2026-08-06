@@ -159,6 +159,13 @@ class ApiClient {
     return response.json();
   }
 
+  /** Drop the cached base URL so it is re-resolved from Tauri (used after a
+   * backend restart, which may bind a different port). */
+  resetBaseUrl() {
+    this.baseUrl = null;
+    this.baseUrlPromise = null;
+  }
+
   // Auth helpers
   setToken(token: string) {
     if (typeof window !== "undefined") {

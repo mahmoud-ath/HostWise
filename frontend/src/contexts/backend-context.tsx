@@ -136,6 +136,7 @@ export function BackendProvider({ children }: { children: ReactNode }) {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         setState({ status: "restarting" });
+        api.resetBaseUrl(); // the restarted backend may bind a different port
         await invoke("restart_backend");
         // Status will be updated by the event listener
       } catch (err) {

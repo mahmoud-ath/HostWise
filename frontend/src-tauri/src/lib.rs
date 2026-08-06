@@ -6,11 +6,16 @@ use tauri::{Manager, State, WindowEvent};
 /// Holds the spawned backend process so we can stop it when the app closes.
 struct BackendProcess(Mutex<Option<std::process::Child>>);
 
-/// The webview asks the Rust shell where the local API lives. The frontend's
-/// `api` client calls this when running inside Tauri (`__TAURI_INTERNALS__`).
+/// The webview asks the Rust shell where the local API lives. Returns the port
+/// the backend actually bound to (a free OS-assigned port, not a fixed 8000).
 #[tauri::command]
-fn get_backend_url() -> String {
-    backend::BACKEND_URL.to_string()
+fn get_backend_url(state: tauri::State<'_, backend::BackendUrl>) -> String {
+    if let Ok(guard) = state.0.lock() {
+        if let Some(url) = guard.as_ref() {
+            return url.clone();
+        }
+    }
+    backend::default_backend_url()
 }
 
 /// Restart the local backend (used by the frontend's connection banner).
@@ -34,6 +39,7 @@ pub fn run() {
         .setup(|app| {
             // Start the Python backend before the window loads; the webview
             // shows "Starting HostWise..." until /api/health is reachable.
+            app.manage(backend::BackendUrl(std::sync::Mutex::new(None)));
             let child = backend::spawn(app.handle());
             app.manage(BackendProcess(Mutex::new(child)));
             Ok(())
