@@ -5,7 +5,7 @@ import { AlertTriangle, RefreshCw, ServerCrash, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ConnectionBanner() {
-  const { status, isReady, restartBackend } = useBackend();
+  const { status, isReady, restartBackend, error } = useBackend();
 
   // Don't show anything when healthy or starting (starting is the initial state)
   if (isReady || status === "starting") return null;
@@ -58,7 +58,12 @@ export function ConnectionBanner() {
     >
       <div className="flex items-center gap-2">
         {c.icon}
-        <span>{c.message}</span>
+        <div>
+          <span>{c.message}</span>
+          {error && (
+            <p className="text-xs opacity-80 mt-0.5 max-w-xl break-words">{error}</p>
+          )}
+        </div>
       </div>
       {c.showRestart && (
         <Button

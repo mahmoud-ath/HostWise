@@ -26,6 +26,7 @@ interface BackendState {
 
 interface BackendContextType {
   status: BackendStatus;
+  error?: string;
   isReady: boolean;
   restartBackend: () => Promise<void>;
 }
@@ -152,6 +153,7 @@ export function BackendProvider({ children }: { children: ReactNode }) {
     <BackendContext.Provider
       value={{
         status: state.status,
+        error: state.error,
         isReady: state.status === "healthy",
         restartBackend,
       }}

@@ -122,12 +122,41 @@ fn release_binary_command(app: &tauri::AppHandle) -> Option<(String, Vec<String>
 }
 
 /// Locate and spawn the backend, then wait for it to be reachable.
+fn emit_failed(app: &tauri::AppHandle, error: &str) {
+    let _ = app.emit(
+        "backend-status",
+        BackendStatus {
+            status: "failed",
+            error: Some(error.to_string()),
+        },
+    );
+}
+
 pub fn spawn(app: &tauri::AppHandle) -> Option<Child> {
     let (program, args) = if cfg!(debug_assertions) {
-        dev_launcher_command()?
+        match dev_launcher_command() {
+            Some(cmd) => cmd,
+            None => {
+                emit_failed(app, "Development backend launcher not found.");
+                return None;
+            }
+        }
     } else {
-        release_binary_command(app)?
+        match release_binary_command(app) {
+            Some(cmd) => cmd,
+            None => {
+                emit_failed(
+                    app,
+                    "Backend executable not found — Windows may have quarantined it as a \
+                     false positive. In Windows Defender, restore the file and add an \
+                     exclusion for the HostWise app-data folder, then restart the app.",
+                );
+                return None;
+            }
+        }
     };
+
+    let mut last_spawn_error: Option<String> = None;
 
     for attempt in 1..=SPAWN_ATTEMPTS {
         // Pick a free port instead of the fixed 8000 (often taken by other
@@ -146,9 +175,10 @@ pub fn spawn(app: &tauri::AppHandle) -> Option<Child> {
 
         let mut child = match command.spawn() {
             Ok(child) => child,
-            Err(_) => {
+            Err(err) => {
+                last_spawn_error = Some(err.to_string());
                 // Could not start the process at all (e.g. Defender still
-                // holding the just-extracted exe). Retry shortly.
+                // holding or blocking the just-extracted exe). Retry shortly.
                 std::thread::sleep(RETRY_DELAY);
                 continue;
             }
@@ -179,12 +209,13 @@ pub fn spawn(app: &tauri::AppHandle) -> Option<Child> {
             std::thread::sleep(RETRY_DELAY);
         }
     }
-    let _ = app.emit(
-        "backend-status",
-        BackendStatus {
-            status: "failed",
-            error: Some("Backend did not become reachable on time".into()),
-        },
-    );
+    let error = match last_spawn_error {
+        Some(e) => format!(
+            "Backend could not be started: {e}. If Windows Defender blocked it, restore \
+             the file and add an exclusion for the HostWise folder, then restart the app."
+        ),
+        None => "Backend did not become reachable on time".to_string(),
+    };
+    emit_failed(app, &error);
     None
 }
