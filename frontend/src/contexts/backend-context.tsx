@@ -9,6 +9,8 @@ import {
   ReactNode,
 } from "react";
 
+import { api } from "@/lib/api";
+
 export type BackendStatus =
   | "starting"
   | "healthy"
@@ -76,6 +78,58 @@ export function BackendProvider({ children }: { children: ReactNode }) {
       if (unlisten) unlisten();
     };
   }, []);
+
+  // Fallback health polling. The Rust shell is supposed to emit a
+  // "backend-status" event once the backend is reachable, but if that event
+  // never arrives (or arrives late) the app would stay on "Starting
+  // HostWise..." forever. Poll /api/health directly so the screen clears as
+  // soon as the backend is up, and surface "unreachable" after a grace period
+  // instead of an endless spinner.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("__TAURI_INTERNALS__" in window)) return; // non-Tauri handled above
+    const pollable =
+      state.status === "starting" ||
+      state.status === "restarting" ||
+      state.status === "unreachable";
+    if (!pollable) return;
+
+    let cancelled = false;
+    const startedAt = Date.now();
+    const UNREACHABLE_AFTER_MS = 30_000;
+    const POLL_MS = 1_500;
+
+    const check = async () => {
+      if (cancelled) return;
+      try {
+        const host = await api.getApiHost();
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3_000);
+        const res = await fetch(`${host}/api/health`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) {
+          setState({ status: "healthy" });
+          return;
+        }
+        throw new Error(`health check HTTP ${res.status}`);
+      } catch {
+        if (cancelled) return;
+        if (
+          state.status === "starting" &&
+          Date.now() - startedAt > UNREACHABLE_AFTER_MS
+        ) {
+          setState({ status: "unreachable" });
+          return;
+        }
+        setTimeout(check, POLL_MS);
+      }
+    };
+
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.status]);
 
   const restartBackend = useCallback(async () => {
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {

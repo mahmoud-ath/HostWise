@@ -1,7 +1,7 @@
 mod backend;
 
 use std::sync::Mutex;
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, State, WindowEvent};
 
 /// Holds the spawned backend process so we can stop it when the app closes.
 struct BackendProcess(Mutex<Option<std::process::Child>>);
@@ -11,6 +11,20 @@ struct BackendProcess(Mutex<Option<std::process::Child>>);
 #[tauri::command]
 fn get_backend_url() -> String {
     backend::BACKEND_URL.to_string()
+}
+
+/// Restart the local backend (used by the frontend's connection banner).
+/// Kills any running instance, spawns a fresh one, and emits backend-status.
+#[tauri::command]
+fn restart_backend(app: tauri::AppHandle, state: State<'_, BackendProcess>) {
+    if let Ok(mut guard) = state.0.lock() {
+        if let Some(mut child) = guard.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        let child = backend::spawn(&app);
+        *guard = child;
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -38,7 +52,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![get_backend_url])
+        .invoke_handler(tauri::generate_handler![get_backend_url, restart_backend])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

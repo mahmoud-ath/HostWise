@@ -9,7 +9,15 @@ use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+
+/// Payload for the `backend-status` events the frontend listens for.
+#[derive(serde::Serialize, Clone)]
+struct BackendStatus {
+    status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
 
 /// Where the webview talks to the backend (the FastAPI app binds here).
 pub const BACKEND_URL: &str = "http://127.0.0.1:8000";
@@ -112,6 +120,13 @@ pub fn spawn(app: &tauri::AppHandle) -> Option<Child> {
         };
 
         if wait_for_backend(PER_ATTEMPT_TIMEOUT) {
+            let _ = app.emit(
+                "backend-status",
+                BackendStatus {
+                    status: "healthy",
+                    error: None,
+                },
+            );
             return Some(child);
         }
 
@@ -123,5 +138,12 @@ pub fn spawn(app: &tauri::AppHandle) -> Option<Child> {
             std::thread::sleep(RETRY_DELAY);
         }
     }
+    let _ = app.emit(
+        "backend-status",
+        BackendStatus {
+            status: "failed",
+            error: Some("Backend did not become reachable on time".into()),
+        },
+    );
     None
 }
