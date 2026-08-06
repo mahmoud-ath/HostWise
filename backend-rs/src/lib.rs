@@ -6,7 +6,9 @@
 pub mod api;
 pub mod auth;
 pub mod core;
+pub mod finance;
 pub mod properties;
+pub mod reservations;
 
 use std::sync::Arc;
 

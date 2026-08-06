@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
     full_name     TEXT,
     avatar_url    TEXT,
     is_active     INTEGER NOT NULL DEFAULT 1,
+    deleted_at    TEXT,
+    is_deleted    INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL,
     sync_id       TEXT
@@ -28,6 +30,7 @@ CREATE TABLE IF NOT EXISTS properties (
     bedrooms    INTEGER NOT NULL DEFAULT 1,
     bathrooms   REAL NOT NULL DEFAULT 1.0,
     deleted_at  TEXT,
+    is_deleted  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
     sync_id     TEXT

@@ -8,7 +8,7 @@ const COLS: &str = "id, email, password_hash, full_name, avatar_url, is_active, 
 
 pub async fn find_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>, sqlx::Error> {
     sqlx::query_as::<_, User>(&format!(
-        "SELECT {COLS} FROM users WHERE email = ?"
+        "SELECT {COLS} FROM users WHERE email = ? AND is_deleted = 0 AND deleted_at IS NULL"
     ))
     .bind(email)
     .fetch_optional(pool)
@@ -17,7 +17,7 @@ pub async fn find_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User
 
 pub async fn find_by_id(pool: &SqlitePool, id: &str) -> Result<Option<User>, sqlx::Error> {
     sqlx::query_as::<_, User>(&format!(
-        "SELECT {COLS} FROM users WHERE id = ?"
+        "SELECT {COLS} FROM users WHERE id = ? AND is_deleted = 0 AND deleted_at IS NULL"
     ))
     .bind(id)
     .fetch_optional(pool)
