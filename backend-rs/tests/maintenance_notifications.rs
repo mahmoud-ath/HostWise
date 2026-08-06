@@ -43,6 +43,13 @@ async fn maintenance_and_notifications_flow() {
         longitude: None,
         bedrooms: 2,
         bathrooms: 1.0,
+        max_guests: 2,
+        square_meters: None,
+        acquisition_cost: None,
+        monthly_mortgage: None,
+        target_occupancy: None,
+        target_annual_revenue: None,
+        notes: None,
         deleted_at: None,
         created_at: now.clone(),
         updated_at: now.clone(),
@@ -125,7 +132,10 @@ async fn maintenance_and_notifications_flow() {
     assert!(!items.is_empty());
     let first_id = items[0].id.clone();
     assert!(notifications::mark_read(&pool, &first_id).await.unwrap());
-    assert_eq!(notifications::unread_count(&pool).await.unwrap(), (unread - 1).max(0));
+    assert_eq!(
+        notifications::unread_count(&pool).await.unwrap(),
+        (unread - 1).max(0)
+    );
     let updated = notifications::mark_all_read(&pool).await.unwrap();
     assert_eq!(notifications::unread_count(&pool).await.unwrap(), 0);
     assert!(updated >= 0);

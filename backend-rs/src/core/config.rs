@@ -67,13 +67,12 @@ impl Config {
             "CORS_ORIGINS",
             r#"["http://localhost:3000","tauri://localhost"]"#,
         );
-        let cors_origins: Vec<String> =
-            serde_json::from_str(&cors_origins).unwrap_or_else(|_| {
-                vec![
-                    "http://localhost:3000".to_string(),
-                    "tauri://localhost".to_string(),
-                ]
-            });
+        let cors_origins: Vec<String> = serde_json::from_str(&cors_origins).unwrap_or_else(|_| {
+            vec![
+                "http://localhost:3000".to_string(),
+                "tauri://localhost".to_string(),
+            ]
+        });
 
         Self {
             app_name: env_or("APP_NAME", "HostWise"),

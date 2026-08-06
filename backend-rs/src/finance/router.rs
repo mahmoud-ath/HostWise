@@ -8,14 +8,14 @@ use chrono::Datelike;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 use crate::finance::models::{Expense, ExpenseCategory, Revenue, RevenueCategory};
 use crate::finance::schemas::{
     AnnualReport, CategoryCreateRequest, CategoryMergeRequest, CategoryUpdateRequest,
     ExpenseCategoryWithCount, ExpenseCreateRequest, ExpenseUpdateRequest, FinanceListParams,
-    FinancialSummary, MonthlyReport, RevenueCreateRequest, RevenueUpdateRequest,
+    FinancialSummary, MonthlyReport, RevenueCategoryWithCount, RevenueCreateRequest,
+    RevenueUpdateRequest,
 };
 use crate::finance::service::FinanceService;
 
@@ -37,12 +37,16 @@ pub fn build_router() -> Router<AppState> {
         .route("/revenue", get(list_revenue).post(create_revenue))
         .route(
             "/revenue/{id}",
-            get(get_revenue).patch(update_revenue).delete(delete_revenue),
+            get(get_revenue)
+                .patch(update_revenue)
+                .delete(delete_revenue),
         )
         .route("/expense", get(list_expense).post(create_expense))
         .route(
             "/expense/{id}",
-            get(get_expense).patch(update_expense).delete(delete_expense),
+            get(get_expense)
+                .patch(update_expense)
+                .delete(delete_expense),
         )
         .route("/summary", get(get_summary))
         .route("/report/monthly", get(get_monthly_report))
@@ -55,7 +59,10 @@ pub fn build_router() -> Router<AppState> {
             "/expense-categories/{id}",
             patch(update_expense_category).delete(delete_expense_category),
         )
-        .route("/expense-categories/{id}/merge", post(merge_expense_category))
+        .route(
+            "/expense-categories/{id}/merge",
+            post(merge_expense_category),
+        )
         .route(
             "/revenue-categories",
             get(list_revenue_categories).post(create_revenue_category),
@@ -74,7 +81,6 @@ fn svc(state: AppState) -> FinanceService {
 
 async fn create_revenue(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<RevenueCreateRequest>,
 ) -> Result<(StatusCode, Json<Revenue>), AppError> {
     let r = svc(state).create_revenue(req).await?;
@@ -83,7 +89,6 @@ async fn create_revenue(
 
 async fn list_revenue(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(p): Query<FinanceListParams>,
 ) -> Result<Json<Vec<Revenue>>, AppError> {
     let skip = p.skip.unwrap_or(0).max(0);
@@ -103,7 +108,6 @@ async fn list_revenue(
 
 async fn get_revenue(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Revenue>, AppError> {
     let r = svc(state).get_revenue(&id.to_string()).await?;
@@ -112,7 +116,6 @@ async fn get_revenue(
 
 async fn update_revenue(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
     Json(req): Json<RevenueUpdateRequest>,
 ) -> Result<Json<Revenue>, AppError> {
@@ -122,7 +125,6 @@ async fn update_revenue(
 
 async fn delete_revenue(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     svc(state).delete_revenue(&id.to_string()).await?;
@@ -133,7 +135,6 @@ async fn delete_revenue(
 
 async fn create_expense(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<ExpenseCreateRequest>,
 ) -> Result<(StatusCode, Json<Expense>), AppError> {
     let e = svc(state).create_expense(req).await?;
@@ -142,7 +143,6 @@ async fn create_expense(
 
 async fn list_expense(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(p): Query<FinanceListParams>,
 ) -> Result<Json<Vec<Expense>>, AppError> {
     let skip = p.skip.unwrap_or(0).max(0);
@@ -162,7 +162,6 @@ async fn list_expense(
 
 async fn get_expense(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Expense>, AppError> {
     let e = svc(state).get_expense(&id.to_string()).await?;
@@ -171,7 +170,6 @@ async fn get_expense(
 
 async fn update_expense(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
     Json(req): Json<ExpenseUpdateRequest>,
 ) -> Result<Json<Expense>, AppError> {
@@ -181,7 +179,6 @@ async fn update_expense(
 
 async fn delete_expense(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     svc(state).delete_expense(&id.to_string()).await?;
@@ -192,7 +189,6 @@ async fn delete_expense(
 
 async fn get_summary(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(p): Query<FinanceListParams>,
 ) -> Result<Json<FinancialSummary>, AppError> {
     let s = svc(state)
@@ -203,7 +199,6 @@ async fn get_summary(
 
 async fn get_monthly_report(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<MonthlyQuery>,
 ) -> Result<Json<MonthlyReport>, AppError> {
     let r = svc(state).get_monthly_report(q.year, q.month).await?;
@@ -212,7 +207,6 @@ async fn get_monthly_report(
 
 async fn get_annual_report(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<AnnualQuery>,
 ) -> Result<Json<AnnualReport>, AppError> {
     // start_date/end_date must be provided together (mirrors Python router).
@@ -235,7 +229,6 @@ async fn get_annual_report(
 
 async fn list_expense_categories(
     State(state): State<AppState>,
-    _auth: AuthUser,
 ) -> Result<Json<Vec<ExpenseCategoryWithCount>>, AppError> {
     let items = svc(state).list_expense_categories().await?;
     Ok(Json(items))
@@ -243,7 +236,6 @@ async fn list_expense_categories(
 
 async fn create_expense_category(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<CategoryCreateRequest>,
 ) -> Result<(StatusCode, Json<ExpenseCategory>), AppError> {
     let c = svc(state).create_expense_category(req).await?;
@@ -252,17 +244,17 @@ async fn create_expense_category(
 
 async fn update_expense_category(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
     Json(req): Json<CategoryUpdateRequest>,
 ) -> Result<Json<ExpenseCategory>, AppError> {
-    let c = svc(state).update_expense_category(&id.to_string(), req).await?;
+    let c = svc(state)
+        .update_expense_category(&id.to_string(), req)
+        .await?;
     Ok(Json(c))
 }
 
 async fn delete_expense_category(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     svc(state).delete_expense_category(&id.to_string()).await?;
@@ -271,7 +263,6 @@ async fn delete_expense_category(
 
 async fn merge_expense_category(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
     Json(req): Json<CategoryMergeRequest>,
 ) -> Result<Json<ExpenseCategory>, AppError> {
@@ -285,15 +276,13 @@ async fn merge_expense_category(
 
 async fn list_revenue_categories(
     State(state): State<AppState>,
-    _auth: AuthUser,
-) -> Result<Json<Vec<RevenueCategory>>, AppError> {
+) -> Result<Json<Vec<RevenueCategoryWithCount>>, AppError> {
     let items = svc(state).list_revenue_categories().await?;
     Ok(Json(items))
 }
 
 async fn create_revenue_category(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<CategoryCreateRequest>,
 ) -> Result<(StatusCode, Json<RevenueCategory>), AppError> {
     let c = svc(state).create_revenue_category(req).await?;
@@ -302,17 +291,17 @@ async fn create_revenue_category(
 
 async fn update_revenue_category(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
     Json(req): Json<CategoryUpdateRequest>,
 ) -> Result<Json<RevenueCategory>, AppError> {
-    let c = svc(state).update_revenue_category(&id.to_string(), req).await?;
+    let c = svc(state)
+        .update_revenue_category(&id.to_string(), req)
+        .await?;
     Ok(Json(c))
 }
 
 async fn delete_revenue_category(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     svc(state).delete_revenue_category(&id.to_string()).await?;

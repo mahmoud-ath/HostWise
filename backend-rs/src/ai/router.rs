@@ -14,7 +14,6 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::ai::service::AiAdvisorService;
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 
@@ -59,14 +58,13 @@ fn svc(state: AppState) -> AiAdvisorService {
     AiAdvisorService::new(state)
 }
 
-async fn analyze(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
+async fn analyze(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let result = svc(state).analyze_financial_performance().await?;
     Ok(Json(result))
 }
 
 async fn advisor(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<AdvisorQuery>,
 ) -> Result<Json<Value>, AppError> {
     if (q.start_date.is_some()) != (q.end_date.is_some()) {
@@ -82,28 +80,27 @@ async fn advisor(
 
 async fn chat(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<ChatRequest>,
 ) -> Result<Json<Value>, AppError> {
     if req.question.trim().is_empty() || req.question.len() > 500 {
-        return Err(AppError::Validation("question must be 1-500 characters".into()));
+        return Err(AppError::Validation(
+            "question must be 1-500 characters".into(),
+        ));
     }
     let year = req.year.unwrap_or_else(|| chrono::Local::now().year());
-    let result = svc(state).answer_question(req.question.trim(), year).await?;
+    let result = svc(state)
+        .answer_question(req.question.trim(), year)
+        .await?;
     Ok(Json(result))
 }
 
-async fn test_connection(
-    State(state): State<AppState>,
-    _auth: AuthUser,
-) -> Result<Json<Value>, AppError> {
+async fn test_connection(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let result = svc(state).test_llm_connection().await?;
     Ok(Json(result))
 }
 
 async fn scenario(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<ScenarioRequest>,
 ) -> Result<Json<Value>, AppError> {
     if !ALLOWED_SCENARIOS.contains(&req.scenario.as_str()) {
@@ -113,6 +110,8 @@ async fn scenario(
         )));
     }
     let year = req.year.unwrap_or_else(|| chrono::Local::now().year());
-    let result = svc(state).simulate_scenario(&req.scenario, &req.params, year).await?;
+    let result = svc(state)
+        .simulate_scenario(&req.scenario, &req.params, year)
+        .await?;
     Ok(Json(result))
 }

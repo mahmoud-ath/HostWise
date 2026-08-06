@@ -4,7 +4,8 @@ use sqlx::SqlitePool;
 
 use crate::auth::models::User;
 
-const COLS: &str = "id, email, password_hash, full_name, avatar_url, is_active, created_at, updated_at, sync_id";
+const COLS: &str =
+    "id, email, password_hash, full_name, avatar_url, is_active, created_at, updated_at, sync_id";
 
 pub async fn find_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>, sqlx::Error> {
     sqlx::query_as::<_, User>(&format!(

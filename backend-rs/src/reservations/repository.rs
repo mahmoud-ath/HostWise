@@ -65,9 +65,8 @@ pub async fn list(
     skip: i64,
     limit: i64,
 ) -> Result<Vec<Reservation>, sqlx::Error> {
-    let mut sql = format!(
-        "SELECT {COLS} FROM reservations WHERE deleted_at IS NULL AND is_deleted = 0"
-    );
+    let mut sql =
+        format!("SELECT {COLS} FROM reservations WHERE deleted_at IS NULL AND is_deleted = 0");
     if property_id.is_some() {
         sql.push_str(" AND property_id = ?");
     }

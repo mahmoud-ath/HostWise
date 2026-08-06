@@ -6,15 +6,14 @@
 //! POST /api/v1/settings/wipe    -> delete all business data
 
 use axum::extract::State;
-use axum::http::StatusCode;
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 use crate::settings::service;
@@ -31,27 +30,20 @@ pub fn build_router() -> Router<AppState> {
         .route("/wipe", post(wipe_all_data))
 }
 
-async fn get_settings(
-    State(state): State<AppState>,
-    _auth: AuthUser,
-) -> Result<Json<Value>, AppError> {
+async fn get_settings(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let all = service::get_all(&state.pool).await?;
     Ok(Json(all))
 }
 
 async fn update_settings(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<SettingsUpdateRequest>,
 ) -> Result<Json<Value>, AppError> {
     let all = service::update(&state.pool, req.settings).await?;
     Ok(Json(all))
 }
 
-async fn export_all_data(
-    State(state): State<AppState>,
-    _auth: AuthUser,
-) -> Result<Response, AppError> {
+async fn export_all_data(State(state): State<AppState>) -> Result<Response, AppError> {
     let html = service::export_data(&state.pool).await?;
     Ok((
         StatusCode::OK,
@@ -67,10 +59,7 @@ async fn export_all_data(
         .into_response())
 }
 
-async fn wipe_all_data(
-    State(state): State<AppState>,
-    _auth: AuthUser,
-) -> Result<Json<Value>, AppError> {
+async fn wipe_all_data(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     service::wipe(&state.pool).await?;
     Ok(Json(json!({ "status": "ok" })))
 }

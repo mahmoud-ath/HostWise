@@ -10,14 +10,13 @@
 //! DELETE /api/v1/backups/{name}          -> delete
 
 use axum::extract::{Multipart, Path, State};
-use axum::http::StatusCode;
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
-use crate::auth::extractors::AuthUser;
 use crate::backup;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
@@ -46,23 +45,21 @@ fn sanitize_backup_name(name: &str) -> Result<String, AppError> {
     Ok(base)
 }
 
-async fn list_backups(
-    State(_state): State<AppState>,
-    _auth: AuthUser,
-) -> Json<Vec<backup::BackupInfo>> {
+async fn list_backups(State(_state): State<AppState>) -> Json<Vec<backup::BackupInfo>> {
     Json(backup::list_backups())
 }
 
-async fn status(State(_state): State<AppState>, _auth: AuthUser) -> Json<Value> {
+async fn status(State(_state): State<AppState>) -> Json<Value> {
     let backups = backup::list_backups();
-    let last_backup = backups.first().map(|b| {
-        json!({ "name": b.name, "created": b.created })
-    });
+    let last_backup = backups
+        .first()
+        .map(|b| json!({ "name": b.name, "created": b.created }));
     let next_backup = match &last_backup {
         Some(l) => {
-            let created = chrono::DateTime::parse_from_rfc3339(&l["created"].as_str().unwrap_or(""))
-                .map(|dt| dt.with_timezone(&chrono::Local) + chrono::Duration::days(1))
-                .unwrap_or_else(|_| chrono::Local::now() + chrono::Duration::days(1));
+            let created =
+                chrono::DateTime::parse_from_rfc3339(&l["created"].as_str().unwrap_or(""))
+                    .map(|dt| dt.with_timezone(&chrono::Local) + chrono::Duration::days(1))
+                    .unwrap_or_else(|_| chrono::Local::now() + chrono::Duration::days(1));
             created.to_rfc3339()
         }
         None => (chrono::Local::now() + chrono::Duration::days(1)).to_rfc3339(),
@@ -77,16 +74,19 @@ async fn status(State(_state): State<AppState>, _auth: AuthUser) -> Json<Value> 
     }))
 }
 
-async fn create(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
+async fn create(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     match backup::create_backup(&state.config.sqlite_path, "manual").await {
-        Some(p) => Ok(Json(json!({ "message": "Backup created", "path": p.to_string_lossy() }))),
-        None => Err(AppError::Internal(anyhow::anyhow!("Failed to create backup"))),
+        Some(p) => Ok(Json(
+            json!({ "message": "Backup created", "path": p.to_string_lossy() }),
+        )),
+        None => Err(AppError::Internal(anyhow::anyhow!(
+            "Failed to create backup"
+        ))),
     }
 }
 
 async fn upload(
     State(_state): State<AppState>,
-    _auth: AuthUser,
     mut multipart: Multipart,
 ) -> Result<Json<Value>, AppError> {
     let mut content: Option<Vec<u8>> = None;
@@ -111,7 +111,9 @@ async fn upload(
     let content = content.ok_or_else(|| AppError::Validation("No file uploaded".into()))?;
     let fname = filename.unwrap_or_default();
     if !fname.ends_with(".db") {
-        return Err(AppError::Validation("Please upload a .db backup file".into()));
+        return Err(AppError::Validation(
+            "Please upload a .db backup file".into(),
+        ));
     }
 
     let name = format!(
@@ -129,7 +131,6 @@ async fn upload(
 
 async fn download(
     State(_state): State<AppState>,
-    _auth: AuthUser,
     Path(name): Path<String>,
 ) -> Result<Response, AppError> {
     let safe = sanitize_backup_name(&name)?;
@@ -137,8 +138,8 @@ async fn download(
     if !path.exists() {
         return Err(AppError::NotFound);
     }
-    let bytes = std::fs::read(&path)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!(e.to_string())))?;
+    let bytes =
+        std::fs::read(&path).map_err(|e| AppError::Internal(anyhow::anyhow!(e.to_string())))?;
 
     let mut response = (StatusCode::OK, bytes).into_response();
     response
@@ -155,7 +156,6 @@ async fn download(
 
 async fn verify(
     State(_state): State<AppState>,
-    _auth: AuthUser,
     Path(name): Path<String>,
 ) -> Result<Json<Value>, AppError> {
     let safe = sanitize_backup_name(&name)?;
@@ -168,20 +168,22 @@ async fn verify(
 
 async fn restore(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(name): Path<String>,
 ) -> Result<Json<Value>, AppError> {
     let safe = sanitize_backup_name(&name)?;
     let ok = backup::restore_backup(&state.config.sqlite_path, &safe).await;
     if !ok {
-        return Err(AppError::Validation(format!("Failed to restore backup {safe}")));
+        return Err(AppError::Validation(format!(
+            "Failed to restore backup {safe}"
+        )));
     }
-    Ok(Json(json!({ "message": format!("Database restored from {safe}") })))
+    Ok(Json(
+        json!({ "message": format!("Database restored from {safe}") }),
+    ))
 }
 
 async fn delete_backup(
     State(_state): State<AppState>,
-    _auth: AuthUser,
     Path(name): Path<String>,
 ) -> Result<Json<Value>, AppError> {
     let safe = sanitize_backup_name(&name)?;
@@ -189,7 +191,6 @@ async fn delete_backup(
     if !path.exists() {
         return Err(AppError::NotFound);
     }
-    std::fs::remove_file(&path)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!(e.to_string())))?;
+    std::fs::remove_file(&path).map_err(|e| AppError::Internal(anyhow::anyhow!(e.to_string())))?;
     Ok(Json(json!({ "message": "Backup deleted" })))
 }

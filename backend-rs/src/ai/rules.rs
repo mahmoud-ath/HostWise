@@ -54,19 +54,30 @@ pub async fn analyze_financial_performance(
     year: i32,
 ) -> Result<Value, AppError> {
     let all = settings::get_all(pool).await?;
-    let cur = all["default_currency"].as_str().unwrap_or("EUR").to_string();
+    let cur = all["default_currency"]
+        .as_str()
+        .unwrap_or("EUR")
+        .to_string();
     let sym = symbol(&cur);
 
     let portfolio = analytics::get_portfolio_analytics(pool, None, Some(start), Some(end)).await?;
     let finance = FinanceService::from_pool(pool.clone());
     let summary = finance.get_summary(Some(start), Some(end)).await?;
 
-    let net_rev = summary.total_revenue;
+    let net_rev = summary.net_revenue;
     let expenses = summary.total_expenses;
     let gross = portfolio["total_gross_revenue"].as_f64().unwrap_or(net_rev);
     let profit = net_rev - expenses;
-    let profit_margin = if net_rev > 0.0 { (profit / net_rev) * 100.0 } else { 0.0 };
-    let expense_ratio = if gross > 0.0 { (expenses / gross) * 100.0 } else { 0.0 };
+    let profit_margin = if net_rev > 0.0 {
+        (profit / net_rev) * 100.0
+    } else {
+        0.0
+    };
+    let expense_ratio = if gross > 0.0 {
+        (expenses / gross) * 100.0
+    } else {
+        0.0
+    };
     let cancellation_rate = portfolio["cancellation_rate"].as_f64().unwrap_or(0.0);
 
     let mut recommendations: Vec<Value> = Vec::new();
@@ -177,24 +188,41 @@ pub async fn analyze_financial_performance(
         }));
     }
 
+    let exec_text = format!(
+        "Net revenue {sym}{net_rev:.2}, expenses {sym}{expenses:.2}, profit {sym}{profit:.2} \
+         ({profit_margin:.1}% margin, {expense_ratio:.1}% expense ratio, \
+         {cancellation_rate:.1}% cancellation)."
+    );
+    let key_metrics = json!({
+        "gross_revenue": round2(gross),
+        "net_revenue": round2(net_rev),
+        "total_expenses": round2(expenses),
+        "profit": round2(profit),
+        "profit_margin": round2(profit_margin),
+        "expense_ratio": round2(expense_ratio),
+        "cancellation_rate": round2(cancellation_rate),
+        "reservation_count": portfolio["reservation_count"],
+        "nights": portfolio["nights"],
+        "property_count": portfolio["properties"].as_array().map(|a| a.len() as i64).unwrap_or(0),
+    });
+    let critical_count = recommendations
+        .iter()
+        .filter(|r| r["type"] == "critical")
+        .count() as i64;
+    let warning_count = recommendations
+        .iter()
+        .filter(|r| r["type"] == "warning")
+        .count() as i64;
+
     Ok(json!({
-        "summary_text": format!(
-            "Net revenue {sym}{net_rev:.2}, expenses {sym}{expenses:.2}, profit {sym}{profit:.2} \
-             ({profit_margin:.1}% margin, {expense_ratio:.1}% expense ratio, \
-             {cancellation_rate:.1}% cancellation)."
-        ),
+        "executive_summary": exec_text,
+        "key_metrics": key_metrics,
         "recommendations": recommendations,
-        "metrics": {
-            "net_revenue": round2(net_rev),
-            "total_expenses": round2(expenses),
-            "profit": round2(profit),
-            "profit_margin": round2(profit_margin),
-            "expense_ratio": round2(expense_ratio),
-            "cancellation_rate": round2(cancellation_rate),
-            "reservation_count": portfolio["reservation_count"],
-            "nights": portfolio["nights"],
-            "property_count": portfolio["properties"].as_array().map(|a| a.len() as i64).unwrap_or(0),
-        },
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+        // Legacy aliases.
+        "summary_text": exec_text,
+        "metrics": key_metrics.clone(),
     }))
 }
 
@@ -260,16 +288,46 @@ pub async fn generate_advisor_report(
         }
     );
 
+    let net_rev = metrics["net_revenue"].as_f64().unwrap_or(0.0);
+    let gross_rev = metrics["gross_revenue"].as_f64().unwrap_or(net_rev);
+    let expense_ratio = metrics["expense_ratio"].as_f64().unwrap_or(0.0);
+    let growth = metrics["revenue_growth_yoy"].as_f64().unwrap_or(0.0);
+    let lost_revenue = round2(net_rev * cr / 100.0);
+    let components = json!({
+        "revenue": (50.0 + (pm.clamp(0.0, 25.0) / 25.0) * 40.0).round() as i64,
+        "expenses": (100.0 - expense_ratio.min(100.0)).round() as i64,
+        "growth": (50.0 + growth.clamp(-25.0, 25.0)).round() as i64,
+        "risk": (100.0 - cr * 2.0).clamp(0.0, 100.0).round() as i64,
+    });
+    let current_metrics = json!({
+        "net_revenue": net_rev,
+        "gross_revenue": gross_rev,
+        "total_expenses": metrics["total_expenses"],
+        "profit": metrics["profit"],
+        "profit_margin": pm,
+        "cancellation_rate": cr,
+        "revenue_growth_yoy": growth,
+        "property_count": metrics["property_count"],
+    });
+
     Ok(json!({
+        "year": year,
+        "generated_at": chrono::Local::now().format("%Y-%m-%d").to_string(),
         "executive_summary": exec,
         "provider": "hostwise",
-        "health_score": { "score": score as i64, "status": status },
+        "key_metrics": metrics.clone(),
+        "current_metrics": current_metrics,
+        "health_score": {
+            "score": score as i64,
+            "status": status,
+            "components": components,
+        },
         "priority_actions": { "critical": critical, "medium": medium, "low": low },
         "opportunities": opportunities,
-        "lost_revenue": null,
+        "lost_revenue": lost_revenue,
         "risks": risks,
         "property_reviews": [],
-        "forecast": null,
+        "forecast": { "next_month_revenue": null, "confidence": null },
         "achievements": [],
         "recommended_goals": [],
         "trend_explanations": [],

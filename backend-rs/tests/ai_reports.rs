@@ -44,6 +44,13 @@ async fn ai_and_reports_flow() {
         longitude: None,
         bedrooms: 3,
         bathrooms: 2.0,
+        max_guests: 2,
+        square_meters: None,
+        acquisition_cost: None,
+        monthly_mortgage: None,
+        target_occupancy: None,
+        target_annual_revenue: None,
+        notes: None,
         deleted_at: None,
         created_at: now.clone(),
         updated_at: now.clone(),
@@ -128,7 +135,10 @@ async fn ai_and_reports_flow() {
         .await
         .unwrap();
     assert!(!analysis["summary_text"].as_str().unwrap().is_empty());
-    assert_eq!(analysis["metrics"]["profit_margin"].as_f64().unwrap(), 77.78);
+    assert_eq!(
+        analysis["metrics"]["profit_margin"].as_f64().unwrap(),
+        77.78
+    );
 
     let advisor = rules::generate_advisor_report(&pool, "2026-01-01", "2026-12-31", 2026)
         .await
@@ -141,7 +151,11 @@ async fn ai_and_reports_flow() {
     // ── AI: service (scenario + connection) ──
     let svc = AiAdvisorService { pool: pool.clone() };
     let sc = svc
-        .simulate_scenario("price_increase", &serde_json::json!({"increase_pct": 5}), 2026)
+        .simulate_scenario(
+            "price_increase",
+            &serde_json::json!({"increase_pct": 5}),
+            2026,
+        )
         .await
         .unwrap();
     assert_eq!(sc["scenario"], "price_increase");
@@ -157,7 +171,12 @@ async fn ai_and_reports_flow() {
 
     let monthly = reports.generate_monthly_report(2026, 6).await.unwrap();
     assert_eq!(monthly["report_type"], "monthly");
-    assert!(monthly["financial_data"]["total_revenue"].as_f64().unwrap() > 0.0);
+    assert!(
+        monthly["financial_data"]["summary"]["net_revenue"]
+            .as_f64()
+            .unwrap()
+            > 0.0
+    );
 
     let annual = reports.generate_annual_report(2026).await.unwrap();
     assert_eq!(annual["report_type"], "annual");

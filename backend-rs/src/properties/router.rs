@@ -12,7 +12,6 @@ use axum::routing::get;
 use axum::{Json, Router};
 use uuid::Uuid;
 
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 use crate::core::time::now_iso;
@@ -25,13 +24,14 @@ pub fn build_router() -> Router<AppState> {
         .route("/", get(list_properties).post(create_property))
         .route(
             "/{id}",
-            get(get_property).patch(update_property).delete(delete_property),
+            get(get_property)
+                .patch(update_property)
+                .delete(delete_property),
         )
 }
 
 async fn create_property(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<PropertyCreateRequest>,
 ) -> Result<(StatusCode, Json<Property>), AppError> {
     if req.name.trim().is_empty() {
@@ -52,6 +52,13 @@ async fn create_property(
         longitude: req.longitude,
         bedrooms: req.bedrooms,
         bathrooms: req.bathrooms,
+        max_guests: req.max_guests,
+        square_meters: req.square_meters,
+        acquisition_cost: req.acquisition_cost,
+        monthly_mortgage: req.monthly_mortgage,
+        target_occupancy: req.target_occupancy,
+        target_annual_revenue: req.target_annual_revenue,
+        notes: req.notes,
         deleted_at: None,
         created_at: now.clone(),
         updated_at: now,
@@ -63,7 +70,6 @@ async fn create_property(
 
 async fn list_properties(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(params): Query<ListParams>,
 ) -> Result<Json<Vec<Property>>, AppError> {
     let skip = params.skip.unwrap_or(0).max(0);
@@ -74,7 +80,6 @@ async fn list_properties(
 
 async fn get_property(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Property>, AppError> {
     let p = props_repo::get_by_id(&state.pool, &id.to_string())
@@ -85,7 +90,6 @@ async fn get_property(
 
 async fn update_property(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
     Json(req): Json<PropertyUpdateRequest>,
 ) -> Result<Json<Property>, AppError> {
@@ -132,6 +136,27 @@ async fn update_property(
     if let Some(v) = req.bathrooms {
         p.bathrooms = v;
     }
+    if let Some(v) = req.max_guests {
+        p.max_guests = v;
+    }
+    if let Some(v) = req.square_meters {
+        p.square_meters = Some(v);
+    }
+    if let Some(v) = req.acquisition_cost {
+        p.acquisition_cost = Some(v);
+    }
+    if let Some(v) = req.monthly_mortgage {
+        p.monthly_mortgage = Some(v);
+    }
+    if let Some(v) = req.target_occupancy {
+        p.target_occupancy = Some(v);
+    }
+    if let Some(v) = req.target_annual_revenue {
+        p.target_annual_revenue = Some(v);
+    }
+    if let Some(v) = req.notes {
+        p.notes = Some(v);
+    }
     p.updated_at = now_iso();
 
     props_repo::update(&state.pool, &p).await?;
@@ -140,7 +165,6 @@ async fn update_property(
 
 async fn delete_property(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     let rows = props_repo::soft_delete(&state.pool, &id.to_string()).await?;

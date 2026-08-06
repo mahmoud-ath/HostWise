@@ -45,11 +45,9 @@ async fn register_login_refresh_flow() {
         })
         .await
         .expect("login");
-    let claims = hostwise_backend::auth::security::decode_token(
-        &config.jwt_secret_key,
-        &login.access_token,
-    )
-    .expect("login token decodes");
+    let claims =
+        hostwise_backend::auth::security::decode_token(&config.jwt_secret_key, &login.access_token)
+            .expect("login token decodes");
     assert_eq!(claims.typ, "access");
     assert!(!claims.sub.is_empty());
 

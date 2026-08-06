@@ -4,11 +4,11 @@ use sqlx::SqlitePool;
 
 use crate::properties::models::Property;
 
-const COLS: &str = "id, name, type, status, address, city, state, country, postal_code, latitude, longitude, bedrooms, bathrooms, deleted_at, created_at, updated_at, sync_id";
+const COLS: &str = "id, name, type, status, address, city, state, country, postal_code, latitude, longitude, bedrooms, bathrooms, max_guests, square_meters, acquisition_cost, monthly_mortgage, target_occupancy, target_annual_revenue, notes, deleted_at, created_at, updated_at, sync_id";
 
 pub async fn insert(pool: &SqlitePool, p: &Property) -> Result<(), sqlx::Error> {
     sqlx::query(&format!(
-        "INSERT INTO properties ({COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+        "INSERT INTO properties ({COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     ))
     .bind(&p.id)
     .bind(&p.name)
@@ -23,6 +23,13 @@ pub async fn insert(pool: &SqlitePool, p: &Property) -> Result<(), sqlx::Error> 
     .bind(p.longitude)
     .bind(p.bedrooms)
     .bind(p.bathrooms)
+    .bind(p.max_guests)
+    .bind(p.square_meters)
+    .bind(p.acquisition_cost)
+    .bind(p.monthly_mortgage)
+    .bind(p.target_occupancy)
+    .bind(p.target_annual_revenue)
+    .bind(&p.notes)
     .bind(&p.deleted_at)
     .bind(&p.created_at)
     .bind(&p.updated_at)
@@ -54,7 +61,9 @@ pub async fn get_by_id(pool: &SqlitePool, id: &str) -> Result<Option<Property>, 
 pub async fn update(pool: &SqlitePool, p: &Property) -> Result<(), sqlx::Error> {
     sqlx::query(
         "UPDATE properties SET name=?, type=?, status=?, address=?, city=?, state=?, country=?, \
-         postal_code=?, latitude=?, longitude=?, bedrooms=?, bathrooms=?, updated_at=? WHERE id=?",
+         postal_code=?, latitude=?, longitude=?, bedrooms=?, bathrooms=?, max_guests=?, \
+         square_meters=?, acquisition_cost=?, monthly_mortgage=?, target_occupancy=?, \
+         target_annual_revenue=?, notes=?, updated_at=? WHERE id=?",
     )
     .bind(&p.name)
     .bind(&p.r#type)
@@ -68,6 +77,13 @@ pub async fn update(pool: &SqlitePool, p: &Property) -> Result<(), sqlx::Error> 
     .bind(p.longitude)
     .bind(p.bedrooms)
     .bind(p.bathrooms)
+    .bind(p.max_guests)
+    .bind(p.square_meters)
+    .bind(p.acquisition_cost)
+    .bind(p.monthly_mortgage)
+    .bind(p.target_occupancy)
+    .bind(p.target_annual_revenue)
+    .bind(&p.notes)
     .bind(&p.updated_at)
     .bind(&p.id)
     .execute(pool)

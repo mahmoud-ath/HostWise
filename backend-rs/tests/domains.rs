@@ -42,6 +42,13 @@ async fn reservations_finance_flow() {
         longitude: None,
         bedrooms: 2,
         bathrooms: 1.0,
+        max_guests: 2,
+        square_meters: None,
+        acquisition_cost: None,
+        monthly_mortgage: None,
+        target_occupancy: None,
+        target_annual_revenue: None,
+        notes: None,
         deleted_at: None,
         created_at: now.clone(),
         updated_at: now.clone(),
@@ -108,7 +115,10 @@ async fn reservations_finance_flow() {
         .await
         .expect("create revenue");
     assert_eq!(rev.net_amount, 450.0);
-    assert!(rev.category_id.is_some(), "description should auto-create a category");
+    assert!(
+        rev.category_id.is_some(),
+        "description should auto-create a category"
+    );
 
     // Expense
     let exp = finance
@@ -131,17 +141,17 @@ async fn reservations_finance_flow() {
 
     // Summary KPIs
     let summary = finance.get_summary(None, None).await.unwrap();
-    assert_eq!(summary.total_revenue, 450.0);
+    assert_eq!(summary.net_revenue, 450.0);
     assert_eq!(summary.total_expenses, 120.0);
-    assert_eq!(summary.net_cashflow, 330.0);
+    assert_eq!(summary.cashflow, 330.0);
     assert_eq!(summary.revenue_count, 1);
     assert_eq!(summary.expense_count, 1);
 
     // Monthly report for Aug 2026
     let monthly = finance.get_monthly_report(2026, 8).await.unwrap();
-    assert_eq!(monthly.total_revenue, 450.0);
-    assert_eq!(monthly.total_expenses, 120.0);
-    assert_eq!(monthly.net, 330.0);
+    assert_eq!(monthly.summary.net_revenue, 450.0);
+    assert_eq!(monthly.summary.total_expenses, 120.0);
+    assert_eq!(monthly.summary.cashflow, 330.0);
 
     drop(pool);
     let _ = std::fs::remove_dir_all(&dir);

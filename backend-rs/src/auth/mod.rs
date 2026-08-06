@@ -8,5 +8,7 @@ pub mod service;
 
 pub use extractors::AuthUser;
 pub use models::User;
-pub use schemas::{LoginRequest, RegisterRequest, TokenResponse, UpdateProfileRequest, UserResponse};
+pub use schemas::{
+    LoginRequest, RegisterRequest, TokenResponse, UpdateProfileRequest, UserResponse,
+};
 pub use service::AuthService;

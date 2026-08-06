@@ -29,7 +29,10 @@ pub fn build_api_router() -> Router<AppState> {
         .nest("/api/v1/finance", finance::router::build_router())
         .nest("/api/v1/settings", settings::router::build_router())
         .nest("/api/v1/analytics", analytics::router::build_router())
-        .nest("/api/v1/notifications", notifications::router::build_router())
+        .nest(
+            "/api/v1/notifications",
+            notifications::router::build_router(),
+        )
         .nest("/api/v1/maintenance", maintenance::router::build_router())
         .nest("/api/v1/backups", backup::router::build_router())
         .nest("/api/v1/setup", setup::router::build_router())

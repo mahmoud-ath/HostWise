@@ -8,8 +8,8 @@
 //! GET /api/v1/reports/export?format=pdf&...
 
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
@@ -17,7 +17,6 @@ use chrono::Datelike;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 use crate::reports::pdf_service;
@@ -78,7 +77,9 @@ fn validate_period(start: Option<&str>, end: Option<&str>) -> Result<(), AppErro
     }
     if let (Some(s), Some(e)) = (start, end) {
         if s > e {
-            return Err(AppError::Validation("start_date must not be after end_date".into()));
+            return Err(AppError::Validation(
+                "start_date must not be after end_date".into(),
+            ));
         }
     }
     Ok(())
@@ -94,36 +95,32 @@ fn resolve_period(year: Option<i32>, start: Option<&str>, end: Option<&str>) -> 
     (format!("{y:04}-01-01"), format!("{y:04}-12-31"))
 }
 
-async fn weekly(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
+async fn weekly(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     Ok(Json(svc(state).generate_weekly_report().await?))
 }
 
 async fn monthly(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<MonthQuery>,
 ) -> Result<Json<Value>, AppError> {
-    Ok(Json(svc(state).generate_monthly_report(q.year, q.month).await?))
+    Ok(Json(
+        svc(state).generate_monthly_report(q.year, q.month).await?,
+    ))
 }
 
 async fn annual(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<YearQuery>,
 ) -> Result<Json<Value>, AppError> {
     Ok(Json(svc(state).generate_annual_report(q.year).await?))
 }
 
-async fn executive(
-    State(state): State<AppState>,
-    _auth: AuthUser,
-) -> Result<Json<Value>, AppError> {
+async fn executive(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     Ok(Json(svc(state).generate_executive_summary().await?))
 }
 
 async fn portfolio(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<PeriodQuery>,
 ) -> Result<Json<Value>, AppError> {
     validate_period(q.start_date.as_deref(), q.end_date.as_deref())?;
@@ -136,11 +133,12 @@ async fn portfolio(
 
 async fn export(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<ExportQuery>,
 ) -> Result<Response, AppError> {
     if q.format != "pdf" {
-        return Err(AppError::Validation("Only 'pdf' format is supported".into()));
+        return Err(AppError::Validation(
+            "Only 'pdf' format is supported".into(),
+        ));
     }
     validate_period(q.start_date.as_deref(), q.end_date.as_deref())?;
     let (s, e) = resolve_period(q.year, q.start_date.as_deref(), q.end_date.as_deref());

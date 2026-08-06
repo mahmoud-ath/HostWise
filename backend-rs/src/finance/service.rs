@@ -13,9 +13,10 @@ use crate::core::time::now_iso;
 use crate::finance::models::{Expense, ExpenseCategory, Revenue, RevenueCategory};
 use crate::finance::repository as repo;
 use crate::finance::schemas::{
-    AnnualReport, CategoryCreateRequest, CategoryUpdateRequest, ExpenseCategoryWithCount,
-    ExpenseCreateRequest, ExpenseUpdateRequest, FinancialSummary, MonthlyReport,
-    RevenueCreateRequest, RevenueUpdateRequest,
+    AnnualReport, CategoryBreakdown, CategoryCreateRequest, CategoryUpdateRequest,
+    ExpenseCategoryWithCount, ExpenseCreateRequest, ExpenseUpdateRequest, FinancialSummary,
+    MonthlyBreakdown, MonthlyReport, RevenueCategoryWithCount, RevenueCreateRequest,
+    RevenueUpdateRequest,
 };
 
 pub struct FinanceService {
@@ -90,7 +91,16 @@ impl FinanceService {
         skip: i64,
         limit: i64,
     ) -> Result<Vec<Revenue>, AppError> {
-        Ok(repo::list_revenues(&self.pool, property_id, category_id, start, end, skip, limit).await?)
+        Ok(repo::list_revenues(
+            &self.pool,
+            property_id,
+            category_id,
+            start,
+            end,
+            skip,
+            limit,
+        )
+        .await?)
     }
 
     pub async fn update_revenue(
@@ -121,7 +131,8 @@ impl FinanceService {
             r.description = Some(v);
             // Re-categorize on description-only edits when no category is set.
             if r.category_id.is_none() && !new_desc.is_empty() {
-                r.category_id = Some(repo::find_or_create_revenue_category(&self.pool, &new_desc).await?);
+                r.category_id =
+                    Some(repo::find_or_create_revenue_category(&self.pool, &new_desc).await?);
             }
         }
         if let Some(v) = req.notes {
@@ -184,7 +195,16 @@ impl FinanceService {
         skip: i64,
         limit: i64,
     ) -> Result<Vec<Expense>, AppError> {
-        Ok(repo::list_expenses(&self.pool, property_id, category_id, start, end, skip, limit).await?)
+        Ok(repo::list_expenses(
+            &self.pool,
+            property_id,
+            category_id,
+            start,
+            end,
+            skip,
+            limit,
+        )
+        .await?)
     }
 
     pub async fn update_expense(
@@ -296,7 +316,9 @@ impl FinanceService {
         target_id: &str,
     ) -> Result<ExpenseCategory, AppError> {
         if source_id == target_id {
-            return Err(AppError::Validation("cannot merge a category into itself".into()));
+            return Err(AppError::Validation(
+                "cannot merge a category into itself".into(),
+            ));
         }
         repo::merge_expense_category(&self.pool, source_id, target_id)
             .await?
@@ -313,8 +335,8 @@ impl FinanceService {
 
     // ── Revenue categories ──────────────────────────────────
 
-    pub async fn list_revenue_categories(&self) -> Result<Vec<RevenueCategory>, AppError> {
-        Ok(repo::list_revenue_categories(&self.pool).await?)
+    pub async fn list_revenue_categories(&self) -> Result<Vec<RevenueCategoryWithCount>, AppError> {
+        Ok(repo::list_revenue_categories_with_counts(&self.pool).await?)
     }
 
     pub async fn create_revenue_category(
@@ -372,25 +394,73 @@ impl FinanceService {
         Ok(())
     }
 
-    // ── Reports ─────────────────────────────────────────────
+    // ── Reports (aligned with the frontend) ─────────────────
+
+    fn round2(v: f64) -> f64 {
+        (v * 100.0).round() / 100.0
+    }
+
+    fn category_breakdown(
+        rows: Vec<(String, f64, i64)>,
+        grand_total: f64,
+    ) -> Vec<CategoryBreakdown> {
+        rows.into_iter()
+            .map(|(category_name, total, count)| {
+                let percentage = if grand_total > 0.0 {
+                    total / grand_total * 100.0
+                } else {
+                    0.0
+                };
+                CategoryBreakdown {
+                    category_name,
+                    total: Self::round2(total),
+                    percentage: Self::round2(percentage),
+                    count,
+                }
+            })
+            .collect()
+    }
 
     pub async fn get_summary(
         &self,
         start: Option<&str>,
         end: Option<&str>,
     ) -> Result<FinancialSummary, AppError> {
-        let (rev, rev_count) = repo::sum_revenue(&self.pool, start, end).await?;
+        let (gross, net, rev_count) = repo::revenue_totals(&self.pool, start, end).await?;
         let (exp, exp_count) = repo::sum_expense(&self.pool, start, end).await?;
+        let cashflow = net - exp;
+        let profit = cashflow;
+        let profit_margin = if net > 0.0 { profit / net * 100.0 } else { 0.0 };
+        let property_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM properties WHERE is_deleted = 0 AND deleted_at IS NULL",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Db)?;
+        let avg_revenue_per_property = if property_count > 0 {
+            net / property_count as f64
+        } else {
+            0.0
+        };
         Ok(FinancialSummary {
-            total_revenue: rev,
-            total_expenses: exp,
-            net_cashflow: rev - exp,
+            gross_revenue: Self::round2(gross),
+            net_revenue: Self::round2(net),
+            total_expenses: Self::round2(exp),
+            cashflow: Self::round2(cashflow),
+            profit: Self::round2(profit),
+            profit_margin: Self::round2(profit_margin),
+            property_count,
+            avg_revenue_per_property: Self::round2(avg_revenue_per_property),
             revenue_count: rev_count,
             expense_count: exp_count,
         })
     }
 
-    pub async fn get_monthly_report(&self, year: i32, month: u32) -> Result<MonthlyReport, AppError> {
+    pub async fn get_monthly_report(
+        &self,
+        year: i32,
+        month: u32,
+    ) -> Result<MonthlyReport, AppError> {
         if !(1..=12).contains(&month) {
             return Err(AppError::Validation("month must be 1-12".into()));
         }
@@ -407,38 +477,94 @@ impl FinanceService {
         let s = start.format("%Y-%m-%d").to_string();
         let e = end.format("%Y-%m-%d").to_string();
 
-        let (rev, _) = repo::sum_revenue(&self.pool, Some(&s), Some(&e)).await?;
-        let (exp, _) = repo::sum_expense(&self.pool, Some(&s), Some(&e)).await?;
-        let revenue_by_category = repo::revenue_by_category(&self.pool, &s, &e).await?;
-        let expenses_by_category = repo::expenses_by_category(&self.pool, &s, &e).await?;
+        let summary = self.get_summary(Some(&s), Some(&e)).await?;
+        let reservation_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM reservations \
+             WHERE deleted_at IS NULL AND is_deleted = 0 AND check_in <= ? AND check_out >= ?",
+        )
+        .bind(&e)
+        .bind(&s)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Db)?;
+
+        let monthly_trend = vec![MonthlyBreakdown {
+            month: month as i32,
+            year,
+            gross_revenue: summary.gross_revenue,
+            net_revenue: summary.net_revenue,
+            total_expenses: summary.total_expenses,
+            cashflow: summary.cashflow,
+            profit: summary.profit,
+            reservation_count,
+        }];
+        let revenue_by_category = Self::category_breakdown(
+            repo::revenue_by_category(&self.pool, &s, &e).await?,
+            summary.net_revenue,
+        );
+        let expense_by_category = Self::category_breakdown(
+            repo::expenses_by_category(&self.pool, &s, &e).await?,
+            summary.total_expenses,
+        );
 
         Ok(MonthlyReport {
-            year,
             month: month as i32,
-            total_revenue: rev,
-            total_expenses: exp,
-            net: rev - exp,
+            year,
+            summary,
+            monthly_trend,
             revenue_by_category,
-            expenses_by_category,
+            expense_by_category,
+            revenue_by_property: Vec::new(),
         })
     }
 
+    async fn yoy_growth(&self, year: i32, current_net: f64) -> Result<Option<f64>, AppError> {
+        let prev_start = NaiveDate::from_ymd_opt(year - 1, 1, 1).unwrap();
+        let prev_end = NaiveDate::from_ymd_opt(year - 1, 12, 31).unwrap();
+        let s = prev_start.format("%Y-%m-%d").to_string();
+        let e = prev_end.format("%Y-%m-%d").to_string();
+        let (_, prev_net, _) = repo::revenue_totals(&self.pool, Some(&s), Some(&e)).await?;
+        if prev_net > 0.0 {
+            Ok(Some(Self::round2(
+                (current_net - prev_net) / prev_net * 100.0,
+            )))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub async fn get_annual_report(&self, year: i32) -> Result<AnnualReport, AppError> {
-        let mut months = Vec::with_capacity(12);
-        let mut total_revenue = 0.0;
-        let mut total_expenses = 0.0;
+        let start = NaiveDate::from_ymd_opt(year, 1, 1).unwrap();
+        let end = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
+        let s = start.format("%Y-%m-%d").to_string();
+        let e = end.format("%Y-%m-%d").to_string();
+
+        let summary = self.get_summary(Some(&s), Some(&e)).await?;
+        let mut monthly_breakdown = Vec::with_capacity(12);
         for m in 1..=12u32 {
             let mr = self.get_monthly_report(year, m).await?;
-            total_revenue += mr.total_revenue;
-            total_expenses += mr.total_expenses;
-            months.push(mr);
+            if let Some(trend) = mr.monthly_trend.first() {
+                monthly_breakdown.push(trend.clone());
+            }
         }
+        let revenue_by_category = Self::category_breakdown(
+            repo::revenue_by_category(&self.pool, &s, &e).await?,
+            summary.net_revenue,
+        );
+        let expense_by_category = Self::category_breakdown(
+            repo::expenses_by_category(&self.pool, &s, &e).await?,
+            summary.total_expenses,
+        );
+        let yoy_growth = self.yoy_growth(year, summary.net_revenue).await?;
+
         Ok(AnnualReport {
             year,
-            months,
-            total_revenue,
-            total_expenses,
-            net: total_revenue - total_expenses,
+            summary,
+            monthly_breakdown,
+            revenue_by_category,
+            expense_by_category,
+            revenue_by_property: Vec::new(),
+            yoy_growth,
         })
     }
 }

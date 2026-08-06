@@ -34,7 +34,13 @@ pub fn render_portfolio_pdf(report: &Value) -> Result<Vec<u8>, String> {
     let mut y: f32 = 278.0;
 
     // Cover
-    text(&layer, &font_bold, 22.0, "HostWise — Portfolio Report", &mut y);
+    text(
+        &layer,
+        &font_bold,
+        22.0,
+        "HostWise — Portfolio Report",
+        &mut y,
+    );
     let period = format!(
         "{} → {}",
         report["period_start"].as_str().unwrap_or(""),
@@ -63,15 +69,72 @@ pub fn render_portfolio_pdf(report: &Value) -> Result<Vec<u8>, String> {
     y -= 6.0;
 
     // KPIs
-    text(&layer, &font_bold, 13.0, "Key Performance Indicators", &mut y);
+    text(
+        &layer,
+        &font_bold,
+        13.0,
+        "Key Performance Indicators",
+        &mut y,
+    );
     let kpis = &report["kpis"];
-    text(&layer, &font, 11.0, &format!("Net revenue:  {}", money(&kpis["net_revenue"])), &mut y);
-    text(&layer, &font, 11.0, &format!("Gross revenue: {}", money(&kpis["gross_revenue"])), &mut y);
-    text(&layer, &font, 11.0, &format!("Total expenses: {}", money(&kpis["total_expenses"])), &mut y);
-    text(&layer, &font, 11.0, &format!("Profit:  {}", money(&kpis["profit"])), &mut y);
-    text(&layer, &font, 11.0, &format!("Profit margin:  {:.1}%", kpis["profit_margin"].as_f64().unwrap_or(0.0)), &mut y);
-    text(&layer, &font, 11.0, &format!("Cancellation rate: {:.1}%", kpis["cancellation_rate"].as_f64().unwrap_or(0.0)), &mut y);
-    text(&layer, &font, 11.0, &format!("Reservations: {}  ·  Nights: {}", kpis["reservation_count"], kpis["nights"]), &mut y);
+    text(
+        &layer,
+        &font,
+        11.0,
+        &format!("Net revenue:  {}", money(&kpis["net_revenue"])),
+        &mut y,
+    );
+    text(
+        &layer,
+        &font,
+        11.0,
+        &format!("Gross revenue: {}", money(&kpis["gross_revenue"])),
+        &mut y,
+    );
+    text(
+        &layer,
+        &font,
+        11.0,
+        &format!("Total expenses: {}", money(&kpis["total_expenses"])),
+        &mut y,
+    );
+    text(
+        &layer,
+        &font,
+        11.0,
+        &format!("Profit:  {}", money(&kpis["profit"])),
+        &mut y,
+    );
+    text(
+        &layer,
+        &font,
+        11.0,
+        &format!(
+            "Profit margin:  {:.1}%",
+            kpis["profit_margin"].as_f64().unwrap_or(0.0)
+        ),
+        &mut y,
+    );
+    text(
+        &layer,
+        &font,
+        11.0,
+        &format!(
+            "Cancellation rate: {:.1}%",
+            kpis["cancellation_rate"].as_f64().unwrap_or(0.0)
+        ),
+        &mut y,
+    );
+    text(
+        &layer,
+        &font,
+        11.0,
+        &format!(
+            "Reservations: {}  ·  Nights: {}",
+            kpis["reservation_count"], kpis["nights"]
+        ),
+        &mut y,
+    );
     y -= 6.0;
 
     // Properties
@@ -109,7 +172,11 @@ pub fn render_portfolio_pdf(report: &Value) -> Result<Vec<u8>, String> {
     text(&layer, &font_bold, 13.0, "Recommended Actions", &mut y);
     if let Some(recs) = report["recommendations"].as_array() {
         for r in recs.iter().take(6) {
-            let line = format!("• [{}] {}", r["type"].as_str().unwrap_or(""), r["title"].as_str().unwrap_or(""));
+            let line = format!(
+                "• [{}] {}",
+                r["type"].as_str().unwrap_or(""),
+                r["title"].as_str().unwrap_or("")
+            );
             text(&layer, &font, 10.0, &line, &mut y);
             if y < 40.0 {
                 break;

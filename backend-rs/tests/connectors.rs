@@ -39,6 +39,13 @@ async fn connectors_flow() {
         longitude: None,
         bedrooms: 2,
         bathrooms: 1.0,
+        max_guests: 2,
+        square_meters: None,
+        acquisition_cost: None,
+        monthly_mortgage: None,
+        target_occupancy: None,
+        target_annual_revenue: None,
+        notes: None,
         deleted_at: None,
         created_at: now.clone(),
         updated_at: now.clone(),
@@ -60,7 +67,18 @@ async fn connectors_flow() {
 
     let (fmt, columns, _rows) = read_file(&csv_path, None, None).unwrap();
     assert_eq!(fmt, "csv");
-    assert_eq!(columns, vec!["property_name", "check_in", "check_out", "nights", "gross_amount", "guest_name", "confirmation_code"]);
+    assert_eq!(
+        columns,
+        vec![
+            "property_name",
+            "check_in",
+            "check_out",
+            "nights",
+            "gross_amount",
+            "guest_name",
+            "confirmation_code"
+        ]
+    );
     assert_eq!(detect_type("auto", &columns), "reservations");
 
     // ── CSV import (auto-creates the "Casa Nova" property) ──

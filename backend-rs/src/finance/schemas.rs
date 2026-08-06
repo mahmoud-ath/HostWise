@@ -98,41 +98,62 @@ pub struct FinanceListParams {
     pub limit: Option<i64>,
 }
 
-// ── Report shapes ───────────────────────────────────────────
+// ── Report shapes (aligned with the frontend) ─────────────
 
 #[derive(Debug, Serialize)]
 pub struct FinancialSummary {
-    pub total_revenue: f64,
+    pub gross_revenue: f64,
+    pub net_revenue: f64,
     pub total_expenses: f64,
-    pub net_cashflow: f64,
+    pub cashflow: f64,
+    pub profit: f64,
+    pub profit_margin: f64,
+    pub property_count: i64,
+    pub avg_revenue_per_property: f64,
     pub revenue_count: i64,
     pub expense_count: i64,
 }
 
 #[derive(Debug, Serialize, FromRow)]
-pub struct CategoryAmount {
-    pub name: String,
+pub struct CategoryBreakdown {
+    pub category_name: String,
     pub total: f64,
+    pub percentage: f64,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MonthlyBreakdown {
+    pub month: i32,
+    pub year: i32,
+    pub gross_revenue: f64,
+    pub net_revenue: f64,
+    pub total_expenses: f64,
+    pub cashflow: f64,
+    pub profit: f64,
+    pub reservation_count: i64,
 }
 
 #[derive(Debug, Serialize)]
 pub struct MonthlyReport {
-    pub year: i32,
     pub month: i32,
-    pub total_revenue: f64,
-    pub total_expenses: f64,
-    pub net: f64,
-    pub revenue_by_category: Vec<CategoryAmount>,
-    pub expenses_by_category: Vec<CategoryAmount>,
+    pub year: i32,
+    pub summary: FinancialSummary,
+    pub monthly_trend: Vec<MonthlyBreakdown>,
+    pub revenue_by_category: Vec<CategoryBreakdown>,
+    pub expense_by_category: Vec<CategoryBreakdown>,
+    pub revenue_by_property: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct AnnualReport {
     pub year: i32,
-    pub months: Vec<MonthlyReport>,
-    pub total_revenue: f64,
-    pub total_expenses: f64,
-    pub net: f64,
+    pub summary: FinancialSummary,
+    pub monthly_breakdown: Vec<MonthlyBreakdown>,
+    pub revenue_by_category: Vec<CategoryBreakdown>,
+    pub expense_by_category: Vec<CategoryBreakdown>,
+    pub revenue_by_property: Vec<serde_json::Value>,
+    pub yoy_growth: Option<f64>,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -148,4 +169,19 @@ pub struct ExpenseCategoryWithCount {
     pub updated_at: String,
     pub sync_id: Option<String>,
     pub expense_count: i64,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct RevenueCategoryWithCount {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub is_default: bool,
+    pub sort_order: i64,
+    pub deleted_at: Option<String>,
+    pub is_deleted: bool,
+    pub created_at: String,
+    pub updated_at: String,
+    pub sync_id: Option<String>,
+    pub revenue_count: i64,
 }

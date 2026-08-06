@@ -34,7 +34,10 @@ fn get<'a>(row: &'a HashMap<String, String>, keys: &[&str]) -> &'a str {
 fn read_bytes_lossy(path: &Path) -> Result<String, String> {
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     let content = String::from_utf8_lossy(&bytes).to_string();
-    Ok(content.strip_prefix('\u{feff}').unwrap_or(&content).to_string())
+    Ok(content
+        .strip_prefix('\u{feff}')
+        .unwrap_or(&content)
+        .to_string())
 }
 
 /// Read a CSV file into (columns, rows of string values).
@@ -95,7 +98,9 @@ fn read_json(path: &Path) -> Result<(Vec<String>, Vec<HashMap<String, String>>),
             for (k, val) in o {
                 map.insert(
                     k.clone(),
-                    val.as_str().map(|s| s.to_string()).unwrap_or_else(|| val.to_string()),
+                    val.as_str()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| val.to_string()),
                 );
             }
             rows.push(map);
@@ -207,14 +212,29 @@ async fn resolve_property(
         r#type: "other".into(),
         status: "active".into(),
         address: None,
-        city: if city.trim().is_empty() { None } else { Some(city.trim().to_string()) },
+        city: if city.trim().is_empty() {
+            None
+        } else {
+            Some(city.trim().to_string())
+        },
         state: None,
-        country: if country.trim().is_empty() { None } else { Some(country.trim().to_string()) },
+        country: if country.trim().is_empty() {
+            None
+        } else {
+            Some(country.trim().to_string())
+        },
         postal_code: None,
         latitude: None,
         longitude: None,
         bedrooms: 1,
         bathrooms: 1.0,
+        max_guests: 2,
+        square_meters: None,
+        acquisition_cost: None,
+        monthly_mortgage: None,
+        target_occupancy: None,
+        target_annual_revenue: None,
+        notes: None,
         deleted_at: None,
         created_at: now.clone(),
         updated_at: now,
@@ -329,7 +349,9 @@ pub async fn import_file(
                     get(row, &["country"]),
                 )
                 .await?;
-                let Some(prop_id) = prop_id else { return Ok(false) };
+                let Some(prop_id) = prop_id else {
+                    return Ok(false);
+                };
                 if created {
                     props_created += 1;
                 }
@@ -337,10 +359,10 @@ pub async fn import_file(
                 if !code.is_empty() && existing_res_codes.contains(&code) {
                     return Ok(false);
                 }
-                let check_in =
-                    parse_date(get(row, &["check_in", "Check-in"]), date_fmt).map_err(AppError::Validation)?;
-                let check_out =
-                    parse_date(get(row, &["check_out", "Check-out"]), date_fmt).map_err(AppError::Validation)?;
+                let check_in = parse_date(get(row, &["check_in", "Check-in"]), date_fmt)
+                    .map_err(AppError::Validation)?;
+                let check_out = parse_date(get(row, &["check_out", "Check-out"]), date_fmt)
+                    .map_err(AppError::Validation)?;
                 let mut nights: i64 = get(row, &["nights", "Nights"]).trim().parse().unwrap_or(0);
                 if nights == 0 {
                     nights = (check_out - check_in).num_days();
@@ -360,7 +382,11 @@ pub async fn import_file(
                     property_id: prop_id.clone(),
                     listing_id: None,
                     external_id: None,
-                    confirmation_code: if code.is_empty() { None } else { Some(code.clone()) },
+                    confirmation_code: if code.is_empty() {
+                        None
+                    } else {
+                        Some(code.clone())
+                    },
                     status: status.to_string(),
                     source: "csv".into(),
                     check_in: check_in.format("%Y-%m-%d").to_string(),
@@ -370,7 +396,11 @@ pub async fn import_file(
                     nights,
                     guest_name: {
                         let g = get(row, &["guest_name"]);
-                        if g.trim().is_empty() { None } else { Some(g.trim().to_string()) }
+                        if g.trim().is_empty() {
+                            None
+                        } else {
+                            Some(g.trim().to_string())
+                        }
                     },
                     guest_email: None,
                     guest_phone: None,
@@ -383,7 +413,11 @@ pub async fn import_file(
                     currency: currency.to_string(),
                     property_name: {
                         let p = get(row, &["property_name"]);
-                        if p.trim().is_empty() { None } else { Some(p.trim().to_string()) }
+                        if p.trim().is_empty() {
+                            None
+                        } else {
+                            Some(p.trim().to_string())
+                        }
                     },
                     property_city: None,
                     property_country: None,
@@ -420,7 +454,9 @@ pub async fn import_file(
                     "",
                 )
                 .await?;
-                let Some(prop_id) = prop_id else { return Ok(false) };
+                let Some(prop_id) = prop_id else {
+                    return Ok(false);
+                };
                 if created {
                     props_created += 1;
                 }
@@ -493,7 +529,9 @@ pub async fn import_file(
                     "",
                 )
                 .await?;
-                let Some(prop_id) = prop_id else { return Ok(false) };
+                let Some(prop_id) = prop_id else {
+                    return Ok(false);
+                };
                 if created {
                     props_created += 1;
                 }
@@ -520,9 +558,17 @@ pub async fn import_file(
                     date: date_str,
                     amount,
                     currency: currency.to_string(),
-                    vendor: if vendor.is_empty() { None } else { Some(vendor.clone()) },
+                    vendor: if vendor.is_empty() {
+                        None
+                    } else {
+                        Some(vendor.clone())
+                    },
                     payment_method: None,
-                    description: if cat_name.is_empty() { None } else { Some(cat_name.clone()) },
+                    description: if cat_name.is_empty() {
+                        None
+                    } else {
+                        Some(cat_name.clone())
+                    },
                     notes: None,
                     is_recurring: false,
                     receipt_url: None,

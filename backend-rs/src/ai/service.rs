@@ -55,7 +55,10 @@ impl AiAdvisorService {
                  property_reviews, forecast, achievements, recommended_goals, trend_explanations. \
                  Base every figure strictly on the provided data.{lang_line}"
             );
-            let user = format!("Here is the real portfolio data as JSON:\n{}", input.to_string());
+            let user = format!(
+                "Here is the real portfolio data as JSON:\n{}",
+                input.to_string()
+            );
             if let Some(reply) = LlmProvider::call(&all, &system, &user).await {
                 if let Some(parsed) = LlmProvider::extract_json(&reply) {
                     if let Value::Object(mut obj) = parsed {
@@ -76,9 +79,9 @@ impl AiAdvisorService {
             analytics::get_portfolio_analytics(&self.pool, None, Some(s), Some(e)).await?;
         Ok(json!({
             "summary": {
-                "net_revenue": summary.total_revenue,
+                "net_revenue": summary.net_revenue,
                 "total_expenses": summary.total_expenses,
-                "net_cashflow": summary.net_cashflow,
+                "net_cashflow": summary.cashflow,
                 "revenue_count": summary.revenue_count,
                 "expense_count": summary.expense_count,
             },
@@ -122,7 +125,13 @@ impl AiAdvisorService {
                 "message": "Using the built-in rules engine — no external connection needed.",
             }));
         }
-        match LlmProvider::call(&all, "You are a connectivity check.", "Reply with exactly: ok").await {
+        match LlmProvider::call(
+            &all,
+            "You are a connectivity check.",
+            "Reply with exactly: ok",
+        )
+        .await
+        {
             Some(_) => Ok(json!({
                 "ok": true,
                 "provider": provider,
@@ -145,13 +154,16 @@ impl AiAdvisorService {
         let (s, e) = year_bounds(year);
         let finance = FinanceService::from_pool(self.pool.clone());
         let summary = finance.get_summary(Some(&s), Some(&e)).await?;
-        let net = summary.total_revenue;
+        let net = summary.net_revenue;
         let expenses = summary.total_expenses;
         let profit = net - expenses;
 
         let (impact, explanation): (f64, String) = match scenario {
             "price_increase" => {
-                let pct = params.get("increase_pct").and_then(|v| v.as_f64()).unwrap_or(5.0);
+                let pct = params
+                    .get("increase_pct")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(5.0);
                 let gain = net * pct / 100.0;
                 (
                     gain,
@@ -159,15 +171,24 @@ impl AiAdvisorService {
                 )
             }
             "hire_cleaner" => {
-                let monthly = params.get("monthly_cost").and_then(|v| v.as_f64()).unwrap_or(300.0);
+                let monthly = params
+                    .get("monthly_cost")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(300.0);
                 let cost = -monthly * 12.0;
                 (
                     cost,
-                    format!("Hiring a cleaner at {monthly:.0}/month costs ~{:.0} per year.", cost.abs()),
+                    format!(
+                        "Hiring a cleaner at {monthly:.0}/month costs ~{:.0} per year.",
+                        cost.abs()
+                    ),
                 )
             }
             "expense_reduction" => {
-                let pct = params.get("reduction_pct").and_then(|v| v.as_f64()).unwrap_or(10.0);
+                let pct = params
+                    .get("reduction_pct")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(10.0);
                 let saved = expenses * pct / 100.0;
                 (
                     saved,
@@ -217,7 +238,9 @@ fn year_bounds(year: i32) -> (String, String) {
 fn period(year: Option<i32>, start: Option<&str>, end: Option<&str>) -> (i32, String, String) {
     match (start, end) {
         (Some(s), Some(e)) => {
-            let y = s[..4].parse().unwrap_or_else(|_| chrono::Local::now().year());
+            let y = s[..4]
+                .parse()
+                .unwrap_or_else(|_| chrono::Local::now().year());
             (y, s.to_string(), e.to_string())
         }
         _ => {

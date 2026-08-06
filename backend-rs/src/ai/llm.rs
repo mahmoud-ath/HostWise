@@ -7,11 +7,7 @@ pub struct LlmProvider;
 
 impl LlmProvider {
     /// Call the configured LLM (OpenAI/DeepSeek/Anthropic-compatible/Ollama).
-    pub async fn call(
-        settings: &Value,
-        system_prompt: &str,
-        user_prompt: &str,
-    ) -> Option<String> {
+    pub async fn call(settings: &Value, system_prompt: &str, user_prompt: &str) -> Option<String> {
         let key = settings
             .get("ai_api_key")
             .and_then(|v| v.as_str())

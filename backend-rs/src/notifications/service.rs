@@ -93,12 +93,11 @@ async fn add(
     severity: &str,
     fingerprint: &str,
 ) -> Result<(), AppError> {
-    let exists: Option<String> = sqlx::query_scalar(
-        "SELECT id FROM notifications WHERE fingerprint = ? AND is_deleted = 0",
-    )
-    .bind(fingerprint)
-    .fetch_optional(pool)
-    .await?;
+    let exists: Option<String> =
+        sqlx::query_scalar("SELECT id FROM notifications WHERE fingerprint = ? AND is_deleted = 0")
+            .bind(fingerprint)
+            .fetch_optional(pool)
+            .await?;
     if exists.is_some() {
         return Ok(());
     }

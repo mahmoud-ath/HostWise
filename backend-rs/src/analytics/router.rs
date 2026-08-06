@@ -12,7 +12,6 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::analytics::service;
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 
@@ -37,7 +36,6 @@ pub fn build_router() -> Router<AppState> {
 
 async fn property_analytics(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
     Query(q): Query<PropertyQuery>,
 ) -> Result<Json<Value>, AppError> {
@@ -54,7 +52,6 @@ async fn property_analytics(
 
 async fn property_health(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, AppError> {
     let result = service::get_property_health_score(&state.pool, &id.to_string()).await?;
@@ -63,7 +60,6 @@ async fn property_health(
 
 async fn portfolio_analytics(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<PortfolioQuery>,
 ) -> Result<Json<Value>, AppError> {
     if (q.start_date.is_some()) != (q.end_date.is_some()) {
@@ -73,12 +69,17 @@ async fn portfolio_analytics(
     }
     if let (Some(s), Some(e)) = (q.start_date.as_deref(), q.end_date.as_deref()) {
         if s > e {
-            return Err(AppError::Validation("start_date must not be after end_date".into()));
+            return Err(AppError::Validation(
+                "start_date must not be after end_date".into(),
+            ));
         }
     }
 
     let fp = service::data_fingerprint(&state.pool).await?;
-    let key = format!("portfolio:{:?}:{:?}:{:?}:{fp}", q.year, q.start_date, q.end_date);
+    let key = format!(
+        "portfolio:{:?}:{:?}:{:?}:{fp}",
+        q.year, q.start_date, q.end_date
+    );
     if let Some(cached) = service::cache_get(&key) {
         return Ok(Json(cached));
     }

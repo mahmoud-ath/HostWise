@@ -32,7 +32,8 @@ const BOOL_KEYS: &[&str] = &[
 ];
 
 fn default_settings() -> Map<String, Value> {
-    serde_json::from_str::<Map<String, Value>>(r#"{
+    serde_json::from_str::<Map<String, Value>>(
+        r#"{
       "profile_name": "", "profile_email": "", "business_name": "HostWise",
       "default_currency": "EUR", "tax_rate": 20.0, "fiscal_year_start": 1, "country": "",
       "timezone": "UTC", "date_format": "DD/MM/YYYY", "language": "English",
@@ -48,7 +49,8 @@ fn default_settings() -> Map<String, Value> {
       "import_encoding": "UTF-8", "import_delimiter": ",", "import_date_format": "DD/MM/YYYY",
       "report_default": "annual", "report_default_format": "pdf",
       "report_auto_generate": "monthly", "report_send_email": false
-    }"#)
+    }"#,
+    )
     .expect("default settings JSON is valid")
 }
 
@@ -96,9 +98,10 @@ fn coerce_bool(value: Value, key: &str) -> Result<Value, AppError> {
             "false" | "0" => false,
             _ => return Err(AppError::Validation(format!("{key} must be a boolean"))),
         },
-        Value::Number(n) => n.as_i64().map(|i| i != 0).ok_or_else(|| {
-            AppError::Validation(format!("{key} must be a boolean"))
-        })?,
+        Value::Number(n) => n
+            .as_i64()
+            .map(|i| i != 0)
+            .ok_or_else(|| AppError::Validation(format!("{key} must be a boolean")))?,
         _ => return Err(AppError::Validation(format!("{key} must be a boolean"))),
     };
     Ok(Value::Bool(b))
@@ -108,18 +111,32 @@ fn coerce_bool(value: Value, key: &str) -> Result<Value, AppError> {
 /// through unchanged (forward compatibility), mirroring SETTINGS_SCHEMA.
 fn coerce_setting(key: &str, value: Value) -> Result<Value, AppError> {
     match key {
-        "default_currency" => check_enum(value, &["USD", "EUR", "GBP", "MAD", "AED", "CAD", "AUD", "CHF"], key),
+        "default_currency" => check_enum(
+            value,
+            &["USD", "EUR", "GBP", "MAD", "AED", "CAD", "AUD", "CHF"],
+            key,
+        ),
         "date_format" | "import_date_format" => {
             check_enum(value, &["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"], key)
         }
-        "language" | "ai_language" => {
-            check_enum(value, &["English", "Français", "Español", "العربية", "Deutsch"], key)
-        }
-        "ai_provider" => check_enum(value, &["hostwise", "openai", "deepseek", "anthropic", "ollama"], key),
+        "language" | "ai_language" => check_enum(
+            value,
+            &["English", "Français", "Español", "العربية", "Deutsch"],
+            key,
+        ),
+        "ai_provider" => check_enum(
+            value,
+            &["hostwise", "openai", "deepseek", "anthropic", "ollama"],
+            key,
+        ),
         "ai_analysis_level" => check_enum(value, &["summary", "detailed", "expert"], key),
         "ai_automatic_analysis" => check_enum(value, &["daily", "weekly", "monthly", "off"], key),
         "appearance_theme" => check_enum(value, &["light", "dark", "system"], key),
-        "import_encoding" => check_enum(value, &["UTF-8", "ISO-8859-1", "Windows-1252", "UTF-16"], key),
+        "import_encoding" => check_enum(
+            value,
+            &["UTF-8", "ISO-8859-1", "Windows-1252", "UTF-16"],
+            key,
+        ),
         "report_default_format" => check_enum(value, &["pdf", "print"], key),
         "report_auto_generate" => check_enum(value, &["off", "daily", "weekly", "monthly"], key),
         "tax_rate" => check_number(value, 0.0, 100.0, key),
@@ -221,13 +238,26 @@ fn xls_table(headers: &[&str], rows: &[Vec<String>]) -> String {
 /// Export all business data as a multi-sheet Excel workbook (.xls), mirroring
 /// `export_all_data` in `backend/app/settings/router.py`.
 pub async fn export_data(pool: &SqlitePool) -> Result<String, AppError> {
-    let props = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>, i64, f64, String)>(
+    let props = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            f64,
+            String,
+        ),
+    >(
         "SELECT id, name, type, city, country, bedrooms, bathrooms, status \
          FROM properties WHERE is_deleted = 0",
     )
     .fetch_all(pool)
     .await?;
-    let prop_by_id: HashMap<String, String> = props.iter().map(|p| (p.0.clone(), p.1.clone())).collect();
+    let prop_by_id: HashMap<String, String> =
+        props.iter().map(|p| (p.0.clone(), p.1.clone())).collect();
 
     let prop_rows: Vec<Vec<String>> = props
         .iter()
@@ -265,7 +295,18 @@ pub async fn export_data(pool: &SqlitePool) -> Result<String, AppError> {
         })
         .collect();
 
-    let expenses = sqlx::query_as::<_, (String, String, f64, String, Option<String>, Option<String>, bool)>(
+    let expenses = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            f64,
+            String,
+            Option<String>,
+            Option<String>,
+            bool,
+        ),
+    >(
         "SELECT date, property_id, amount, currency, vendor, description, is_recurring \
          FROM expenses WHERE is_deleted = 0",
     )
@@ -281,7 +322,11 @@ pub async fn export_data(pool: &SqlitePool) -> Result<String, AppError> {
                 cur.clone(),
                 vendor.clone().unwrap_or_default(),
                 desc.clone().unwrap_or_default(),
-                if *rec { "yes".to_string() } else { "no".to_string() },
+                if *rec {
+                    "yes".to_string()
+                } else {
+                    "no".to_string()
+                },
             ]
         })
         .collect();
@@ -312,22 +357,56 @@ pub async fn export_data(pool: &SqlitePool) -> Result<String, AppError> {
     let sheets = [
         (
             "Properties",
-            vec!["Name", "Type", "City", "Country", "Bedrooms", "Bathrooms", "Status"],
+            vec![
+                "Name",
+                "Type",
+                "City",
+                "Country",
+                "Bedrooms",
+                "Bathrooms",
+                "Status",
+            ],
             prop_rows,
         ),
         (
             "Revenue",
-            vec!["Date", "Property", "Gross", "Commission", "Net", "Currency", "Description"],
+            vec![
+                "Date",
+                "Property",
+                "Gross",
+                "Commission",
+                "Net",
+                "Currency",
+                "Description",
+            ],
             rev_rows,
         ),
         (
             "Expenses",
-            vec!["Date", "Property", "Amount", "Currency", "Vendor", "Description", "Recurring"],
+            vec![
+                "Date",
+                "Property",
+                "Amount",
+                "Currency",
+                "Vendor",
+                "Description",
+                "Recurring",
+            ],
             exp_rows,
         ),
         (
             "Reservations",
-            vec!["Check In", "Check Out", "Property", "Status", "Guest", "Nights", "Gross", "Net", "Currency"],
+            vec![
+                "Check In",
+                "Check Out",
+                "Property",
+                "Status",
+                "Guest",
+                "Nights",
+                "Gross",
+                "Net",
+                "Currency",
+            ],
             res_rows,
         ),
     ];

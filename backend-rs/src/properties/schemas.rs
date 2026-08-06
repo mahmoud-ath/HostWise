@@ -14,6 +14,9 @@ fn default_bedrooms() -> i64 {
 fn default_bathrooms() -> f64 {
     1.0
 }
+fn default_max_guests() -> i64 {
+    2
+}
 
 #[derive(Debug, Deserialize)]
 pub struct PropertyCreateRequest {
@@ -33,6 +36,14 @@ pub struct PropertyCreateRequest {
     pub bedrooms: i64,
     #[serde(default = "default_bathrooms")]
     pub bathrooms: f64,
+    #[serde(default = "default_max_guests")]
+    pub max_guests: i64,
+    pub square_meters: Option<f64>,
+    pub acquisition_cost: Option<f64>,
+    pub monthly_mortgage: Option<f64>,
+    pub target_occupancy: Option<f64>,
+    pub target_annual_revenue: Option<f64>,
+    pub notes: Option<String>,
 }
 
 /// PATCH semantics: only fields present in the JSON are updated.
@@ -51,6 +62,13 @@ pub struct PropertyUpdateRequest {
     pub longitude: Option<f64>,
     pub bedrooms: Option<i64>,
     pub bathrooms: Option<f64>,
+    pub max_guests: Option<i64>,
+    pub square_meters: Option<f64>,
+    pub acquisition_cost: Option<f64>,
+    pub monthly_mortgage: Option<f64>,
+    pub target_occupancy: Option<f64>,
+    pub target_annual_revenue: Option<f64>,
+    pub notes: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

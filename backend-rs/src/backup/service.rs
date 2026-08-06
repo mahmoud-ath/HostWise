@@ -137,6 +137,8 @@ pub async fn verify_backup_by_name(backup_name: &str) -> serde_json::Value {
             v["verified"] = v["ok"].clone();
             v
         }
-        None => serde_json::json!({ "ok": false, "name": backup_name, "error": "Could not open backup" }),
+        None => {
+            serde_json::json!({ "ok": false, "name": backup_name, "error": "Could not open backup" })
+        }
     }
 }

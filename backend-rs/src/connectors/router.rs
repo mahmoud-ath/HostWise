@@ -16,7 +16,6 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::auth::extractors::AuthUser;
 use crate::connectors::ical;
 use crate::connectors::service;
 use crate::core::error::AppError;
@@ -115,7 +114,6 @@ async fn available() -> Json<Value> {
 
 async fn upload_csv(
     State(state): State<AppState>,
-    _auth: AuthUser,
     mut multipart: Multipart,
 ) -> Result<Json<Value>, AppError> {
     let (fname, content) = take_upload(&mut multipart).await?;
@@ -149,7 +147,6 @@ async fn upload_csv(
 
 async fn import_csv(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<CsvImportQuery>,
 ) -> Result<Json<Value>, AppError> {
     let path = state.config.upload_dir.join(sanitize_filename(&q.filename));
@@ -166,7 +163,6 @@ async fn import_csv(
 
 async fn upload_ical(
     State(state): State<AppState>,
-    _auth: AuthUser,
     mut multipart: Multipart,
 ) -> Result<Json<Value>, AppError> {
     let (fname, content) = take_upload(&mut multipart).await?;
@@ -204,7 +200,6 @@ async fn upload_ical(
 
 async fn import_ical(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<IcalImportQuery>,
 ) -> Result<Json<Value>, AppError> {
     let path = state.config.upload_dir.join(sanitize_filename(&q.filename));

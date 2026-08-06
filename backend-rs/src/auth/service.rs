@@ -3,7 +3,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use argon2::password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use argon2::password_hash::{
+    rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
+};
 use argon2::Argon2;
 use uuid::Uuid;
 
@@ -39,7 +41,10 @@ impl AuthService {
                 "Password must be at least 8 characters".into(),
             ));
         }
-        if auth_repo::find_by_email(&self.pool, &email).await?.is_some() {
+        if auth_repo::find_by_email(&self.pool, &email)
+            .await?
+            .is_some()
+        {
             return Err(AppError::Conflict("Email already registered".into()));
         }
 
@@ -71,8 +76,8 @@ impl AuthService {
             .await?
             .ok_or(AppError::Unauthorized)?;
 
-        let parsed =
-            PasswordHash::new(&user.password_hash).map_err(|e| AppError::Password(e.to_string()))?;
+        let parsed = PasswordHash::new(&user.password_hash)
+            .map_err(|e| AppError::Password(e.to_string()))?;
         if Argon2::default()
             .verify_password(req.password.as_bytes(), &parsed)
             .is_err()
@@ -112,12 +117,19 @@ impl AuthService {
     }
 
     fn tokens_for(&self, user: &User) -> Result<TokenResponse, AppError> {
-        let access_ttl = Duration::from_secs((self.config.jwt_access_token_expire_minutes * 60) as u64);
+        let access_ttl =
+            Duration::from_secs((self.config.jwt_access_token_expire_minutes * 60) as u64);
         let refresh_ttl =
             Duration::from_secs((self.config.jwt_refresh_token_expire_days * 24 * 3600) as u64);
 
-        let access = security::create_token(&self.config.jwt_secret_key, &user.id, "access", access_ttl)?;
-        let refresh = security::create_token(&self.config.jwt_secret_key, &user.id, "refresh", refresh_ttl)?;
+        let access =
+            security::create_token(&self.config.jwt_secret_key, &user.id, "access", access_ttl)?;
+        let refresh = security::create_token(
+            &self.config.jwt_secret_key,
+            &user.id,
+            "refresh",
+            refresh_ttl,
+        )?;
 
         Ok(TokenResponse {
             access_token: access,

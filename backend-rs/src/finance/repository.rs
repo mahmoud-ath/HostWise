@@ -4,7 +4,6 @@ use sqlx::SqlitePool;
 
 use crate::core::time::now_iso;
 use crate::finance::models::{Expense, ExpenseCategory, Revenue, RevenueCategory};
-use crate::finance::schemas::CategoryAmount;
 
 const REV_COLS: &str = "id, property_id, reservation_id, category_id, date, gross_amount, \
                         commission_amount, net_amount, source, currency, description, notes, \
@@ -43,7 +42,10 @@ pub async fn insert_revenue(pool: &SqlitePool, r: &Revenue) -> Result<(), sqlx::
     .map(|_| ())
 }
 
-pub async fn get_revenue_by_id(pool: &SqlitePool, id: &str) -> Result<Option<Revenue>, sqlx::Error> {
+pub async fn get_revenue_by_id(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<Option<Revenue>, sqlx::Error> {
     sqlx::query_as::<_, Revenue>(&format!(
         "SELECT {REV_COLS} FROM revenues WHERE id = ? AND deleted_at IS NULL AND is_deleted = 0"
     ))
@@ -62,7 +64,8 @@ pub async fn list_revenues(
     skip: i64,
     limit: i64,
 ) -> Result<Vec<Revenue>, sqlx::Error> {
-    let mut sql = format!("SELECT {REV_COLS} FROM revenues WHERE deleted_at IS NULL AND is_deleted = 0");
+    let mut sql =
+        format!("SELECT {REV_COLS} FROM revenues WHERE deleted_at IS NULL AND is_deleted = 0");
     if property_id.is_some() {
         sql.push_str(" AND property_id = ?");
     }
@@ -148,7 +151,10 @@ pub async fn insert_expense(pool: &SqlitePool, e: &Expense) -> Result<(), sqlx::
     .map(|_| ())
 }
 
-pub async fn get_expense_by_id(pool: &SqlitePool, id: &str) -> Result<Option<Expense>, sqlx::Error> {
+pub async fn get_expense_by_id(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<Option<Expense>, sqlx::Error> {
     sqlx::query_as::<_, Expense>(&format!(
         "SELECT {EXP_COLS} FROM expenses WHERE id = ? AND deleted_at IS NULL AND is_deleted = 0"
     ))
@@ -167,7 +173,8 @@ pub async fn list_expenses(
     skip: i64,
     limit: i64,
 ) -> Result<Vec<Expense>, sqlx::Error> {
-    let mut sql = format!("SELECT {EXP_COLS} FROM expenses WHERE deleted_at IS NULL AND is_deleted = 0");
+    let mut sql =
+        format!("SELECT {EXP_COLS} FROM expenses WHERE deleted_at IS NULL AND is_deleted = 0");
     if property_id.is_some() {
         sql.push_str(" AND property_id = ?");
     }
@@ -323,11 +330,28 @@ pub async fn get_expense_category(
     .await
 }
 
-pub async fn list_revenue_categories(pool: &SqlitePool) -> Result<Vec<RevenueCategory>, sqlx::Error> {
+pub async fn list_revenue_categories(
+    pool: &SqlitePool,
+) -> Result<Vec<RevenueCategory>, sqlx::Error> {
     sqlx::query_as::<_, RevenueCategory>(&format!(
         "SELECT {CAT_COLS} FROM revenue_categories WHERE deleted_at IS NULL AND is_deleted = 0 \
          ORDER BY sort_order, name"
     ))
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn list_revenue_categories_with_counts(
+    pool: &SqlitePool,
+) -> Result<Vec<crate::finance::schemas::RevenueCategoryWithCount>, sqlx::Error> {
+    sqlx::query_as::<_, crate::finance::schemas::RevenueCategoryWithCount>(
+        "SELECT c.id, c.name, c.description, c.is_default, c.sort_order, c.deleted_at, \
+         c.is_deleted, c.created_at, c.updated_at, c.sync_id, \
+         (SELECT COUNT(*) FROM revenues r WHERE r.category_id = c.id AND r.deleted_at IS NULL \
+          AND r.is_deleted = 0) AS revenue_count \
+         FROM revenue_categories c WHERE c.deleted_at IS NULL AND c.is_deleted = 0 \
+         ORDER BY c.sort_order, c.name",
+    )
     .fetch_all(pool)
     .await
 }
@@ -347,7 +371,10 @@ pub async fn list_expense_categories_with_counts(
     .await
 }
 
-pub async fn insert_expense_category(pool: &SqlitePool, c: &ExpenseCategory) -> Result<(), sqlx::Error> {
+pub async fn insert_expense_category(
+    pool: &SqlitePool,
+    c: &ExpenseCategory,
+) -> Result<(), sqlx::Error> {
     sqlx::query(&format!(
         "INSERT INTO expense_categories ({CAT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?)"
     ))
@@ -366,7 +393,10 @@ pub async fn insert_expense_category(pool: &SqlitePool, c: &ExpenseCategory) -> 
     .map(|_| ())
 }
 
-pub async fn update_expense_category(pool: &SqlitePool, c: &ExpenseCategory) -> Result<(), sqlx::Error> {
+pub async fn update_expense_category(
+    pool: &SqlitePool,
+    c: &ExpenseCategory,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "UPDATE expense_categories SET name = ?, description = ?, updated_at = ? WHERE id = ?",
     )
@@ -417,7 +447,10 @@ pub async fn merge_expense_category(
     get_expense_category(pool, target_id).await
 }
 
-pub async fn insert_revenue_category(pool: &SqlitePool, c: &RevenueCategory) -> Result<(), sqlx::Error> {
+pub async fn insert_revenue_category(
+    pool: &SqlitePool,
+    c: &RevenueCategory,
+) -> Result<(), sqlx::Error> {
     sqlx::query(&format!(
         "INSERT INTO revenue_categories ({CAT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?)"
     ))
@@ -436,7 +469,10 @@ pub async fn insert_revenue_category(pool: &SqlitePool, c: &RevenueCategory) -> 
     .map(|_| ())
 }
 
-pub async fn update_revenue_category(pool: &SqlitePool, c: &RevenueCategory) -> Result<(), sqlx::Error> {
+pub async fn update_revenue_category(
+    pool: &SqlitePool,
+    c: &RevenueCategory,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "UPDATE revenue_categories SET name = ?, description = ?, updated_at = ? WHERE id = ?",
     )
@@ -487,6 +523,29 @@ pub async fn sum_revenue(
     q.fetch_one(pool).await
 }
 
+/// Gross + net revenue and row count over a range.
+pub async fn revenue_totals(
+    pool: &SqlitePool,
+    start: Option<&str>,
+    end: Option<&str>,
+) -> Result<(f64, f64, i64), sqlx::Error> {
+    let mut sql = String::from(
+        "SELECT COALESCE(SUM(gross_amount), 0.0), COALESCE(SUM(net_amount), 0.0), COUNT(*) \
+         FROM revenues WHERE deleted_at IS NULL AND is_deleted = 0",
+    );
+    if start.is_some() {
+        sql.push_str(" AND date >= ?");
+    }
+    if end.is_some() {
+        sql.push_str(" AND date <= ?");
+    }
+    let mut q = sqlx::query_as::<_, (f64, f64, i64)>(&sql);
+    for v in [start, end].into_iter().flatten() {
+        q = q.bind(v);
+    }
+    q.fetch_one(pool).await
+}
+
 pub async fn sum_expense(
     pool: &SqlitePool,
     start: Option<&str>,
@@ -513,9 +572,10 @@ pub async fn revenue_by_category(
     pool: &SqlitePool,
     start: &str,
     end: &str,
-) -> Result<Vec<CategoryAmount>, sqlx::Error> {
-    sqlx::query_as::<_, CategoryAmount>(
-        "SELECT COALESCE(c.name, 'Uncategorized') AS name, COALESCE(SUM(r.net_amount), 0.0) AS total \
+) -> Result<Vec<(String, f64, i64)>, sqlx::Error> {
+    sqlx::query_as::<_, (String, f64, i64)>(
+        "SELECT COALESCE(c.name, 'Uncategorized') AS category_name, \
+                COALESCE(SUM(r.net_amount), 0.0) AS total, COUNT(*) AS count \
          FROM revenues r LEFT JOIN revenue_categories c ON c.id = r.category_id \
          WHERE r.deleted_at IS NULL AND r.is_deleted = 0 AND r.date >= ? AND r.date <= ? \
          GROUP BY r.category_id ORDER BY total DESC",
@@ -530,9 +590,10 @@ pub async fn expenses_by_category(
     pool: &SqlitePool,
     start: &str,
     end: &str,
-) -> Result<Vec<CategoryAmount>, sqlx::Error> {
-    sqlx::query_as::<_, CategoryAmount>(
-        "SELECT COALESCE(c.name, 'Uncategorized') AS name, COALESCE(SUM(e.amount), 0.0) AS total \
+) -> Result<Vec<(String, f64, i64)>, sqlx::Error> {
+    sqlx::query_as::<_, (String, f64, i64)>(
+        "SELECT COALESCE(c.name, 'Uncategorized') AS category_name, \
+                COALESCE(SUM(e.amount), 0.0) AS total, COUNT(*) AS count \
          FROM expenses e LEFT JOIN expense_categories c ON c.id = e.category_id \
          WHERE e.deleted_at IS NULL AND e.is_deleted = 0 AND e.date >= ? AND e.date <= ? \
          GROUP BY e.category_id ORDER BY total DESC",

@@ -10,7 +10,6 @@ use axum::routing::get;
 use axum::{Json, Router};
 use uuid::Uuid;
 
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 use crate::core::time::now_iso;
@@ -26,7 +25,6 @@ pub fn build_router() -> Router<AppState> {
 
 async fn create_reservation(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Json(req): Json<ReservationCreateRequest>,
 ) -> Result<(StatusCode, Json<Reservation>), AppError> {
     if req.nights < 0 {
@@ -76,7 +74,6 @@ async fn create_reservation(
 
 async fn list_reservations(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(params): Query<ListParams>,
 ) -> Result<Json<Vec<Reservation>>, AppError> {
     let skip = params.skip.unwrap_or(0).max(0);
@@ -87,7 +84,6 @@ async fn list_reservations(
 
 async fn get_reservation(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Reservation>, AppError> {
     let r = res_repo::get_by_id(&state.pool, &id.to_string())

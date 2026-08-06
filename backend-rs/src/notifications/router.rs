@@ -14,7 +14,6 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 use crate::notifications::models::Notification;
@@ -48,7 +47,6 @@ pub fn build_router() -> Router<AppState> {
 
 async fn list_notifications(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Value>, AppError> {
     let limit = q.limit.unwrap_or(50).clamp(1, 200);
@@ -60,30 +58,34 @@ async fn list_notifications(
     })))
 }
 
-async fn summary(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
-    Ok(Json(json!({ "unread": service::unread_count(&state.pool).await? })))
+async fn summary(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    Ok(Json(
+        json!({ "unread": service::unread_count(&state.pool).await? }),
+    ))
 }
 
-async fn refresh(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
+async fn refresh(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let result = service::refresh(&state.pool).await?;
     Ok(Json(result))
 }
 
-async fn read_all(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
-    Ok(Json(json!({ "updated": service::mark_all_read(&state.pool).await? })))
+async fn read_all(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    Ok(Json(
+        json!({ "updated": service::mark_all_read(&state.pool).await? }),
+    ))
 }
 
-async fn clear_notifications(
-    State(state): State<AppState>,
-    _auth: AuthUser,
-) -> Result<Json<Value>, AppError> {
-    Ok(Json(json!({ "deleted": service::clear_all(&state.pool).await? })))
+async fn clear_notifications(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    Ok(Json(
+        json!({ "deleted": service::clear_all(&state.pool).await? }),
+    ))
 }
 
 async fn mark_read(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, AppError> {
-    Ok(Json(json!({ "updated": service::mark_read(&state.pool, &id.to_string()).await? })))
+    Ok(Json(
+        json!({ "updated": service::mark_read(&state.pool, &id.to_string()).await? }),
+    ))
 }

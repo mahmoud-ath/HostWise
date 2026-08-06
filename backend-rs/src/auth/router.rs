@@ -13,7 +13,9 @@ use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::auth::extractors::AuthUser;
-use crate::auth::schemas::{LoginRequest, RegisterRequest, TokenResponse, UpdateProfileRequest, UserResponse};
+use crate::auth::schemas::{
+    LoginRequest, RegisterRequest, TokenResponse, UpdateProfileRequest, UserResponse,
+};
 use crate::auth::service::AuthService;
 use crate::core::error::AppError;
 use crate::core::state::AppState;

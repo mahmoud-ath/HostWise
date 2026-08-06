@@ -13,7 +13,6 @@ use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::auth::extractors::AuthUser;
 use crate::core::error::AppError;
 use crate::core::state::AppState;
 use crate::maintenance::service;
@@ -38,39 +37,34 @@ pub fn build_router() -> Router<AppState> {
         .route("/reset-all-data", post(reset_all))
 }
 
-async fn status(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
+async fn status(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let result = service::status(&state.pool, &state.config).await?;
     Ok(Json(result))
 }
 
-async fn optimize(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
+async fn optimize(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let result = service::optimize(&state.pool, &state.config).await?;
     Ok(Json(result))
 }
 
-async fn logs(
-    State(_state): State<AppState>,
-    _auth: AuthUser,
-    Query(q): Query<LinesQuery>,
-) -> Json<Value> {
+async fn logs(State(_state): State<AppState>, Query(q): Query<LinesQuery>) -> Json<Value> {
     Json(service::get_logs(q.lines.unwrap_or(200)))
 }
 
 async fn cleanup(
     State(state): State<AppState>,
-    _auth: AuthUser,
     Query(q): Query<DaysQuery>,
 ) -> Result<Json<Value>, AppError> {
     let result = service::cleanup(&state.pool, q.days.unwrap_or(30).clamp(0, 3650)).await?;
     Ok(Json(result))
 }
 
-async fn reset_demo(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
+async fn reset_demo(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let result = service::reset_demo(&state.pool).await?;
     Ok(Json(result))
 }
 
-async fn reset_all(State(state): State<AppState>, _auth: AuthUser) -> Result<Json<Value>, AppError> {
+async fn reset_all(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let result = service::reset_all(&state.pool).await?;
     Ok(Json(result))
 }

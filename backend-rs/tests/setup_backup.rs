@@ -3,7 +3,9 @@
 
 use std::sync::Arc;
 
-use hostwise_backend::backup::{create_backup, list_backups, restore_backup, verify_backup_by_name};
+use hostwise_backend::backup::{
+    create_backup, list_backups, restore_backup, verify_backup_by_name,
+};
 use hostwise_backend::core::config::Config;
 use hostwise_backend::core::db;
 use hostwise_backend::core::state::AppState;

@@ -80,6 +80,25 @@ fn year_bounds(year: i32) -> (String, String) {
     (format!("{year:04}-01-01"), format!("{year:04}-12-31"))
 }
 
+/// Shift an inclusive [start, end] window one year back (YoY comparison).
+fn shift_year_back(start: &str, end: &str) -> (String, String) {
+    let parse = |s: &str| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok();
+    match (parse(start), parse(end)) {
+        (Some(sd), Some(ed)) => {
+            let ps = sd.checked_sub_months(chrono::Months::new(12)).unwrap_or(sd);
+            let pe = ed.checked_sub_months(chrono::Months::new(12)).unwrap_or(ed);
+            (
+                ps.format("%Y-%m-%d").to_string(),
+                pe.format("%Y-%m-%d").to_string(),
+            )
+        }
+        _ => {
+            let y = chrono::Local::now().year() - 1;
+            (format!("{y:04}-01-01"), format!("{y:04}-12-31"))
+        }
+    }
+}
+
 /// Comprehensive property performance analytics for a year.
 pub async fn get_property_analytics(
     pool: &SqlitePool,
@@ -206,7 +225,11 @@ pub async fn get_property_analytics(
     .fetch_one(pool)
     .await?;
 
-    let expense_ratio = if gross > 0.0 { round2((total_expenses / gross) * 100.0) } else { 0.0 };
+    let expense_ratio = if gross > 0.0 {
+        round2((total_expenses / gross) * 100.0)
+    } else {
+        0.0
+    };
     let profit = round2(net - total_expenses);
     let profit_margin = if net > 0.0 {
         round2(((net - total_expenses) / net) * 100.0)
@@ -335,17 +358,199 @@ pub async fn get_portfolio_analytics(
         0.0
     };
 
+    // ── Frontend-aligned KPIs ───────────────────────────────
+    let property_count = per_prop.len() as i64;
+    let avg_revenue_per_property = if property_count > 0 {
+        round2(net / property_count as f64)
+    } else {
+        0.0
+    };
+    let avg_stay = if total > 0 {
+        round2(nights as f64 / total as f64)
+    } else {
+        0.0
+    };
+
+    let avg_booking_window: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(AVG(julianday(check_in) - julianday(booked_at)), 0.0) \
+         FROM reservations WHERE is_deleted = 0 AND booked_at IS NOT NULL \
+         AND check_in >= ? AND check_in <= ?",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_one(pool)
+    .await?;
+    let avg_booking_window = round1(avg_booking_window);
+
+    // YoY growth vs the same window one year earlier.
+    let (prev_start, prev_end) = shift_year_back(&start_s, &end_s);
+    let prev_net: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(net_amount),0.0) FROM revenues \
+         WHERE is_deleted = 0 AND date >= ? AND date <= ?",
+    )
+    .bind(&prev_start)
+    .bind(&prev_end)
+    .fetch_one(pool)
+    .await?;
+    let revenue_growth_yoy = if prev_net > 0.0 {
+        round2(((net - prev_net) / prev_net) * 100.0)
+    } else {
+        0.0
+    };
+
+    // Category splits.
+    let rev_cats: Vec<(String, f64, i64)> = sqlx::query_as(
+        "SELECT COALESCE(c.name,'Uncategorized'), COALESCE(SUM(r.net_amount),0.0), COUNT(*) \
+         FROM revenues r LEFT JOIN revenue_categories c ON c.id = r.category_id \
+         WHERE r.is_deleted = 0 AND r.date >= ? AND r.date <= ? \
+         GROUP BY r.category_id ORDER BY 2 DESC",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_all(pool)
+    .await?;
+    let revenue_categories: Vec<Value> = rev_cats
+        .into_iter()
+        .map(|(category_name, total, count)| {
+            let pct = if net > 0.0 {
+                round2(total / net * 100.0)
+            } else {
+                0.0
+            };
+            json!({
+                "category_name": category_name,
+                "total": round2(total),
+                "percentage": pct,
+                "count": count,
+            })
+        })
+        .collect();
+    let exp_cats: Vec<(String, f64, i64)> = sqlx::query_as(
+        "SELECT COALESCE(c.name,'Uncategorized'), COALESCE(SUM(e.amount),0.0), COUNT(*) \
+         FROM expenses e LEFT JOIN expense_categories c ON c.id = e.category_id \
+         WHERE e.is_deleted = 0 AND e.date >= ? AND e.date <= ? \
+         GROUP BY e.category_id ORDER BY 2 DESC",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_all(pool)
+    .await?;
+    let expense_categories: Vec<Value> = exp_cats
+        .into_iter()
+        .map(|(category_name, total, count)| {
+            let pct = if total_expenses > 0.0 {
+                round2(total / total_expenses * 100.0)
+            } else {
+                0.0
+            };
+            json!({
+                "category_name": category_name,
+                "total": round2(total),
+                "percentage": pct,
+                "count": count,
+            })
+        })
+        .collect();
+
+    // Seasonality: net revenue by month.
+    let monthly_net: Vec<(i64, f64)> = sqlx::query_as(
+        "SELECT CAST(substr(date,6,2) AS INTEGER), COALESCE(SUM(net_amount),0.0) \
+         FROM revenues WHERE is_deleted = 0 AND date >= ? AND date <= ? GROUP BY 1 ORDER BY 1",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_all(pool)
+    .await?;
+    let month_map: HashMap<i64, f64> = monthly_net.into_iter().collect();
+    let seasonality: Vec<Value> = (1..=12)
+        .map(|m| {
+            json!({
+                "month": m,
+                "net_revenue": round2(month_map.get(&m).copied().unwrap_or(0.0)),
+            })
+        })
+        .collect();
+
+    // Per-property health ranking + distribution.
+    let mut ranking: Vec<Value> = Vec::new();
+    let mut dist: HashMap<String, i64> = HashMap::new();
+    for (id, name, pnet, pexp, pres) in &per_prop {
+        let h = get_property_health_score(pool, id).await?;
+        let score = h["health_score"]
+            .as_i64()
+            .unwrap_or_else(|| h["score"].as_i64().unwrap_or(0));
+        let label = h["status"]
+            .as_str()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| h["label"].as_str().unwrap_or("fair").to_string());
+        *dist.entry(label.clone()).or_insert(0) += 1;
+        let pprofit = round2(pnet - pexp);
+        let pm = if *pnet > 0.0 {
+            round2((pnet - pexp) / pnet * 100.0)
+        } else {
+            0.0
+        };
+        ranking.push(json!({
+            "property_id": id,
+            "property_name": name,
+            "health_score": score,
+            "status": label,
+            "profit_margin": pm,
+            "net_revenue": round2(*pnet),
+            "profit": pprofit,
+            "reservation_count": *pres,
+        }));
+    }
+    ranking.sort_by(|a, b| {
+        b["health_score"]
+            .as_i64()
+            .unwrap_or(0)
+            .cmp(&a["health_score"].as_i64().unwrap_or(0))
+    });
+    let health_distribution: Vec<Value> = ["excellent", "good", "fair", "poor"]
+        .iter()
+        .map(|s| json!({ "status": s, "count": dist.get(*s).copied().unwrap_or(0) }))
+        .collect();
+
+    // Simple next-month forecast: average monthly net revenue.
+    let forecast_next_month = if month_map.is_empty() {
+        0.0
+    } else {
+        let sum: f64 = month_map.values().sum();
+        round2(sum / month_map.len() as f64)
+    };
+
+    let year = start_s[0..4]
+        .parse::<i32>()
+        .unwrap_or_else(|_| chrono::Local::now().year());
+
     Ok(json!({
+        "year": year,
         "start_date": start_s,
         "end_date": end_s,
-        "total_gross_revenue": round2(gross),
-        "total_net_revenue": round2(net),
+        "property_count": property_count,
+        "gross_revenue": round2(gross),
+        "net_revenue": round2(net),
         "total_expenses": round2(total_expenses),
         "profit": profit,
         "profit_margin": profit_margin,
+        "avg_revenue_per_property": avg_revenue_per_property,
+        "revenue_growth_yoy": revenue_growth_yoy,
+        "total_reservations": total,
+        "avg_stay": avg_stay,
+        "cancellation_rate": cancellation_rate,
+        "avg_booking_window": avg_booking_window,
+        "forecast_next_month": forecast_next_month,
+        "health_distribution": health_distribution,
+        "property_ranking": ranking,
+        "expense_categories": expense_categories,
+        "revenue_categories": revenue_categories,
+        "seasonality": seasonality,
+        // Legacy keys used by the reports + AI consumers.
+        "total_gross_revenue": round2(gross),
+        "total_net_revenue": round2(net),
         "reservation_count": total,
         "nights": nights,
-        "cancellation_rate": cancellation_rate,
         "properties": properties,
     }))
 }
@@ -373,12 +578,27 @@ pub async fn get_property_health_score(
         "poor"
     };
 
+    let expense_ratio = pa["expense_ratio"].as_f64().unwrap_or(0.0);
+    let net_revenue = pa["net_revenue"].as_f64().unwrap_or(0.0);
+    let property_name: Option<String> =
+        sqlx::query_scalar("SELECT name FROM properties WHERE id = ? AND is_deleted = 0")
+            .bind(property_id)
+            .fetch_optional(pool)
+            .await?;
+    let property_name = property_name.unwrap_or_else(|| property_id.to_string());
+
     Ok(json!({
         "property_id": property_id,
+        "property_name": property_name,
         "year": year,
-        "score": score as i64,
-        "label": label,
+        "health_score": score as i64,
+        "status": label,
         "profit_margin": pm,
         "cancellation_rate": cr,
+        "expense_ratio": expense_ratio,
+        "net_revenue": net_revenue,
+        // Legacy aliases.
+        "score": score as i64,
+        "label": label,
     }))
 }

@@ -60,7 +60,10 @@ impl IntoResponse for AppError {
             AppError::Forbidden => (StatusCode::FORBIDDEN, self.to_string()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m.clone()),
             AppError::Validation(m) => (StatusCode::UNPROCESSABLE_ENTITY, m.clone()),
-            AppError::Db(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error".to_string()),
+            AppError::Db(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error".to_string(),
+            ),
             AppError::Auth(_) => (
                 StatusCode::UNAUTHORIZED,
                 "Invalid or missing credentials".to_string(),
@@ -70,12 +73,14 @@ impl IntoResponse for AppError {
                 "Could not hash or verify password".to_string(),
             ),
             AppError::Io(_) => (StatusCode::INTERNAL_SERVER_ERROR, "I/O error".to_string()),
-            AppError::Json(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Serialization error".to_string())
-            }
-            AppError::Internal(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
-            }
+            AppError::Json(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Serialization error".to_string(),
+            ),
+            AppError::Internal(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            ),
         };
         (status, Json(ErrorBody { error: message })).into_response()
     }
