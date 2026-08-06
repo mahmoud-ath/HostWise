@@ -19,6 +19,7 @@ argon2 = "0.5"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["json", "multipart"] }
 chrono = { version = "0.4", features = ["serde"] }
+csv = "1"
 dotenvy = "0.15"
 jsonwebtoken = "9"
 rand = "0.8"
