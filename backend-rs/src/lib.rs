@@ -6,8 +6,11 @@
 pub mod analytics;
 pub mod api;
 pub mod auth;
+pub mod backup;
 pub mod core;
 pub mod finance;
+pub mod maintenance;
+pub mod notifications;
 pub mod properties;
 pub mod reservations;
 pub mod settings;

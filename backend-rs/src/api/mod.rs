@@ -9,6 +9,8 @@ use crate::analytics;
 use crate::auth;
 use crate::core::state::AppState;
 use crate::finance;
+use crate::maintenance;
+use crate::notifications;
 use crate::properties;
 use crate::reservations;
 use crate::settings;
@@ -22,6 +24,8 @@ pub fn build_api_router() -> Router<AppState> {
         .nest("/api/v1/finance", finance::router::build_router())
         .nest("/api/v1/settings", settings::router::build_router())
         .nest("/api/v1/analytics", analytics::router::build_router())
+        .nest("/api/v1/notifications", notifications::router::build_router())
+        .nest("/api/v1/maintenance", maintenance::router::build_router())
 }
 
 async fn health(State(state): State<AppState>) -> Json<serde_json::Value> {
