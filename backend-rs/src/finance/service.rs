@@ -31,6 +31,14 @@ impl FinanceService {
         }
     }
 
+    /// Build a service from just a pool (used by rules/reports engines).
+    pub fn from_pool(pool: sqlx::SqlitePool) -> Self {
+        Self {
+            pool,
+            config: Arc::new(Config::from_env()),
+        }
+    }
+
     // ── Revenues ────────────────────────────────────────────
 
     pub async fn create_revenue(&self, req: RevenueCreateRequest) -> Result<Revenue, AppError> {

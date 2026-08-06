@@ -3,6 +3,7 @@
 //! Builds an `axum` router that can run standalone (`main.rs`) or embedded
 //! inside the Tauri desktop shell (planned integration).
 
+pub mod ai;
 pub mod analytics;
 pub mod api;
 pub mod auth;
@@ -13,6 +14,7 @@ pub mod finance;
 pub mod maintenance;
 pub mod notifications;
 pub mod properties;
+pub mod reports;
 pub mod reservations;
 pub mod settings;
 pub mod setup;

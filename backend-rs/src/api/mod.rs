@@ -5,6 +5,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::json;
 
+use crate::ai;
 use crate::analytics;
 use crate::auth;
 use crate::backup;
@@ -14,6 +15,7 @@ use crate::finance;
 use crate::maintenance;
 use crate::notifications;
 use crate::properties;
+use crate::reports;
 use crate::reservations;
 use crate::settings;
 use crate::setup;
@@ -32,6 +34,8 @@ pub fn build_api_router() -> Router<AppState> {
         .nest("/api/v1/backups", backup::router::build_router())
         .nest("/api/v1/setup", setup::router::build_router())
         .nest("/api/v1/connectors", connectors::router::build_router())
+        .nest("/api/v1/ai", ai::router::build_router())
+        .nest("/api/v1/reports", reports::router::build_router())
 }
 
 async fn health(State(state): State<AppState>) -> Json<serde_json::Value> {
