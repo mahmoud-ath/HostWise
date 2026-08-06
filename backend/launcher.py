@@ -8,6 +8,17 @@ import os
 import sys
 import logging
 
+# Windowed (console=False) PyInstaller builds have no console on Windows, so
+# sys.stdout/sys.stderr are None. That breaks logging AND crashes uvicorn's log
+# formatters (they call sys.stdout.isatty() -> AttributeError: 'NoneType' object
+# has no attribute 'isatty'). Point them at a real stream so isatty() -> False.
+if getattr(sys, "frozen", False) and (sys.stdout is None or sys.stderr is None):
+    _devnull = open(os.devnull, "w", encoding="utf-8")
+    if sys.stdout is None:
+        sys.stdout = _devnull
+    if sys.stderr is None:
+        sys.stderr = _devnull
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="[HOSTWISE] %(asctime)s %(levelname)s %(message)s",
