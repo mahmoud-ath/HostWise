@@ -7,6 +7,7 @@ use serde_json::json;
 
 use crate::analytics;
 use crate::auth;
+use crate::backup;
 use crate::core::state::AppState;
 use crate::finance;
 use crate::maintenance;
@@ -14,6 +15,7 @@ use crate::notifications;
 use crate::properties;
 use crate::reservations;
 use crate::settings;
+use crate::setup;
 
 pub fn build_api_router() -> Router<AppState> {
     Router::new()
@@ -26,6 +28,8 @@ pub fn build_api_router() -> Router<AppState> {
         .nest("/api/v1/analytics", analytics::router::build_router())
         .nest("/api/v1/notifications", notifications::router::build_router())
         .nest("/api/v1/maintenance", maintenance::router::build_router())
+        .nest("/api/v1/backups", backup::router::build_router())
+        .nest("/api/v1/setup", setup::router::build_router())
 }
 
 async fn health(State(state): State<AppState>) -> Json<serde_json::Value> {

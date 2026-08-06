@@ -14,6 +14,7 @@ pub mod notifications;
 pub mod properties;
 pub mod reservations;
 pub mod settings;
+pub mod setup;
 
 use std::sync::Arc;
 
