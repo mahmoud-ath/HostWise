@@ -30,19 +30,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
-
-      - name: Python lint (ruff)
-        run: |
-          cd backend
-          pip install -q ruff
-          ruff check app/ --no-fix || echo "Lint warnings found (non-blocking)"
 
       - name: Clear bun cache (avoid tarball extraction issues)
         run: |
@@ -58,6 +47,21 @@ jobs:
         run: |
           cd frontend
           bun run lint || echo "Lint warnings found (non-blocking)"
+
+  # ── Rust Backend (native) ─────────────────────────────
+  backend:
+    name: Rust Backend (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust backend — fmt, clippy, test
+        working-directory: backend-rs
+        run: |
+          cargo fmt --check || echo "fmt issues (non-blocking)"
+          cargo clippy --all-targets -- -D warnings || echo "Clippy warnings (non-blocking)"
+          cargo test
 
   # ── Frontend Build (smoke test) ───────────────────────
   build-frontend:

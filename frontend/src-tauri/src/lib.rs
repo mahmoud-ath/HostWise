@@ -1,35 +1,26 @@
-mod backend;
+mod rust_backend;
 
 use std::sync::Mutex;
 use tauri::{Manager, State, WindowEvent};
 
-/// Holds the spawned backend process so we can stop it when the app closes.
-struct BackendProcess(Mutex<Option<std::process::Child>>);
-
 /// The webview asks the Rust shell where the local API lives. Returns the port
-/// the backend actually bound to (a free OS-assigned port, not a fixed 8000).
+/// the in-process Rust backend actually bound to (a free OS-assigned port).
 #[tauri::command]
-fn get_backend_url(state: tauri::State<'_, backend::BackendUrl>) -> String {
+fn get_backend_url(state: State<'_, rust_backend::BackendUrl>) -> String {
     if let Ok(guard) = state.0.lock() {
         if let Some(url) = guard.as_ref() {
             return url.clone();
         }
     }
-    backend::default_backend_url()
+    rust_backend::default_backend_url()
 }
 
-/// Restart the local backend (used by the frontend's connection banner).
-/// Kills any running instance, spawns a fresh one, and emits backend-status.
+/// Restart the in-process Rust backend (used by the frontend's connection
+/// banner). The server is embedded in this process, so "restart" re-initialises
+/// the router on a fresh free port.
 #[tauri::command]
-fn restart_backend(app: tauri::AppHandle, state: State<'_, BackendProcess>) {
-    if let Ok(mut guard) = state.0.lock() {
-        if let Some(mut child) = guard.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-        let child = backend::spawn(&app);
-        *guard = child;
-    }
+fn restart_backend(app: tauri::AppHandle) -> String {
+    rust_backend::start(&app)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -37,25 +28,18 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            // Start the Python backend before the window loads; the webview
-            // shows "Starting HostWise..." until /api/health is reachable.
-            app.manage(backend::BackendUrl(std::sync::Mutex::new(None)));
-            let child = backend::spawn(app.handle());
-            app.manage(BackendProcess(Mutex::new(child)));
+            // The native Rust backend starts before the window loads; the
+            // webview shows "Starting HostWise..." until /api/health responds.
+            app.manage(rust_backend::BackendUrl(Mutex::new(None)));
+            app.manage(rust_backend::BackendServer(Mutex::new(None)));
+            let url = rust_backend::start(app.handle());
+            tracing::info!("Rust backend listening at {url}");
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Kill the backend once the last window is destroyed.
+            // Stop the in-process backend when the window is destroyed.
             if let WindowEvent::Destroyed = event {
-                let app = window.app_handle();
-                if let Some(state) = app.try_state::<BackendProcess>() {
-                    if let Ok(mut guard) = state.0.lock() {
-                        if let Some(mut child) = guard.take() {
-                            let _ = child.kill();
-                            let _ = child.wait();
-                        }
-                    }
-                }
+                rust_backend::stop(window.app_handle());
             }
         })
         .invoke_handler(tauri::generate_handler![get_backend_url, restart_backend])
