@@ -1,11 +1,14 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-.venv/
-venv/
-*.egg
+# Rust build artifacts
+backend-rs/target/
+frontend/src-tauri/target/
+
+# Frontend / JS
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/test-results/
+frontend/playwright-report/
+*.tsbuildinfo
 
 # Environment
 .env
@@ -22,35 +25,11 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Docker
-docker-compose.override.yml
-
-# Uploads
-uploads/
-
-# Database
+# Data
 *.db
 *.sqlite3
-
-# Frontend
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/.env.local
-frontend/test-results/
-frontend/playwright-report/
-
-# PyInstaller
-backend/build/
-backend/dist/
-# hostwise-backend.spec is intentionally VERSIONED (CI builds need it);
-# ignore only auto-generated PyInstaller specs (e.g. from `pyi-makespec`).
-backend/hostwise.db
+uploads/
 
 # Logs
 *.log
 logs/
-
-# Alembic
-backend/alembic/versions/*.pyc
-frontend/src-tauri/embedded/hostwise-backend/
