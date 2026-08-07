@@ -115,10 +115,17 @@ fn desktop_config(port: u16) -> hostwise_backend::core::config::Config {
     } else {
         "production".to_string()
     };
+    // The packaged webview's origin differs per OS:
+    //   - Linux/macOS: `tauri://localhost`
+    //   - Windows:     `http://tauri.localhost`  (Tauri v2 uses the http scheme
+    //                  there because WebView2 can't fetch custom schemes)
+    // Missing any of these makes the built app's backend unreachable (CORS
+    // blocks every /api call) — "backend won't run" on a packaged build.
     cfg.cors_origins = vec![
         "http://localhost:3000".into(),
         "http://127.0.0.1:3000".into(),
         "tauri://localhost".into(),
+        "http://tauri.localhost".into(),
         "https://tauri.localhost".into(),
     ];
     cfg
