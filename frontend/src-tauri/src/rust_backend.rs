@@ -25,8 +25,12 @@ pub struct BackendServer(pub Mutex<Option<JoinHandle<()>>>);
 pub const DEFAULT_PORT: u16 = 8000;
 
 /// Base URL to report before the backend has picked its port (dev/fallback).
+///
+/// The frontend `api.ts` expects the base URL to END in `/api/v1` (all its
+/// endpoints are called without the version prefix, e.g. `/finance/summary`),
+/// so the Tauri command must return the full `http://host:port/api/v1`.
 pub fn default_backend_url() -> String {
-    format!("http://127.0.0.1:{DEFAULT_PORT}")
+    format!("http://127.0.0.1:{DEFAULT_PORT}/api/v1")
 }
 
 /// Pick a free TCP port on 127.0.0.1, preferring `preferred` when it is free.
@@ -126,7 +130,11 @@ pub fn start(app: &AppHandle) -> String {
     stop(app);
 
     let port = pick_free_port(DEFAULT_PORT);
-    let url = format!("http://127.0.0.1:{port}");
+    // IMPORTANT: must end in `/api/v1` — the frontend api.ts builds request URLs
+    // as `baseUrl + endpoint` where endpoints are like `/finance/summary` (no
+    // version prefix). Returning a bare host made every data request 404 in the
+    // desktop webview (the recurring "API Connection Error").
+    let url = format!("http://127.0.0.1:{port}/api/v1");
     let config = desktop_config(port);
 
     // Open the SQLite pool + run migrations (quick; fine to block briefly here).
@@ -145,21 +153,29 @@ pub fn start(app: &AppHandle) -> String {
     };
 
     let router = hostwise_backend::build_router(state);
-    let app_handle = app.clone();
 
+    // Bind the listener NOW (synchronously, before the window loads) so the
+    // webview never races a half-started backend: previously the bind happened
+    // inside the spawned task below, so the webview's first data requests could
+    // fire before the port was listening, fail with "Request failed", and leave
+    // the dashboard stuck on the API Connection Error until a manual reload.
+    let addr = format!("127.0.0.1:{port}");
+    let listener = match tauri::async_runtime::block_on(tokio::net::TcpListener::bind(&addr)) {
+        Ok(l) => l,
+        Err(err) => {
+            emit_status(app, "failed", Some(err.to_string()));
+            return url;
+        }
+    };
+    emit_status(app, "healthy", None);
+    // Publish the bound port so the web/dev discovery can find it.
+    let _ = std::fs::write(data_dir().join("hostwise.port"), port.to_string());
+
+    let app_handle = app.clone();
     let handle = tauri::async_runtime::spawn(async move {
-        let addr = format!("127.0.0.1:{port}");
-        match tokio::net::TcpListener::bind(&addr).await {
-            Ok(listener) => {
-                emit_status(&app_handle, "healthy", None);
-                // Publish the bound port so the web/dev discovery can find it.
-                let _ = std::fs::write(data_dir().join("hostwise.port"), port.to_string());
-                if let Err(err) = axum::serve(listener, router).await {
-                    tracing::error!("backend server error: {err}");
-                    emit_status(&app_handle, "failed", Some(err.to_string()));
-                }
-            }
-            Err(err) => emit_status(&app_handle, "failed", Some(err.to_string())),
+        if let Err(err) = axum::serve(listener, router).await {
+            tracing::error!("backend server error: {err}");
+            emit_status(&app_handle, "failed", Some(err.to_string()));
         }
     });
 

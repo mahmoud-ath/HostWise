@@ -8,6 +8,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
@@ -37,6 +38,17 @@ export function BackendProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<BackendState>({
     status: "starting",
   });
+  const queryClient = useQueryClient();
+
+  // When the backend becomes reachable (e.g. after a slow first boot where the
+  // embedded backend binds a moment after the webview loaded, or after a manual
+  // restart), refetch everything so pages don't stay stuck on cached "Request
+  // failed" errors until a manual reload.
+  useEffect(() => {
+    if (state.status === "healthy") {
+      queryClient.invalidateQueries();
+    }
+  }, [state.status, queryClient]);
 
   // Listen for Tauri backend-status events
   useEffect(() => {

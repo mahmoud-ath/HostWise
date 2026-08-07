@@ -176,7 +176,7 @@ them to a **GitHub Release**.
 
 ```bash
 # 1. Commit everything on main and push
-git add -A && git commit -m "chore: release prep"
+git add -A && git commit -m "chore: fix backend api connection"
 git push origin main
 
 # 2. Tag and push → the release pipeline starts
