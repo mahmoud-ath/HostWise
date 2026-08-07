@@ -152,6 +152,8 @@ pub fn start(app: &AppHandle) -> String {
         match tokio::net::TcpListener::bind(&addr).await {
             Ok(listener) => {
                 emit_status(&app_handle, "healthy", None);
+                // Publish the bound port so the web/dev discovery can find it.
+                let _ = std::fs::write(data_dir().join("hostwise.port"), port.to_string());
                 if let Err(err) = axum::serve(listener, router).await {
                     tracing::error!("backend server error: {err}");
                     emit_status(&app_handle, "failed", Some(err.to_string()));

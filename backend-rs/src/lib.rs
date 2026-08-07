@@ -70,14 +70,35 @@ pub async fn serve(config: Config) -> Result<(), AppError> {
     };
     let app = build_router(state);
 
+    // Dynamic port: try the configured port (PORT env or 8000), but never fail
+    // if it is taken — fall back to an OS-assigned free port instead.
     let addr = format!("{}:{}", config.host, config.port);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    tracing::info!(%addr, "HostWise backend listening");
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(_) => {
+            let fallback = format!("{}:0", config.host);
+            tokio::net::TcpListener::bind(&fallback).await?
+        }
+    };
+    let actual = listener.local_addr()?;
+    // Publish the actual port so the frontend can find the backend.
+    write_port_file(actual.port());
+    tracing::info!(addr = actual.to_string(), "HostWise backend listening");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())
+}
+
+/// Write the bound port to `<data_dir>/hostwise.port` (consumed by the Next
+/// dev-server proxy and any other local discovery).
+fn write_port_file(port: u16) {
+    let path = crate::core::config::port_file_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(path, port.to_string());
 }
 
 async fn shutdown_signal() {

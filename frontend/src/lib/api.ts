@@ -6,9 +6,11 @@
  * Resolves backend URL dynamically from Tauri (desktop) or env var (dev).
  */
 
-// Fallback for browser dev (non-Tauri)
+// Fallback for browser dev (non-Tauri). In dev the Next.js server proxies
+// `/api/*` to the backend's dynamic port (see next.config.js), so a relative
+// base just works — no hardcoded 8000/3000.
 const FALLBACK_API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+  process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 /// Try to get the backend URL from Tauri, falling back to env var.
 async function resolveApiBaseUrl(): Promise<string> {

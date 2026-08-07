@@ -27,6 +27,12 @@ pub fn default_data_dir() -> PathBuf {
     base.join("hostwise")
 }
 
+/// Path where the backend writes the port it actually bound to, so the
+/// frontend (dev server / shell) can discover it regardless of fixed ports.
+pub fn port_file_path() -> PathBuf {
+    default_data_dir().join("hostwise.port")
+}
+
 fn env_or(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_string())
 }
@@ -76,7 +82,7 @@ impl Config {
 
         Self {
             app_name: env_or("APP_NAME", "HostWise"),
-            app_version: env_or("APP_VERSION", "0.7.0"),
+            app_version: env_or("APP_VERSION", env!("CARGO_PKG_VERSION")),
             environment: env_or("ENVIRONMENT", "development"),
             host: env_or("HOST", "127.0.0.1"),
             port: env_or("PORT", "8000").parse().unwrap_or(8000),
