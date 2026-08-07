@@ -1,6 +1,6 @@
 [package]
 name = "hostwise-backend"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 description = "HostWise native backend (Rust) — replaces the Python/FastAPI backend"
 license = "MIT"

@@ -1,3 +1,4 @@
+
 # HostWise — Run Locally & Ship to Production
 
 > HostWise v0.7.0 is a **100% native Rust backend** (`backend-rs/`) embedded
