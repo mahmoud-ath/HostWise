@@ -28,7 +28,9 @@ tracing = "0.1"
 
 [profile.release]
 panic = "abort"
+# Less aggressive packaging: keep symbols (no full strip) and use thin LTO so
+# the resulting binary does not resemble packed/obfuscated malware — reduces
+# Windows Defender / SmartScreen false positives on unsigned builds.
 codegen-units = 1
-lto = true
-opt-level = "s"
-strip = true
+lto = "thin"
+opt-level = 2
