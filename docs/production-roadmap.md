@@ -1,5 +1,11 @@
 # HostWise — Production Roadmap
 
+> ⚠️ **SUPERSEDED (2026-08-07):** This roadmap was written against the pre-Rust
+> codebase (Python/PyInstaller). The backend is now a **native Rust crate**
+> embedded in-process (`backend-rs/`). See the current docs:
+> `docs/run-and-production.md`, `docs/BUILD.md`, `docs/CHANGELOG.md` and
+> `docs/rust-rewrite-prompt.md`.
+
 > **Built on the existing audit** (`AUDIT.md`, `decision-log.md`,
 > `overall-architecture.md`, `database-audit.md`, page audits, `roadmap.md`),
 > **not a new audit**. Re-verified against the codebase on **Aug 4, 2026**.

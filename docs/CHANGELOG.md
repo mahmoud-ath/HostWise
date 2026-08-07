@@ -8,6 +8,25 @@
 
 ## 1. Recent changes (2026-08-07)
 
+### v0.7.6 — diagnostics + version sync
+- **`api.ts` no longer hides `get_backend_url` failures.** In the Tauri webview
+  it now invokes `get_backend_url`, validates the result (`http://127.0.0.1:…`),
+  and THROWS a descriptive error on failure — no more silent fallback to a
+  relative `/api/v1` that can't reach the embedded backend. (Browser-only dev
+  still uses the `/api/v1` proxy base.)
+- **Backend URL shown in diagnostics.** Settings → Maintenance now resolves and
+  displays the actual `API URL` the app talks to (via the API client), instead
+  of the placeholder "dynamic (Tauri)".
+- **Persistent file logging.** The Tauri shell now appends backend logs to
+  `<app-data>/logs/hostwise.log` as well as the terminal, so startup failures
+  are visible on packaged Windows release builds (which have no console).
+- **Version synced to 0.7.6** across `backend-rs/Cargo.toml`,
+  `src-tauri/Cargo.toml` and `tauri.conf.json` (+ lockfiles).
+- Docs updated for the Rust architecture: `BUILD.md` rewritten; stale
+  Python/PyInstaller docs (`ARCHITECTURE.md`, `overall-architecture.md`,
+  `README-config.md`, `production-overview.md`, `production-roadmap.md`,
+  `frontend-architecture.md`) marked SUPERSEDED.
+
 ### v0.7.5 — production CORS fix
 - **`frontend/src-tauri/src/rust_backend.rs`**: the embedded backend's CORS
   allow-list now includes **`http://tauri.localhost`** — the packaged webview's
@@ -113,7 +132,7 @@ bunx tauri build
 |---|---|
 | Desktop shows "API Connection Error / Request failed", browser is fine | **Stale webview storage** (WebKit persists localStorage/cache across restarts). Delete `~/.local/share/com.hostwise.desktop` (+ `app.hostwise.desktop`) and relaunch. Keep `~/.local/share/hostwise/` (your DB). |
 | Settings "can't be saved" | Usually the same stale webview → it's still calling the old bare-host URL. Clear webview storage (above) and relaunch; confirm in the terminal log that requests go to `/api/v1/settings` and return 200. |
-| No backend logs in `tauri:dev` | Fixed in v0.7.5 (tracing subscriber). Ensure you rebuilt. |
+| No backend logs in `tauri:dev` | Fixed in v0.7.6 (tracing subscriber prints to the terminal and to `<app-data>/logs/hostwise.log`). Ensure you rebuilt. |
 | Packaged Windows app can't reach backend | CORS origin `http://tauri.localhost` must be in `desktop_config` (fixed v0.7.5). |
 | `/api` 404/500 in browser dev | The proxy is baked in at boot; the backend wasn't up. Restart `next dev` after the backend is running. |
 | "backend won't run" on a clean install | Check the terminal log for `Database init failed` or bind errors; verify `get_backend_url` returns `.../api/v1`. |
@@ -125,3 +144,33 @@ curl http://127.0.0.1:8000/api/v1/settings          # settings JSON
 curl -H "Origin: http://tauri.localhost" -D - -o /dev/null \
      http://127.0.0.1:8000/api/health | grep -i access-control-allow-origin
 ```
+
+---
+
+## 6. Verifying a packaged build (the 1-minute check)
+
+On the machine where the app is installed, when the UI says the backend is
+unreachable:
+
+1. Open the app-data dir and read the port file:
+   - Windows: `%APPDATA%\hostwise\hostwise.port`
+   - Linux: `~/.local/share/hostwise/hostwise.port`
+   - macOS: `~/Library/Application Support/hostwise/hostwise.port`
+
+   It contains the port the embedded backend bound, e.g. `53142`.
+
+2. From a terminal (PowerShell on Windows):
+   ```
+   Invoke-WebRequest http://127.0.0.1:53142/api/health
+   ```
+
+3. Interpret the result:
+   - `{"status":"ok","database":"up","version":"0.7.6"}` → the **Rust
+     backend is working**; the problem is frontend → Tauri IPC / URL / CORS.
+     Then check `<app-data>/logs/hostwise.log` for what the webview requested.
+   - connection refused → Rust isn't serving; check `logs/hostwise.log` for
+     `Database init failed` / bind errors at startup.
+
+Full definition-of-done (Windows clean VM): install → launch → dashboard loads
+→ create property/revenue/expense → restart app → data persists → export PDF →
+uninstall/reinstall → data persists.

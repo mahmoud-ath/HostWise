@@ -1,5 +1,12 @@
 # HostWise — Overall Architecture
 
+> ⚠️ **SUPERSEDED (2026-08-07):** This document predates the **native Rust
+> backend rewrite** (v0.7+). The Python/FastAPI/PyInstaller architecture it
+> describes no longer exists — the backend is now compiled into the Tauri app
+> as an in-process Rust axum server. See the current docs:
+> `docs/run-and-production.md`, `docs/BUILD.md`, `docs/CHANGELOG.md` and
+> `docs/rust-rewrite-prompt.md`.
+
 > **One-sentence mission:** HostWise is an AI-powered financial intelligence
 > platform for vacation-rental hosts — the analytics layer on top of booking
 > data, delivered as a **local-first, cloud-optional** desktop application.

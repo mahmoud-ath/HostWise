@@ -12,16 +12,25 @@
 const FALLBACK_API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-/// Try to get the backend URL from Tauri, falling back to env var.
+/// Resolve the backend base URL.
+/// - In the Tauri webview: ask the Rust shell via `get_backend_url`. If that
+///   IPC call fails (or returns an invalid URL) we THROW a descriptive error
+///   instead of silently falling back to `/api/v1`. In the packaged app that
+///   relative path resolves to `tauri://localhost/api/v1`, which is NOT the
+///   embedded backend, so a silent fallback would make a healthy backend look
+///   dead. Surfacing the real error is what makes it diagnosable.
+/// - In a plain browser: use the relative `/api/v1` base, which the Next.js
+///   dev server proxies to the backend (browser-only dev mode).
 async function resolveApiBaseUrl(): Promise<string> {
   if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-    try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      return await invoke<string>("get_backend_url");
-    } catch {
-      // Tauri invoke failed — use fallback
-      return FALLBACK_API_BASE;
+    const { invoke } = await import("@tauri-apps/api/core");
+    const url: string = await invoke("get_backend_url");
+    if (!url || !url.startsWith("http://127.0.0.1:")) {
+      throw new Error(
+        `Invalid backend URL returned by Tauri: ${JSON.stringify(url)}`
+      );
     }
+    return url.replace(/\/+$/, "");
   }
   return FALLBACK_API_BASE;
 }

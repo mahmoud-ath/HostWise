@@ -1,5 +1,11 @@
 # HostWise — Production & Architecture Overview
 
+> ⚠️ **SUPERSEDED (2026-08-07):** This document predates the **native Rust
+> backend rewrite** (v0.7+). The Python backend / PyInstaller sidecar it
+> describes no longer exists — the Rust backend is embedded in-process. See the
+> current docs: `docs/run-and-production.md`, `docs/BUILD.md` and
+> `docs/CHANGELOG.md`.
+
 > One-file summary of what the app is, how the desktop app works, and how it is
 > built and released. Last updated for **v0.6.9** (2026-08-06).
 

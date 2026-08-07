@@ -1,64 +1,71 @@
 # Building HostWise as a Desktop App
 
-HostWise is a **local-first desktop app**: a Tauri (Rust) shell that spawns the
-FastAPI/Python backend and shows the Next.js frontend in its webview.
+HostWise is a **local-first desktop app**: a Tauri (Rust) shell that runs a
+**native Rust backend in-process** and shows the Next.js frontend in its
+webview. There is **no Python, no PyInstaller, no sidecar process** — SQLite
+and the API server are compiled into the binary.
 
 ```
-┌─────────────────────────────┐   ┌────────────────────────────────────┐
-│  Tauri (Rust) shell         │   │  Python backend (PyInstaller)      │
-│  · webview → static `out/`  │──▶│  · uvicorn on 127.0.0.1:8000       │
-│  · spawns + stops backend   │   │  · SQLite in OS app-data dir       │
-└─────────────────────────────┘   └────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│  Tauri v2 shell (Rust)                     │
+│  · webview → static `out/` (tauri://…)     │
+│  · in-process axum backend (backend-rs)    │
+│     · binds 127.0.0.1:<port> (8000 pref.)  │
+│     · serves /api/v1/*  +  /api/health     │
+│     · SQLite in OS app-data dir            │
+│  · exposes get_backend_url → …/api/v1      │
+└────────────────────────────────────────────┘
 ```
 
 ## Architecture notes
 
 - **Frontend** — Next.js, built with `output: 'export'` into `frontend/out/`.
-  Tauri serves it from its webview (`tauri://localhost`). All pages are
-  client-side rendered; dynamic routes (e.g. the property deep-dive) use a
-  static route + query param (`/properties/detail?id=…`) so the export works.
-- **Backend** — FastAPI. In development it runs `backend/launcher.py` with the
-  repo venv; in release the PyInstaller bundle is embedded as a Tauri
-  resource (`src-tauri/resources/hostwise-backend/`) and launched as a
-  sidecar. It stores the DB under the OS app-data directory.
+  Tauri serves it from its webview (`tauri://localhost` on Linux/macOS,
+  `http://tauri.localhost` on Windows). All pages are client-side rendered;
+  dynamic routes use a static route + query param (`/properties/detail?id=…`).
+- **Backend** — the `backend-rs/` crate (axum + sqlx/SQLite) is a **path
+  dependency** of `src-tauri`, so it is compiled directly into the app binary.
+  It binds `127.0.0.1:<port>` **before the window loads**, stores the DB at
+  the OS app-data dir, and writes its bound port to `hostwise.port`.
 - **API URL** — the webview asks the Rust shell via `invoke('get_backend_url')`
-  → `http://127.0.0.1:8000/api/v1`. CORS in `backend/launcher.py` already
-  allows `tauri://localhost`.
+  which returns `http://127.0.0.1:<port>/api/v1` (**must** end in `/api/v1`).
+  The backend's CORS allows the packaged webview origins:
+  `tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost`.
+- **Logging** — the Tauri shell installs a tracing subscriber that prints to
+  the terminal **and** appends to `<app-data>/logs/hostwise.log` (so startup
+  failures are visible on Windows release builds, which have no console).
 
 ## Prerequisites
 
 - [Bun](https://bun.sh) (frontend tooling)
-- [Rust](https://rustup.rs) + Cargo (Tauri)
-- Python 3.10 (backend)
+- [Rust](https://rustup.rs) + Cargo (Tauri + backend)
 - OS-specific Tauri system deps — see the per-OS CI workflows in
   `.github/workflows/` (Linux needs `libwebkit2gtk-4.1-dev`, etc.)
 
 ## Development
 
 ```bash
-# 1. Backend deps + venv
-cd backend && python -m venv .venv && ./.venv/bin/pip install -r requirements.txt
-
-# 2. Frontend deps + Tauri CLI
+# 1. Frontend deps
 cd frontend && bun install
 
-# 3. Run the desktop app in dev mode (starts next dev + the backend)
-bun tauri dev
+# 2. Desktop app (single command — starts next dev + embedded backend)
+cd frontend && bun run tauri:dev
 ```
 
-> Running the web frontend standalone is unchanged: `bun next dev` (3000) +
-> `uvicorn app.main:app --reload` (8000).
+> Web/browser-only dev: `cd backend-rs && cargo run` (backend on 8000) in one
+> terminal, then `cd frontend && bun run dev` in another. Start the backend
+> FIRST so the Next dev proxy targets the live port.
 
 ## Building the desktop app
 
 ```bash
-# 1. Bundle the Python backend into Tauri resources
-scripts/build-backend.sh
+# 1. Frontend static export → out/ (embedded into the binary at build time)
+cd frontend && bun run build
 
-# 2. Build the desktop app (frontend export + Rust + installer)
+# 2. Release binary / installer
 cd frontend
-bunx tauri build --bundles nsis   # Windows
-bunx tauri build --bundles dmg    # macOS
+bunx tauri build --bundles nsis        # Windows
+bunx tauri build --bundles dmg         # macOS
 bunx tauri build --bundles appimage,deb  # Linux
 ```
 
@@ -66,8 +73,8 @@ Artifacts land in `frontend/src-tauri/target/release/bundle/`.
 
 ## Continuous integration
 
-Separate workflows build each OS (they bundle the backend, export the
-frontend, and produce an installer):
+Separate workflows build each OS (export the frontend, compile the Rust
+binary, and produce an installer):
 
 | OS | Workflow | Artifact |
 | --- | --- | --- |
@@ -79,11 +86,13 @@ Run them manually (`workflow_dispatch`) or push a `v*` tag.
 
 ## Known caveats
 
-- **WeasyPrint PDF export** needs native libs (Pango/Cairo/GDK-PixBuf) on the
-  target OS. The Linux workflow installs them; Windows/macOS may need the
-  runtime installed, and the app falls back to the print view if they're
-  absent (see `docs/pdf-report-system.md`).
+- **PDF export** is generated by the Rust backend (`backend-rs/reports`) with
+  the `printpdf` crate — no external runtime needed. The browser print view is
+  the fallback (see `docs/pdf-report-system.md`).
 - **Code signing / notarization** (macOS) and **Authenticode** (Windows) are
   stubbed out in the workflows — add your certificates + secrets when you're
-  ready to distribute. See the commented steps in `build-macos.yml`.
-- The backend binds `127.0.0.1:8000`; make sure no other process uses it.
+  ready to distribute.
+- The backend binds `127.0.0.1:8000` (or the next free port); the frontend
+  learns the actual port via `get_backend_url`, so collisions don't matter.
+- Version metadata is synced across `backend-rs/Cargo.toml`,
+  `src-tauri/Cargo.toml` and `tauri.conf.json` — bump all three together.

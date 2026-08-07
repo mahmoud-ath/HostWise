@@ -28,12 +28,42 @@ fn restart_backend(app: tauri::AppHandle) -> String {
 /// Tauri shell previously initialized NO subscriber, so all `tracing` output
 /// from `hostwise-backend` was silently dropped — leaving "no logs" when the
 /// app runs under a single `bun run tauri:dev` command.
+///
+/// Logs are written BOTH to stdout/stderr (visible in `tauri:dev`) AND to
+/// `<app-data>/logs/hostwise.log` — the file is what makes startup failures
+/// diagnosable on packaged Windows release builds, which have no console
+/// window (`windows_subsystem = "windows"`).
 fn init_tracing() {
+    use tracing_subscriber::prelude::*;
     use tracing_subscriber::EnvFilter;
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         EnvFilter::new("hostwise_backend=info,tower_http=info,hostwise=info")
     });
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+
+    let log_dir = rust_backend::data_dir().join("logs");
+    let file = std::fs::create_dir_all(&log_dir)
+        .ok()
+        .and_then(|_| {
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_dir.join("hostwise.log"))
+                .ok()
+        });
+
+    match file {
+        Some(file) => {
+            let stdout = tracing_subscriber::fmt::layer();
+            let file_layer = tracing_subscriber::fmt::layer()
+                .with_writer(file)
+                .with_ansi(false);
+            tracing_subscriber::registry()
+                .with(stdout.with_filter(filter.clone()))
+                .with(file_layer.with_filter(filter))
+                .init();
+        }
+        None => tracing_subscriber::fmt().with_env_filter(filter).init(),
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

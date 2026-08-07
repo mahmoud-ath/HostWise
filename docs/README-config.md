@@ -1,5 +1,10 @@
 # HostWise — Vacation Rental Intelligence Platform
 
+> ⚠️ **SUPERSEDED (2026-08-07):** This document predates the **native Rust
+> backend rewrite** (v0.7+). The Python/FastAPI/venv/uvicorn instructions it
+> contains no longer apply. See the current docs: `docs/run-and-production.md`,
+> `docs/BUILD.md` and `docs/CHANGELOG.md`.
+
 **Not a PMS. Not a booking platform.** An AI-powered analytics and financial intelligence layer for vacation rental hosts.
 
 ---

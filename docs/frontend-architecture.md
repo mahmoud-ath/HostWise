@@ -1,5 +1,10 @@
 # HostWise — Frontend Architecture
 
+> ⚠️ **SUPERSEDED (2026-08-07):** This document predates the **native Rust
+> backend rewrite** (v0.7+). The FastAPI backend references no longer apply.
+> See the current docs: `docs/run-and-production.md`, `docs/BUILD.md` and
+> `docs/CHANGELOG.md`.
+
 ## 1. Overview
 
 The frontend is a **Next.js 14 App Router** application written in

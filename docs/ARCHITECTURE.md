@@ -1,5 +1,10 @@
 # HostWise — Vacation Rental Intelligence Platform
 
+> ⚠️ **SUPERSEDED (2026-08-07):** This document predates the **native Rust
+> backend rewrite** (v0.7+). The Python/FastAPI architecture it describes no
+> longer exists. See the current docs: `docs/run-and-production.md`,
+> `docs/BUILD.md`, `docs/CHANGELOG.md` and `docs/rust-rewrite-prompt.md`.
+
 ## Architecture Document
 
 ---

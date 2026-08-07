@@ -61,7 +61,7 @@ fn emit_status(app: &AppHandle, status: &'static str, error: Option<String>) {
 }
 
 /// Platform app-data directory (mirrors the old backend launcher).
-fn data_dir() -> PathBuf {
+pub(crate) fn data_dir() -> PathBuf {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .map(PathBuf::from)

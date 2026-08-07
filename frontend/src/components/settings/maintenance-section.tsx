@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SectionCard } from "./section-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api";
 import {
   Wrench,
   Database,
@@ -41,12 +42,21 @@ export function MaintenanceSection() {
   const [copied, setCopied] = useState(false);
   const logs = useBackendLogs(200);
 
-  const apiUrl =
-    (typeof window !== "undefined" &&
-      "__TAURI_INTERNALS__" in window &&
-      "get_backend_url" in window)
-      ? "dynamic (Tauri)"
-      : process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+  // Resolve the ACTUAL backend URL the app is talking to (via the API client,
+  // which calls get_backend_url in Tauri or the /api/v1 proxy in the browser).
+  const [backendUrl, setBackendUrl] = useState<string>("resolving…");
+  useEffect(() => {
+    let active = true;
+    api
+      .getApiBaseUrl()
+      .then((url) => active && setBackendUrl(url))
+      .catch((err) =>
+        active && setBackendUrl(err instanceof Error ? err.message : String(err))
+      );
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const clearCache = () => {
     if (!confirm("Clear cached application data? Your data is safe; only cached values are removed.")) return;
@@ -96,7 +106,7 @@ export function MaintenanceSection() {
       "HostWise Diagnostics",
       `Backend status: ${backendStatus}`,
       `Backend ready: ${isReady}`,
-      `API URL: ${apiUrl}`,
+      `API URL: ${backendUrl}`,
       `User agent: ${navigator.userAgent}`,
       `Screen: ${window.screen.width}x${window.screen.height}`,
       `Local time: ${new Date().toISOString()}`,
@@ -148,7 +158,9 @@ export function MaintenanceSection() {
         </div>
         <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
           <span className="text-muted-foreground">API URL</span>
-          <span className="font-mono text-xs">{apiUrl}</span>
+          <span className="font-mono text-xs break-all text-right" title={backendUrl}>
+            {backendUrl}
+          </span>
         </div>
         <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
           <span className="text-muted-foreground">Security</span>

@@ -1817,7 +1817,7 @@ dependencies = [
 
 [[package]]
 name = "hostwise"
-version = "0.7.3"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "axum",
@@ -1830,11 +1830,12 @@ dependencies = [
  "tauri-plugin-opener",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
 name = "hostwise-backend"
-version = "0.7.3"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "argon2",
