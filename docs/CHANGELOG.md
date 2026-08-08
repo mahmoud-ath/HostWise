@@ -26,6 +26,10 @@
   Python/PyInstaller docs (`ARCHITECTURE.md`, `overall-architecture.md`,
   `README-config.md`, `production-overview.md`, `production-roadmap.md`,
   `frontend-architecture.md`) marked SUPERSEDED.
+- **Browser dev single-command runner** (`bun run dev:app` →
+  `frontend/scripts/dev.mjs`): starts `backend-rs` (`cargo run`, :8000) first,
+  waits for it to listen, then boots Next (:3000) — no more `ECONNREFUSED`
+  proxy spam. Both logs show in one terminal; Ctrl+C stops both.
 
 ### v0.7.5 — production CORS fix
 - **`frontend/src-tauri/src/rust_backend.rs`**: the embedded backend's CORS

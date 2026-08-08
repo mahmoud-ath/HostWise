@@ -54,10 +54,25 @@ bun run tauri:dev    # opens the native app window
 
 ## 3. Option B — Web / browser dev mode
 
-Two processes. In the browser the frontend uses a **relative** `/api/v1` base
-that the Next.js dev server proxies to the backend (see `next.config.js`). By
-dev convention the backend runs on **`http://127.0.0.1:8000`** — both `cargo run`
-and the Tauri in-process backend prefer port 8000 in dev.
+In the browser the frontend uses a **relative** `/api/v1` base that the Next.js
+dev server proxies to the backend (see `next.config.js`). By dev convention the
+backend runs on **`http://127.0.0.1:8000`** — both `cargo run` and the Tauri
+in-process backend prefer port 8000 in dev.
+
+### Recommended: single command
+
+```bash
+cd frontend
+bun install          # first time only
+bun run dev:app      # starts backend-rs (cargo run, :8000) + Next dev (:3000)
+```
+
+`dev:app` (`frontend/scripts/dev.mjs`) starts the Rust backend **first**, waits
+for it to listen on 8000, then boots Next — so the proxy never sees
+`ECONNREFUSED`. Both logs print in one terminal with `[backend]` / `[frontend]`
+prefixes; Ctrl+C stops both.
+
+### Or: two terminals
 
 ```bash
 # Terminal 1 — Rust backend → http://127.0.0.1:8000  (start this FIRST)
@@ -72,10 +87,10 @@ bun run dev
 
 Open **http://localhost:3000** in your browser.
 
-> **Start the backend before `bun run dev`.** The dev proxy targets the
-> backend's port when Next starts. If Next boots first (or the backend restarts
-> on a new port), `/api` calls 404/500 until you restart `next dev` (or touch
-> `next.config.js` to re-evaluate the rewrites).
+> **Start the backend before `bun run dev`.** The dev proxy targets
+> `127.0.0.1:8000` when Next starts. If Next boots first (or the backend isn't
+> running), every `/api` call logs `ECONNREFUSED` until the backend is up. If
+> you don't want to manage two terminals, use `bun run dev:app` above.
 
 ### ⚠️ The #1 gotcha: stale `PORT` env var
 
