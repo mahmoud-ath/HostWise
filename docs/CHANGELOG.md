@@ -30,6 +30,15 @@
   `frontend/scripts/dev.mjs`): starts `backend-rs` (`cargo run`, :8000) first,
   waits for it to listen, then boots Next (:3000) — no more `ECONNREFUSED`
   proxy spam. Both logs show in one terminal; Ctrl+C stops both.
+- **Legacy-schema reconciliation** (`backend-rs/src/core/db.rs`): databases
+  created by the old Python backend carry an unused `organization_id NOT NULL`
+  column (plus `is_deleted`/`sync_id` nullability differences) on the core
+  tables, so **every insert** (property / revenue / expense / reservation /
+  category) returned `500 {"error":"Database error"}`. On startup the backend
+  now rebuilds those tables in the Rust-compatible shape — drops
+  `organization_id`, defaults `is_deleted` to 0, makes `sync_id` nullable —
+  preserving all data. Idempotent (fresh Rust-created DBs are untouched).
+  Verified: property/revenue/expense inserts now return 201.
 
 ### v0.7.5 — production CORS fix
 - **`frontend/src-tauri/src/rust_backend.rs`**: the embedded backend's CORS
