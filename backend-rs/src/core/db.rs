@@ -154,7 +154,9 @@ async fn reconcile_legacy_schema(pool: &SqlitePool) -> anyhow::Result<()> {
             .await?;
         let r1 = sqlx::query(&ddl).execute(&mut *conn).await;
         let r2 = sqlx::query(&copy).execute(&mut *conn).await;
-        let r3 = sqlx::query(&format!("DROP TABLE {table}")).execute(&mut *conn).await;
+        let r3 = sqlx::query(&format!("DROP TABLE {table}"))
+            .execute(&mut *conn)
+            .await;
         let r4 = sqlx::query(&format!("ALTER TABLE {table}_new RENAME TO {table}"))
             .execute(&mut *conn)
             .await;

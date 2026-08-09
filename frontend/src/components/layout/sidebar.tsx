@@ -12,13 +12,13 @@ import {
   FileText,
   Upload,
   Settings,
-  Home,
   BookOpen,
   MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "next-themes";
 import { useI18n } from "@/lib/i18n";
+import { Logo } from "./logo";
 
 const navItems = [
   { href: "/", key: "nav.dashboard", icon: LayoutDashboard },
@@ -42,8 +42,8 @@ export function Sidebar() {
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:start-0 border-e bg-card">
       {/* Logo */}
-      <div className="flex items-center h-16 px-6 border-b">
-        <Home className="h-6 w-6 text-primary me-2" />
+      <div className="flex items-center h-16 px-6 border-b gap-2">
+        <Logo size={30} />
         <span className="text-xl font-bold">HostWise</span>
       </div>
 
@@ -73,7 +73,7 @@ export function Sidebar() {
       {/* User */}
       <div className="p-4 border-t">
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate">{user?.full_name}</p>
+          <p className="text-sm font-medium truncate">{user?.business_name || user?.full_name}</p>
           <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
         </div>
       </div>

@@ -447,6 +447,28 @@ pub async fn merge_expense_category(
     get_expense_category(pool, target_id).await
 }
 
+pub async fn merge_revenue_category(
+    pool: &SqlitePool,
+    source_id: &str,
+    target_id: &str,
+) -> Result<Option<RevenueCategory>, sqlx::Error> {
+    sqlx::query("UPDATE revenues SET category_id = ? WHERE category_id = ?")
+        .bind(target_id)
+        .bind(source_id)
+        .execute(pool)
+        .await?;
+    let now = now_iso();
+    sqlx::query(
+        "UPDATE revenue_categories SET deleted_at = ?, is_deleted = 1, updated_at = ? WHERE id = ?",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(source_id)
+    .execute(pool)
+    .await?;
+    get_revenue_category(pool, target_id).await
+}
+
 pub async fn insert_revenue_category(
     pool: &SqlitePool,
     c: &RevenueCategory,
@@ -574,11 +596,11 @@ pub async fn revenue_by_category(
     end: &str,
 ) -> Result<Vec<(String, f64, i64)>, sqlx::Error> {
     sqlx::query_as::<_, (String, f64, i64)>(
-        "SELECT COALESCE(c.name, 'Uncategorized') AS category_name, \
+        "SELECT COALESCE(NULLIF(TRIM(c.name), ''), NULLIF(TRIM(r.description), ''), 'Uncategorized') AS category_name, \
                 COALESCE(SUM(r.net_amount), 0.0) AS total, COUNT(*) AS count \
          FROM revenues r LEFT JOIN revenue_categories c ON c.id = r.category_id \
          WHERE r.deleted_at IS NULL AND r.is_deleted = 0 AND r.date >= ? AND r.date <= ? \
-         GROUP BY r.category_id ORDER BY total DESC",
+         GROUP BY category_name ORDER BY total DESC",
     )
     .bind(start)
     .bind(end)
@@ -592,11 +614,11 @@ pub async fn expenses_by_category(
     end: &str,
 ) -> Result<Vec<(String, f64, i64)>, sqlx::Error> {
     sqlx::query_as::<_, (String, f64, i64)>(
-        "SELECT COALESCE(c.name, 'Uncategorized') AS category_name, \
+        "SELECT COALESCE(NULLIF(TRIM(c.name), ''), NULLIF(TRIM(e.description), ''), 'Uncategorized') AS category_name, \
                 COALESCE(SUM(e.amount), 0.0) AS total, COUNT(*) AS count \
          FROM expenses e LEFT JOIN expense_categories c ON c.id = e.category_id \
          WHERE e.deleted_at IS NULL AND e.is_deleted = 0 AND e.date >= ? AND e.date <= ? \
-         GROUP BY e.category_id ORDER BY total DESC",
+         GROUP BY category_name ORDER BY total DESC",
     )
     .bind(start)
     .bind(end)

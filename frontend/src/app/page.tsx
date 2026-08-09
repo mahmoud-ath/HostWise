@@ -185,10 +185,12 @@ function DashboardContent() {
               <RevenueBarChart
                 data={annualReport.monthly_breakdown || []}
                 title={`Revenue vs Expenses — ${periodLabel(period)}`}
+                currency={currency}
               />
               <CashflowLineChart
                 data={annualReport.monthly_breakdown || []}
                 title={`Cashflow Trend — ${periodLabel(period)}`}
+                currency={currency}
               />
             </>
           ) : null}

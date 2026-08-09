@@ -138,7 +138,27 @@ export interface PropertyRankingItem {
   net_revenue: number;
   reservation_count: number;
   health_score: number | null;
+  status: string;
   profit_margin: number;
+}
+
+export interface AnalyticsCategory {
+  category_name: string;
+  total: number;
+  percentage: number;
+  count: number;
+}
+
+export interface AnalyticsSeasonality {
+  month: number;
+  gross_revenue: number;
+  net_revenue: number;
+  total_expenses: number;
+}
+
+export interface HealthDistributionItem {
+  status: string;
+  count: number;
 }
 
 export interface PortfolioAnalytics {
@@ -156,11 +176,11 @@ export interface PortfolioAnalytics {
   cancellation_rate: number;
   avg_booking_window: number;
   forecast_next_month: number;
-  health_distribution: { excellent: number; good: number; average: number; poor: number };
+  health_distribution: HealthDistributionItem[];
   property_ranking: PropertyRankingItem[];
-  expense_categories: { name: string; total: number; percentage: number }[];
-  revenue_categories: { name: string; total: number; percentage: number }[];
-  seasonality: { month: number; gross_revenue: number; net_revenue: number; reservation_count: number; total_expenses: number }[];
+  expense_categories: AnalyticsCategory[];
+  revenue_categories: AnalyticsCategory[];
+  seasonality: AnalyticsSeasonality[];
 }
 
 export interface AIRecommendation {

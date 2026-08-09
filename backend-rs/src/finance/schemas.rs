@@ -32,6 +32,8 @@ pub struct RevenueCreateRequest {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct RevenueUpdateRequest {
+    pub property_id: Option<String>,
+    pub date: Option<String>,
     pub category_id: Option<String>,
     pub gross_amount: Option<f64>,
     pub commission_amount: Option<f64>,
@@ -60,6 +62,8 @@ pub struct ExpenseCreateRequest {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct ExpenseUpdateRequest {
+    pub property_id: Option<String>,
+    pub date: Option<String>,
     pub category_id: Option<String>,
     pub amount: Option<f64>,
     pub currency: Option<String>,

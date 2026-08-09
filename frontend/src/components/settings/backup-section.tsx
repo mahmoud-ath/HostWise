@@ -5,7 +5,9 @@ import { SectionCard } from "./section-card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useBackupStatus } from "@/hooks/use-api";
+import { useBackend } from "@/contexts/backend-context";
 import { useI18n } from "@/lib/i18n";
+import { useQueryClient } from "@tanstack/react-query";
 import { Database, Download, RefreshCw, RotateCcw, Trash2, CalendarClock, Upload } from "lucide-react";
 
 interface Backup {
@@ -41,16 +43,28 @@ function Stat({ label, value }: { label: string; value: string }) {
 export function BackupSection() {
   const { data: status, isLoading } = useBackupStatus();
   const { t } = useI18n();
+  const { restartBackend } = useBackend();
+  const queryClient = useQueryClient();
   const [backups, setBackups] = useState<Backup[]>([]);
   const [creating, setCreating] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  const refreshStatus = () => {
+    // Keep the stat cards (last/next backup, storage) in sync with the list.
+    queryClient.invalidateQueries({ queryKey: ["backup-status"] });
+  };
+
   const loadBackups = async () => {
     try {
-      setBackups(await api.get<Backup[]>("/backups/"));
+      setBackups(await api.get<Backup[]>("/backups"));
     } catch {
       // ignore
     }
+  };
+
+  const refreshAll = async () => {
+    refreshStatus();
+    await loadBackups();
   };
 
   useEffect(() => {
@@ -61,7 +75,7 @@ export function BackupSection() {
     setCreating(true);
     try {
       await api.post("/backups/create");
-      await loadBackups();
+      await refreshAll();
     } catch {
       // ignore
     } finally {
@@ -77,7 +91,7 @@ export function BackupSection() {
       formData.append("file", file);
       const resp = await fetch(`${host}/api/v1/backups/upload`, { method: "POST", body: formData });
       if (!resp.ok) throw new Error("Upload failed");
-      await loadBackups();
+      await refreshAll();
     } catch (err) {
       alert("Failed to upload backup.");
     } finally {
@@ -89,7 +103,12 @@ export function BackupSection() {
     if (!confirm(`Restore database from "${name}"?\nA safety backup will be created first.`)) return;
     try {
       await api.post(`/backups/restore/${encodeURIComponent(name)}`);
-      alert("Database restored! The app will restart.");
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        // The backend is embedded in the desktop process — restart it so it
+        // reopens the restored database from disk (a plain reload keeps the
+        // old open connection and the restore appears to do nothing).
+        await restartBackend();
+      }
       window.location.reload();
     } catch {
       alert("Failed to restore backup.");
@@ -116,7 +135,7 @@ export function BackupSection() {
   const remove = async (name: string) => {
     try {
       await api.delete(`/backups/${encodeURIComponent(name)}`);
-      await loadBackups();
+      await refreshAll();
     } catch {
       // ignore
     }

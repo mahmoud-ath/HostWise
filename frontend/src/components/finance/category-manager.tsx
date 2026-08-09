@@ -4,18 +4,16 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, GitMerge, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X } from "lucide-react";
 import {
   useExpenseCategories,
   useRevenueCategories,
   useCreateExpenseCategory,
   useUpdateExpenseCategory,
   useDeleteExpenseCategory,
-  useMergeExpenseCategory,
   useCreateRevenueCategory,
   useUpdateRevenueCategory,
   useDeleteRevenueCategory,
-  useMergeRevenueCategory,
   type ExpenseCategory,
   type RevenueCategory,
 } from "@/hooks/use-api";
@@ -85,8 +83,6 @@ function ExpenseCategoryList() {
   const { data: cats, isLoading } = useExpenseCategories();
   const rename = useUpdateExpenseCategory();
   const del = useDeleteExpenseCategory();
-  const merge = useMergeExpenseCategory();
-  const [targets, setTargets] = useState<Record<string, string>>({});
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   const list = cats || [];
@@ -97,18 +93,11 @@ function ExpenseCategoryList() {
   };
   const handleDelete = (c: ExpenseCategory) => {
     if (c.is_default) {
-      alert("Default categories cannot be deleted — merge them instead.");
+      alert("Default categories cannot be deleted.");
       return;
     }
     if (window.confirm(`Delete "${c.name}"? Its expenses will become "Uncategorized".`)) {
       del.mutate(c.id);
-    }
-  };
-  const handleMerge = (c: ExpenseCategory) => {
-    const target_id = targets[c.id];
-    if (!target_id) return;
-    if (window.confirm(`Merge "${c.name}" into the selected category? This cannot be undone.`)) {
-      merge.mutate({ id: c.id, target_id });
     }
   };
 
@@ -129,21 +118,6 @@ function ExpenseCategoryList() {
             </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <select
-              value={targets[c.id] || ""}
-              onChange={(e) => setTargets((p) => ({ ...p, [c.id]: e.target.value }))}
-              className="h-8 rounded-md border bg-background px-2 text-xs"
-            >
-              <option value="">Merge into…</option>
-              {list
-                .filter((x) => x.id !== c.id)
-                .map((x) => (
-                  <option key={x.id} value={x.id}>{x.name}</option>
-                ))}
-            </select>
-            <Button variant="outline" size="icon" className="h-8 w-8" title="Merge" onClick={() => handleMerge(c)}>
-              <GitMerge className="h-3.5 w-3.5" />
-            </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" title="Rename" onClick={() => handleRename(c)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -161,8 +135,6 @@ function RevenueCategoryList() {
   const { data: cats, isLoading } = useRevenueCategories();
   const rename = useUpdateRevenueCategory();
   const del = useDeleteRevenueCategory();
-  const merge = useMergeRevenueCategory();
-  const [targets, setTargets] = useState<Record<string, string>>({});
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   const list = cats || [];
@@ -173,18 +145,11 @@ function RevenueCategoryList() {
   };
   const handleDelete = (c: RevenueCategory) => {
     if (c.is_default) {
-      alert("Default categories cannot be deleted — merge them instead.");
+      alert("Default categories cannot be deleted.");
       return;
     }
     if (window.confirm(`Delete "${c.name}"? Its revenue will become "Uncategorized".`)) {
       del.mutate(c.id);
-    }
-  };
-  const handleMerge = (c: RevenueCategory) => {
-    const target_id = targets[c.id];
-    if (!target_id) return;
-    if (window.confirm(`Merge "${c.name}" into the selected category? This cannot be undone.`)) {
-      merge.mutate({ id: c.id, target_id });
     }
   };
 
@@ -205,21 +170,6 @@ function RevenueCategoryList() {
             </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <select
-              value={targets[c.id] || ""}
-              onChange={(e) => setTargets((p) => ({ ...p, [c.id]: e.target.value }))}
-              className="h-8 rounded-md border bg-background px-2 text-xs"
-            >
-              <option value="">Merge into…</option>
-              {list
-                .filter((x) => x.id !== c.id)
-                .map((x) => (
-                  <option key={x.id} value={x.id}>{x.name}</option>
-                ))}
-            </select>
-            <Button variant="outline" size="icon" className="h-8 w-8" title="Merge" onClick={() => handleMerge(c)}>
-              <GitMerge className="h-3.5 w-3.5" />
-            </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" title="Rename" onClick={() => handleRename(c)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>

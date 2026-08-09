@@ -74,7 +74,7 @@ export default function ReportsPage() {
         {!isLoading && !isError && report && (
           <>
             <div className="space-y-6 print:hidden">
-              <ReportsContent report={report} />
+              <ReportsContent report={report} currency={currency} />
             </div>
             <div className="hidden print:block">
               <ReportPrintView report={report} />
@@ -86,7 +86,7 @@ export default function ReportsPage() {
   );
 }
 
-function ReportsContent({ report }: { report: PortfolioReport }) {
+function ReportsContent({ report, currency }: { report: PortfolioReport; currency: string }) {
   return (
     <div className="space-y-6">
       <ExecutiveSummary report={report} />
@@ -94,8 +94,8 @@ function ReportsContent({ report }: { report: PortfolioReport }) {
       <KpiComparison report={report} />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <RevenueBarChart data={report.monthly_breakdown || []} title="Monthly Revenue" />
-        <CashflowLineChart data={report.monthly_breakdown || []} title="Cashflow Trend" />
+        <RevenueBarChart data={report.monthly_breakdown || []} title="Monthly Revenue" currency={currency} />
+        <CashflowLineChart data={report.monthly_breakdown || []} title="Cashflow Trend" currency={currency} />
       </div>
 
       <PropertyPerformance report={report} />

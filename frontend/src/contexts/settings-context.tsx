@@ -112,8 +112,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const save = useCallback(async () => {
     setSaving(true);
     try {
+      // Send ONLY the keys that actually changed — never the whole draft.
+      // This avoids re-writing untouched defaults and keeps the masked AI key
+      // placeholder (or any secret) from being echoed back to the backend.
+      const changes: Record<string, any> = {};
+      for (const k of Object.keys(draft)) {
+        if (draft[k] !== settings[k]) changes[k] = draft[k];
+      }
       const data = await api.put<Record<string, any>>("/settings", {
-        settings: draft,
+        settings: changes,
       });
       setSettings((prev) => ({ ...prev, ...data }));
       setDraft((prev) => ({ ...prev, ...data }));
@@ -126,7 +133,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } finally {
       setSaving(false);
     }
-  }, [draft, queryClient]);
+  }, [draft, settings, queryClient]);
 
   const reset = useCallback(() => {
     setDraft(settings);

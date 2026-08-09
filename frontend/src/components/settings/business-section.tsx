@@ -32,16 +32,16 @@ export function BusinessSection() {
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label className="text-xs">Business Name</Label>
+          <Label className="text-xs">{t("settings.businessName")}</Label>
           <Input
             className="mt-1"
             value={get("business_name", "")}
             onChange={(e) => updateSetting("business_name", e.target.value)}
-            placeholder="Your business name"
+            placeholder={t("settings.businessNamePlaceholder")}
           />
         </div>
         <div>
-          <Label className="text-xs">Email</Label>
+          <Label className="text-xs">{t("settings.email")}</Label>
           <Input
             className="mt-1"
             type="email"
@@ -53,19 +53,19 @@ export function BusinessSection() {
       </div>
 
       <div className="mt-2 divide-y">
-        <SettingRow label="Country" hint="Where your business is based">
+        <SettingRow label={t("settings.country")} hint={t("settings.countryHint")}>
           <select
             className={selectCls}
             value={get("country", "")}
             onChange={(e) => updateSetting("country", e.target.value)}
           >
-            <option value="">— Select —</option>
+            <option value="">{t("settings.selectCountry")}</option>
             {COUNTRIES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </SettingRow>
-        <SettingRow label="Default Currency" hint="Used across the app for formatting & reports">
+        <SettingRow label={t("settings.defaultCurrency")} hint={t("settings.currencyHint")}>
           <select
             className={selectCls}
             value={get("default_currency", "EUR")}
@@ -76,7 +76,7 @@ export function BusinessSection() {
             ))}
           </select>
         </SettingRow>
-        <SettingRow label="Language" hint="Formats dates & numbers; Arabic switches the UI to RTL">
+        <SettingRow label={t("settings.language")} hint={t("settings.languageHint")}>
           <select
             className={selectCls}
             value={get("language", "English")}
@@ -87,7 +87,7 @@ export function BusinessSection() {
             ))}
           </select>
         </SettingRow>
-        <SettingRow label="Tax Rate" hint="Used in the Tax Summary">
+        <SettingRow label={t("settings.taxRate")} hint={t("settings.taxRateHint")}>
           <Input
             type="number"
             className="h-9 w-24 text-right"
@@ -97,7 +97,7 @@ export function BusinessSection() {
             onChange={(e) => updateSetting("tax_rate", parseFloat(e.target.value) || 0)}
           />
         </SettingRow>
-        <SettingRow label="Fiscal Year Start">
+        <SettingRow label={t("settings.fiscalYearStart")}>
           <select
             className={selectCls}
             value={get("fiscal_year_start", 1)}

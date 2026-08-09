@@ -325,8 +325,8 @@ impl ReportGenerationService {
                 "score": score,
                 "status": status,
                 "components": {
-                    "revenue": components["revenue"],
-                    "profit": components["revenue"],
+                    "revenue": components["growth"],
+                    "profit": components["profit"],
                     "expenses": components["expenses"],
                     "revenue_change_pct": growth,
                 },
@@ -353,20 +353,21 @@ impl ReportGenerationService {
             .unwrap_or_default()
             .into_iter()
             .map(|r| {
-                let conf = r["confidence"].as_f64().unwrap_or(0.5);
                 json!({
-                    "level": if conf >= 0.85 { "high" } else { "medium" },
-                    "title": r["risk"],
-                    "detail": r["impact"],
+                    "level": r["level"].as_str().unwrap_or("medium"),
+                    "title": r["property_name"],
+                    "detail": r["recommendation"],
                 })
             })
             .collect();
 
         // AI insights in the frontend shape.
-        let opportunities = ai["opportunities"].as_array().cloned().unwrap_or_default();
-        let mut drivers: Vec<Value> = opportunities
-            .iter()
-            .map(|o| json!({ "label": o["title"], "detail": o["cause"] }))
+        let mut drivers: Vec<Value> = ai["opportunities"]["actions"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|o| json!({ "label": o["title"], "detail": o["detail"] }))
             .collect();
         if drivers.is_empty() {
             drivers.push(json!({
@@ -379,11 +380,10 @@ impl ReportGenerationService {
             .as_array()
             .and_then(|a| a.first())
             .map(|r| {
-                let conf = r["confidence"].as_f64().unwrap_or(0.5);
                 json!({
-                    "level": if conf >= 0.85 { "high" } else { "medium" },
-                    "title": r["risk"],
-                    "cause": r["impact"],
+                    "level": r["level"].as_str().unwrap_or("medium"),
+                    "title": r["property_name"],
+                    "cause": r["recommendation"],
                     "suggested_action": Value::Null,
                 })
             })

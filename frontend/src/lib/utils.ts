@@ -54,6 +54,16 @@ export function formatCurrencyDetailed(amount: number, currency: string = "EUR")
   }).format(amount);
 }
 
+/** Compact currency for chart axes (e.g. "$12K", "12K MAD"). */
+export function formatCurrencyCompact(amount: number, currency: string = "EUR"): string {
+  return new Intl.NumberFormat(activeLocale, {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
+}
+
 export function formatPercentage(value: number): string {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }

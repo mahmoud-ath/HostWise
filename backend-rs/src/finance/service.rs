@@ -112,6 +112,12 @@ impl FinanceService {
             .await?
             .ok_or(AppError::NotFound)?;
 
+        if let Some(v) = req.property_id {
+            r.property_id = v;
+        }
+        if let Some(v) = req.date {
+            r.date = v;
+        }
         if let Some(v) = req.gross_amount {
             r.gross_amount = v;
             r.net_amount = r.gross_amount - r.commission_amount;
@@ -156,10 +162,17 @@ impl FinanceService {
 
     pub async fn create_expense(&self, req: ExpenseCreateRequest) -> Result<Expense, AppError> {
         let now = now_iso();
+        // The form's "category" field arrives as `description`: use it to
+        // find-or-create an expense category, mirroring revenue behavior.
+        let mut category_id = req.category_id;
+        let desc = req.description.as_deref().unwrap_or("").trim().to_string();
+        if category_id.is_none() && !desc.is_empty() {
+            category_id = Some(repo::find_or_create_expense_category(&self.pool, &desc).await?);
+        }
         let expense = Expense {
             id: Uuid::new_v4().to_string(),
             property_id: req.property_id,
-            category_id: req.category_id,
+            category_id,
             date: req.date,
             amount: req.amount,
             currency: req.currency,
@@ -216,6 +229,12 @@ impl FinanceService {
             .await?
             .ok_or(AppError::NotFound)?;
 
+        if let Some(v) = req.property_id {
+            e.property_id = v;
+        }
+        if let Some(v) = req.date {
+            e.date = v;
+        }
         if let Some(v) = req.category_id {
             e.category_id = Some(v);
         }
@@ -232,7 +251,13 @@ impl FinanceService {
             e.payment_method = Some(v);
         }
         if let Some(v) = req.description {
+            let new_desc = v.trim().to_string();
             e.description = Some(v);
+            // Re-categorize on description-only edits when no category is set.
+            if e.category_id.is_none() && !new_desc.is_empty() {
+                e.category_id =
+                    Some(repo::find_or_create_expense_category(&self.pool, &new_desc).await?);
+            }
         }
         if let Some(v) = req.notes {
             e.notes = Some(v);
@@ -384,6 +409,21 @@ impl FinanceService {
         c.updated_at = now_iso();
         repo::update_revenue_category(&self.pool, &c).await?;
         Ok(c)
+    }
+
+    pub async fn merge_revenue_category(
+        &self,
+        source_id: &str,
+        target_id: &str,
+    ) -> Result<RevenueCategory, AppError> {
+        if source_id == target_id {
+            return Err(AppError::Validation(
+                "cannot merge a category into itself".into(),
+            ));
+        }
+        repo::merge_revenue_category(&self.pool, source_id, target_id)
+            .await?
+            .ok_or(AppError::NotFound)
     }
 
     pub async fn delete_revenue_category(&self, id: &str) -> Result<(), AppError> {

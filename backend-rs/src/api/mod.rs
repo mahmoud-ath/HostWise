@@ -47,9 +47,17 @@ async fn health(State(state): State<AppState>) -> Json<serde_json::Value> {
         .await
         .is_ok();
 
+    let schema_version: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(version), 0) FROM _sqlx_migrations WHERE success = 1",
+    )
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
+
     Json(json!({
         "status": if db_up { "ok" } else { "degraded" },
         "version": state.config.app_version,
+        "schema_version": schema_version,
         "database": if db_up { "up" } else { "down" },
     }))
 }

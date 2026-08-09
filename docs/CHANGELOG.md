@@ -6,7 +6,186 @@
 
 ---
 
-## 1. Recent changes (2026-08-07)
+## 1. Recent changes (2026-08-09)
+
+### v0.8.0 — official logo, production-ready settings save, coherent settings UX
+
+**Branding — official logo**
+- Adopted the official HostWise logo (white rounded tile, two gradient house
+  loops with a chimney, and the window / checklist / bar-chart glyphs).
+  Source master: `logo_hostwise.png` → cropped to a square
+  `frontend/public/logo-1024.png` (`frontend/src/app/icon.png` = web favicon).
+- Regenerated the entire Tauri icon set (`src-tauri/icons/*`: `icon.png`,
+  `icon.ico`, `icon.icns`, Square* + Windows/macOS/iOS/Android variants) from
+  the new logo via `tauri icon`.
+- Replaced the in-app placeholder marks (lucide `Home` / `Rocket`) with the new
+  `Logo` component (`frontend/src/components/layout/logo.tsx`) in the sidebar,
+  the mobile header (`app-shell`) and the welcome wizard; added favicon metadata
+  in `app/layout.tsx`.
+
+**Root cause fix — desktop could not save settings (CORS missing PUT)**
+- See the dedicated section below: `backend-rs/src/lib.rs` CORS now allows
+  `PUT`, so saving settings works in the Tauri desktop window, not just the
+  browser dev proxy.
+
+**Settings workflow (previous section below) + version bump to 0.8.0**
+- Version bumped to `0.8.0` across `backend-rs/Cargo.toml`,
+  `frontend/src-tauri/Cargo.toml`, `tauri.conf.json` and `frontend/package.json`.
+
+### Root cause: desktop (Tauri) could not save settings — missing PUT in CORS
+- **Symptom:** saving settings worked in the browser (`localhost:3000`) but not
+  in the desktop window (`bun run tauri:dev`) — changes looked "not applied".
+- **Root cause:** the backend CORS layer (`backend-rs/src/lib.rs`) allowed
+  `GET, POST, PATCH, DELETE, OPTIONS` but **not `PUT`**. In the browser the
+  Next dev server proxies `/api/*` to the backend (same-origin, no CORS), so
+  every method worked. In the Tauri webview the frontend calls the backend
+  **directly** (cross-origin `localhost:3000 → 127.0.0.1:8000`), so writes
+  trigger a CORS preflight; the preflight answered "PUT not allowed" and the
+  browser/webview blocked the request. GETs are "simple" requests, which is why
+  the desktop could load data but never persist a settings save.
+- **Fix:** added `Method::PUT` to `CorsLayer::allow_methods`. Verified with a
+  real preflight (`OPTIONS`) against a rebuilt backend: the allow list is now
+  `GET,POST,PUT,PATCH,DELETE,OPTIONS` and a cross-origin `PUT /settings`
+  returns 200. `cargo check --all-targets`, `cargo test`, and `cargo fmt` green.
+- **To pick up:** restart `bun run tauri:dev` (Tauri depends on `backend-rs` by
+  path, so it rebuilds the embedded binary automatically).
+
+### Settings — coherent save workflow, business identity & welcome wizard
+- **Settings context saves only the changed keys** (`save()` diffs the draft
+  against the committed settings instead of PUTting the whole 36-key draft).
+  This stops re-writing untouched defaults and never echoes the masked
+  `ai_api_key` placeholder back to the backend. Verified: only the edited key
+  changes on the server; unrelated values (currency, tax rate, appearance)
+  are preserved.
+- **Unsaved-changes guard** — new `useConfirmLeave(dirty)` hook on the Settings
+  page. Leaving the page (in-app link click or browser close/reload) with
+  pending edits now shows *"You have unsaved changes. Leave without saving?"*
+  instead of silently dropping the draft.
+- **Sidebar identity = `business_name`** — the sidebar `{/* User */}` block now
+  renders `business_name` (committed settings, so it updates on Save — same rule
+  as theme/language) instead of the old `profile_name || business_name` mix.
+  `auth-context.tsx` exposes `user.business_name`.
+- **Welcome wizard is coherent with Settings** — the field is now *"Your
+  business name"* (all 5 languages), pre-filled from existing settings, and on
+  submit writes `business_name` + `profile_email` + `profile_name` via
+  `PUT /settings` (keeping `/setup/initialize` for DB init). No more orphaned
+  `profile_name` that the Business tab can't edit.
+- **Backup stats refresh** — `BackupSection` now invalidates the
+  `["backup-status"]` query after create/upload/delete, so the stat cards
+  (last/next backup, storage) stay in sync with the backup list.
+- All settings tabs exercised in the browser against the running backend:
+  Business (save/discard/currency/tax), AI (provider switch, API-key
+  save→mask→clear→test-connection), Appearance (theme applies only on Save,
+  accent, compact), Backup (create + stats refresh), Notifications (toggle),
+  Maintenance (optimize, copy diagnostics, logs, cache), Import, About.
+
+### AI Advisor — coherent scoring, sentence summary, opportunities & PDF layout
+- **Health score components** are now four self-explanatory pillars
+  (`profit`, `growth`, `expenses`, `risk`) on a 0–100 scale; the overall score is
+  a weighted average of them, so it matches what the bars show. The frontend
+  labels them *Profitability / Revenue Trend / Expenses / Risk* with a caption
+  explaining each. Reports `portfolio_health` uses the same pillars (Revenue bar
+  now reflects the YoY trend, fixing the contradictory "100/100 while ↓34%").
+- **Executive AI Summary** is now written as plain sentences
+  (e.g. "Your portfolio generated $16,237 in net revenue against $3,228 in
+  expenses, leaving a profit of $13,009 — a 80.1% margin…").
+- **Opportunities & Lost Revenue** are coherent: `opportunities.actions` are
+  concrete levers tied to real gaps (recover revenue decline, improve occupancy,
+  reduce cancellations, capture growth) with per-lever gains; `lost_revenue`
+  equals the sum of its itemized reasons.
+- **PDF**: added a "Print / Save PDF" button on the Reports page that renders the
+  styled CSS print view (cover, KPI cards, CSS bar charts, tables). The backend
+  **Generate Report** PDF (`reports/pdf_service.rs`) was rewritten from plain
+  text into a structured, visual A4 report: cover band, sentence executive
+  summary, **KPI cards**, **AI Executive Insights** with risk/recommendation
+  callout boxes, a **monthly revenue-vs-expenses bar chart** (drawn with printpdf
+  shapes), **property performance** and **expense analysis** tables, risks with
+  level chips, recommended actions, and per-page footers with page numbers
+  (auto-pagination).
+
+### AI Advisor — crash fix + logical section outputs (rules engine)
+
+- **Contract fix:** `generate_advisor_report` (`backend-rs/src/ai/rules.rs`) now
+  emits exactly the shapes the frontend `AdvisorReport` type expects. Previously
+  `opportunities` was a flat array and `lost_revenue` a bare number, which
+  crashed the AI Advisor page (`undefined is not an object (evaluating
+  'opp.actions.map')`); `risks` and `forecast` also had mismatched shapes and
+  rendered garbage.
+- **Every section now has real, logical output** (several were hardcoded empty):
+  - **Health score** — transparent composite (profit margin 30 · occupancy 20 ·
+    expense ratio 20 · cancellations 15 · booking value 15), 0–100, with
+    component bars on a 0–100 scale; mirrors the per-property analytics score.
+  - **Executive summary** — narrative includes margin, expense ratio, cancellation rate.
+  - **Opportunities** — upside = cancellation leakage + recoverable revenue
+    change (|YoY growth|); each action carries a real gain and the actionable step.
+  - **Lost revenue** — itemized reasons (cancellations, revenue decline) with amounts.
+  - **Risks** — per-property (negative margin → high; health < 40 or low occupancy → medium).
+  - **Property reviews** — generated for every property (strengths, weaknesses,
+    AI summary, suggested action) from the ranking + per-property expense
+    ratio/occupancy (now exposed on `property_ranking`).
+  - **Trend explanations** — why net revenue / expenses / profit changed vs the
+    same window a year earlier (volume, cancellations, spending).
+  - **Recommended goals** — concrete targets (expense ratio, occupancy, margin,
+    cancellations, revenue growth) with progress.
+  - **Achievements** — wins based on margin, cancellations, growth, cost ratio, activity.
+  - **Forecast** — expected next-month revenue, risk level aligned to health
+    status, best property, and a data-driven confidence.
+- **YoY growth exposed** in the rules `metrics` (`revenue_growth_yoy`) so the
+  growth-driven goals / reasons / achievements actually trigger.
+- **Reports + Dashboard AI consumers updated** for the new advisor shapes:
+  `reports/service.rs` now maps `ai["risks"]` (per-property → RiskItem), builds
+  `ai_insights.drivers` from `opportunities.actions`, and derives `biggest_risk`
+  from the per-property risks. The dashboard only reads `executive_summary` +
+  `priority_actions` (unchanged shapes) — verified rendering in the browser.
+- Frontend `opportunities.tsx` hardened with array guards so it never throws on
+  partial / LLM-shaped data.
+- **Note:** the desktop backend is compiled by `tauri dev` into
+  `frontend/src-tauri/target/debug/hostwise`; backend-rs source changes go live
+  after restarting `bun run tauri:dev`.
+
+## 2. Recent changes (2026-08-08)
+
+### v0.7.6 — production & settings audit (2026-08-08)
+
+A page-by-page production audit of **Finance, Import, Analytics, Reports,
+Feedback and Settings** (frontend + Rust backend together, verified against
+`bun run tauri:dev`). Fixes, all uncommitted until reviewed:
+
+- **Finance** — added the missing `POST /finance/revenue-categories/{id}/merge`
+  endpoint (the category manager called it; only the expense version existed).
+  `PATCH /finance/revenue|expense/{id}` now persists `date` and `property_id`
+  (previously ignored).
+- **Reports PDF** (`backend-rs/src/reports/pdf_service.rs`) — the PDF read
+  `executive_summary` as a string but the API returns an object (so the
+  section rendered empty), and risk lines used the wrong key (`risk` vs
+  `title`). Both fixed.
+- **Settings → Backup list** — the frontend called `GET /backups/` (404); the
+  backend serves `GET /backups`. Fixed the frontend path (axum does not
+  normalise the trailing slash).
+- **Settings → About** — versions were hardcoded (`v0.5.0` / backend `0.1.0`).
+  `/api/health` now also returns `schema_version` (applied migration count)
+  and the About tab displays the real app version + migration count.
+- **AI settings** — the API-key **Clear** button did nothing (empty string was
+  treated as "keep"); only the `••` masked placeholder is preserved now and an
+  empty string actually clears the key. `ai_base_url` is validated (must be
+  http(s) with a host → 422 otherwise).
+- **Backup restore** — restore copied the file but the open pool + stale
+  `-wal`/`-shm` sidecars made it a no-op. The backend now removes the sidecars
+  after copying, and the desktop frontend calls `restart_backend` so the
+  embedded backend reopens the restored database.
+- **CSV import encoding** — `import_encoding` was ignored (always decoded as
+  UTF-8). Added the `encoding_rs` crate; ISO-8859-1 / Windows-1252 (mapped to
+  windows-1252 per WHATWG) / UTF-16 (BOM-aware) files now decode correctly,
+  and the upload preview uses the configured encoding too.
+- **Dashboard / Reports charts** — the Y-axis was hardcoded `$` and tooltips
+  defaulted to EUR. Added `formatCurrencyCompact` + a `currency` prop (falls
+  back to the `default_currency` setting) to the shared charts and passed the
+  currency at both call sites.
+- **Settings → Business** — field labels were hardcoded English while the
+  section title/description were translated; labels now use i18n keys across
+  all 5 languages.
+- **`frontend/package.json`** version synced `0.4.0 → 0.7.6` to match
+  `backend-rs` / `src-tauri` / `tauri.conf.json`.
 
 ### v0.7.6 — diagnostics + version sync
 - **`api.ts` no longer hides `get_backend_url` failures.** In the Tauri webview

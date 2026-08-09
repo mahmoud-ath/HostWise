@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
-import { CheckCircle2, Loader2, Server, Database, Brain, Rocket, User } from "lucide-react";
+import { useSettings } from "@/contexts/settings-context";
+import { CheckCircle2, Loader2, Server, Database, Brain, User } from "lucide-react";
+import { Logo } from "./logo";
 
 const WELCOME_KEY = "hostwise_welcome_shown_v3";
 
@@ -19,6 +21,7 @@ interface SetupStep {
 
 export function WelcomeWizard() {
   const { t } = useI18n();
+  const { ready, settings } = useSettings();
   const [show, setShow] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,15 @@ export function WelcomeWizard() {
       setShow(true);
     }
   }, []);
+
+  // Pre-fill from settings that may already exist (e.g. after a reinstall),
+  // so the wizard is coherent with what's already stored on this device.
+  useEffect(() => {
+    if (ready && show) {
+      setName((prev) => prev || (settings.business_name && settings.business_name !== "HostWise" ? settings.business_name : ""));
+      setEmail((prev) => prev || settings.profile_email || "");
+    }
+  }, [ready, show, settings.business_name, settings.profile_email]);
 
   const runSteps = useCallback(async () => {
     setError(null);
@@ -79,12 +91,28 @@ export function WelcomeWizard() {
   }, [show, runSteps]);
 
   const saveProfile = async () => {
-    if (!name.trim()) return;
+    const businessName = name.trim();
+    if (!businessName) return;
     setSaving(true);
     try {
-      await api.post("/setup/initialize", { name: name.trim(), email: email.trim() || undefined });
+      // The business identity lives in the settings store — write the same
+      // keys the Settings → Business tab edits, so the sidebar/dashboard
+      // reflect what was entered here.
+      await api.put("/settings", {
+        settings: {
+          business_name: businessName,
+          profile_email: email.trim() || "",
+          profile_name: businessName,
+        },
+      });
+      // Keep the legacy setup endpoint in sync (DB init + profile row) so a
+      // reinstall that calls /setup/initialize still has coherent data.
+      await api.post("/setup/initialize", {
+        name: businessName,
+        email: email.trim() || undefined,
+      }).catch(() => undefined);
     } catch {
-      // ignore
+      // ignore — local app; the wizard can still be dismissed.
     }
     localStorage.setItem(WELCOME_KEY, "true");
     setSaving(false);
@@ -97,8 +125,8 @@ export function WelcomeWizard() {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
       <div className="mx-4 w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-            <Rocket className="h-8 w-8 text-primary" />
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center">
+            <Logo size={64} rounded="rounded-2xl" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">HostWise</h1>
           <p className="mt-2 text-muted-foreground">{t("app.tagline")}</p>

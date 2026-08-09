@@ -11,6 +11,16 @@ platform. It was written for **future developers**, **software architects**,
 > a professional PDF report layout, and an automated backend test suite.
 > See the **What changed** note in [decision-log.md](./decision-log.md).
 
+> **Current status (2026-08-08):** v0.7.6 runs a **native Rust backend**
+> (`backend-rs/`, axum + sqlx/SQLite) embedded in-process inside the Tauri
+> desktop shell — no Python, no sidecar. A full production & settings audit
+> fixed several functional gaps (finance category merge, PDF export fields,
+> backup list + restore, AI key clear + base-url validation, CSV import
+> encodings, currency-driven charts, About versions). See
+> [CHANGELOG.md](./CHANGELOG.md) for what changed and
+> [run-and-production.md](./run-and-production.md) / [BUILD.md](./BUILD.md) for
+> how to run and build it.
+
 > The guiding principle throughout: HostWise is **not** a booking engine and
 > **not** a traditional PMS. It is the **analytics and intelligence layer** that
 > sits on top of booking data. Every architectural decision exists to serve

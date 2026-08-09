@@ -13,6 +13,7 @@ interface Profile {
   id: string;
   email: string;
   full_name: string;
+  business_name: string;
   is_active: boolean;
   avatar_url: string | null;
 }
@@ -26,15 +27,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { get, ready } = useSettings();
+  const { settings, get, ready } = useSettings();
 
   const full_name = get("profile_name", "") || get("business_name", "HostWise User");
+  // Business identity comes from the *committed* settings so the sidebar only
+  // updates after Save (same rule as theme/language), not while typing.
+  const business_name =
+    settings.business_name || get("business_name", "HostWise");
   const email = get("profile_email", "");
 
   const user: Profile = {
     id: "local",
     email,
     full_name,
+    business_name,
     is_active: true,
     avatar_url: null,
   };

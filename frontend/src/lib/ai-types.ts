@@ -7,9 +7,9 @@ export interface HealthScore {
   score: number | null;
   status: string;
   components: {
-    revenue: number | null;
-    expenses: number | null;
+    profit: number | null;
     growth: number | null;
+    expenses: number | null;
     risk: number | null;
   };
 }

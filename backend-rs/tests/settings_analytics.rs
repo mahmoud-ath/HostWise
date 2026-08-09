@@ -156,7 +156,7 @@ async fn settings_and_analytics_flow() {
         .unwrap();
 
     // ── Analytics: property KPIs for 2026 ──
-    let pa = analytics::get_property_analytics(&pool, &prop_id, 2026)
+    let pa = analytics::get_property_analytics(&pool, &prop_id, "2026-01-01", "2026-12-31")
         .await
         .expect("property analytics");
     // Revenue: 500 gross - 50 commission = 450 net.
@@ -176,7 +176,7 @@ async fn settings_and_analytics_flow() {
     assert_eq!(portfolio["total_net_revenue"].as_f64().unwrap(), 450.0);
     assert_eq!(portfolio["total_expenses"].as_f64().unwrap(), 100.0);
 
-    let health = analytics::get_property_health_score(&pool, &prop_id)
+    let health = analytics::get_property_health_score(&pool, &prop_id, "2026-01-01", "2026-12-31")
         .await
         .expect("health score");
     let score = health["score"].as_i64().unwrap();

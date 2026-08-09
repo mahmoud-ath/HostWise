@@ -31,21 +31,33 @@ fn get<'a>(row: &'a HashMap<String, String>, keys: &[&str]) -> &'a str {
     ""
 }
 
-fn read_bytes_lossy(path: &Path) -> Result<String, String> {
+fn read_bytes_encoded(path: &Path, encoding: &str) -> Result<String, String> {
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    let content = String::from_utf8_lossy(&bytes).to_string();
-    Ok(content
-        .strip_prefix('\u{feff}')
-        .unwrap_or(&content)
-        .to_string())
+    let text = match encoding {
+        // WHATWG maps ISO-8859-1 labels to windows-1252 (the practical superset).
+        "ISO-8859-1" | "Windows-1252" => encoding_rs::WINDOWS_1252.decode(&bytes).0.into_owned(),
+        "UTF-16" => {
+            // Honour a UTF-16 BOM when present; default to little-endian.
+            if bytes.starts_with(&[0xFF, 0xFE]) {
+                encoding_rs::UTF_16LE.decode(&bytes[2..]).0.into_owned()
+            } else if bytes.starts_with(&[0xFE, 0xFF]) {
+                encoding_rs::UTF_16BE.decode(&bytes[2..]).0.into_owned()
+            } else {
+                encoding_rs::UTF_16LE.decode(&bytes).0.into_owned()
+            }
+        }
+        _ => String::from_utf8_lossy(&bytes).to_string(),
+    };
+    Ok(text.strip_prefix('\u{feff}').unwrap_or(&text).to_string())
 }
 
 /// Read a CSV file into (columns, rows of string values).
 fn read_csv(
     path: &Path,
     delimiter: u8,
+    encoding: &str,
 ) -> Result<(Vec<String>, Vec<HashMap<String, String>>), String> {
-    let content = read_bytes_lossy(path)?;
+    let content = read_bytes_encoded(path, encoding)?;
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .has_headers(true)
@@ -69,8 +81,11 @@ fn read_csv(
 }
 
 /// Read a JSON file (array of objects or `{type, rows}`) into rows.
-fn read_json(path: &Path) -> Result<(Vec<String>, Vec<HashMap<String, String>>), String> {
-    let content = read_bytes_lossy(path)?;
+fn read_json(
+    path: &Path,
+    encoding: &str,
+) -> Result<(Vec<String>, Vec<HashMap<String, String>>), String> {
+    let content = read_bytes_encoded(path, encoding)?;
     let v: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
     let arr: Vec<Value> = match &v {
         Value::Array(a) => a.clone(),
@@ -112,21 +127,22 @@ fn read_json(path: &Path) -> Result<(Vec<String>, Vec<HashMap<String, String>>),
 /// Read a file, returning (format, columns, rows).
 pub fn read_file(
     path: &Path,
-    _encoding: Option<&str>,
+    encoding: Option<&str>,
     delimiter: Option<&str>,
 ) -> Result<(String, Vec<String>, Vec<HashMap<String, String>>), String> {
+    let enc = encoding.unwrap_or("UTF-8");
     let is_json = path
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.eq_ignore_ascii_case("json"))
         .unwrap_or(false);
     if is_json {
-        let (cols, rows) = read_json(path)?;
+        let (cols, rows) = read_json(path, enc)?;
         return Ok(("json".into(), cols, rows));
     }
     let delim = delimiter.unwrap_or(",");
     let delim_byte = delim.as_bytes().first().copied().unwrap_or(b',');
-    let (cols, rows) = read_csv(path, delim_byte)?;
+    let (cols, rows) = read_csv(path, delim_byte, enc)?;
     Ok(("csv".into(), cols, rows))
 }
 
@@ -609,7 +625,9 @@ pub async fn import_ical(
     file_path: &Path,
     property_id: &str,
 ) -> Result<Value, AppError> {
-    let content = read_bytes_lossy(file_path).map_err(AppError::Validation)?;
+    let all = settings::get_all(pool).await?;
+    let enc = all["import_encoding"].as_str().unwrap_or("UTF-8");
+    let content = read_bytes_encoded(file_path, enc).map_err(AppError::Validation)?;
     let events = ical::parse_ics(&content);
 
     if events.is_empty() {

@@ -8,8 +8,9 @@ import { WelcomeWizard } from "./welcome-wizard";
 import { NotificationBell } from "./notification-bell";
 import { useBackend } from "@/contexts/backend-context";
 import { useI18n } from "@/lib/i18n";
-import { Home, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
+import { Logo } from "./logo";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { isReady: backendReady, status: backendStatus } = useBackend();
@@ -32,9 +33,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <ConnectionBanner />
         <NotificationBell />
         <Sidebar />
-        <div className="lg:hidden flex items-center h-14 px-4 border-b">
+        <div className="lg:hidden flex items-center h-14 px-4 border-b gap-2">
           <Link href="/" className="flex items-center">
-            <Home className="h-5 w-5 text-primary me-2" />
+            <Logo size={26} />
             <span className="font-bold">HostWise</span>
           </Link>
         </div>

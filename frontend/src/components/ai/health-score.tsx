@@ -6,9 +6,9 @@ import { HeartPulse } from "lucide-react";
 import type { AdvisorReport } from "@/lib/ai-types";
 
 const COMPONENT_COLORS: Record<string, string> = {
-  revenue: "bg-primary",
+  profit: "bg-success",
+  growth: "bg-primary",
   expenses: "bg-blue-500",
-  growth: "bg-success",
   risk: "bg-amber-500",
 };
 
@@ -40,9 +40,9 @@ export function BusinessHealthScore({ report }: { report: AdvisorReport }) {
       : "text-destructive";
 
   const bars = [
-    { key: "revenue", label: "Revenue" },
+    { key: "profit", label: "Profitability" },
+    { key: "growth", label: "Revenue Trend" },
     { key: "expenses", label: "Expenses" },
-    { key: "growth", label: "Growth" },
     { key: "risk", label: "Risk" },
   ] as const;
 
@@ -81,6 +81,12 @@ export function BusinessHealthScore({ report }: { report: AdvisorReport }) {
               <ProgressBar value={health.components[b.key] ?? 0} color={COMPONENT_COLORS[b.key]} />
             </div>
           ))}
+          <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
+            Each pillar is scored out of 100: <strong>Profitability</strong> (profit margin),
+            <strong> Revenue Trend</strong> (year-over-year change), <strong>Expenses</strong> (share
+            of revenue consumed by costs) and <strong>Risk</strong> (cancellation rate). The overall
+            score is a weighted average of the four.
+          </p>
         </div>
       </div>
     </ReportSection>

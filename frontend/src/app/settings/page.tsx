@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n";
 import { useSettings } from "@/contexts/settings-context";
+import { useConfirmLeave } from "@/hooks/use-confirm-leave";
 import { BusinessSection } from "@/components/settings/business-section";
 import { AISection } from "@/components/settings/ai-section";
 import { BackupSection } from "@/components/settings/backup-section";
@@ -50,6 +51,9 @@ export default function SettingsPage() {
   const { t } = useI18n();
   const { save, reset, dirty, saving } = useSettings();
   const [feedback, setFeedback] = useState<"idle" | "saved" | "failed">("idle");
+
+  // Never let unsaved edits be silently dropped when leaving the page.
+  useConfirmLeave(dirty);
 
   const handleSave = async () => {
     const ok = await save();

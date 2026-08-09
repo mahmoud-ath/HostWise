@@ -71,6 +71,10 @@ pub fn build_router() -> Router<AppState> {
             "/revenue-categories/{id}",
             patch(update_revenue_category).delete(delete_revenue_category),
         )
+        .route(
+            "/revenue-categories/{id}/merge",
+            post(merge_revenue_category),
+        )
 }
 
 fn svc(state: AppState) -> FinanceService {
@@ -306,4 +310,15 @@ async fn delete_revenue_category(
 ) -> Result<StatusCode, AppError> {
     svc(state).delete_revenue_category(&id.to_string()).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn merge_revenue_category(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<CategoryMergeRequest>,
+) -> Result<Json<RevenueCategory>, AppError> {
+    let c = svc(state)
+        .merge_revenue_category(&id.to_string(), &req.target_id)
+        .await?;
+    Ok(Json(c))
 }

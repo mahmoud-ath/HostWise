@@ -141,7 +141,8 @@ function AnalyticsContent() {
       </p>
     );
 
-  const monthly = data.seasonality || [];
+  const monthly = (data.seasonality || []) as any[];
+  const prevMonthly = (prev?.seasonality || []) as any[];
   const prevByProp = new Map<string, any>(
     (prev?.property_ranking || []).map((p: any) => [p.property_id, p])
   );
@@ -153,12 +154,35 @@ function AnalyticsContent() {
     if (score >= 25) return "text-orange-500";
     return "text-red-500";
   };
+  const healthLabel = (score: number | null | undefined) => {
+    if (score == null) return "—";
+    if (score >= 80) return "Excellent";
+    if (score >= 60) return "Good";
+    if (score >= 40) return "Fair";
+    return "Poor";
+  };
 
   const ranking = [...(data.property_ranking || [])].sort(
     (a: any, b: any) => (b.net_revenue ?? 0) - (a.net_revenue ?? 0)
   );
 
-  const expCats = data.expense_categories || [];
+  const expCats = (data.expense_categories || []) as any[];
+  const prevExpCats = new Map<string, any>(
+    ((prev?.expense_categories || []) as any[]).map((c: any) => [c.category_name, c])
+  );
+
+  const dist = new Map<string, number>();
+  ((data.health_distribution || []) as any[]).forEach((d: any) => dist.set(d.status, d.count));
+  const prevDist = new Map<string, number>();
+  ((prev?.health_distribution || []) as any[]).forEach((d: any) =>
+    prevDist.set(d.status, d.count)
+  );
+  const HEALTH_STATUSES = [
+    { key: "excellent", label: "Excellent", color: "bg-emerald-500" },
+    { key: "good", label: "Good", color: "bg-blue-500" },
+    { key: "fair", label: "Average", color: "bg-amber-500" },
+    { key: "poor", label: "Poor", color: "bg-red-500" },
+  ] as const;
 
   return (
     <div className="space-y-6">
@@ -241,20 +265,34 @@ function AnalyticsContent() {
                   labels: monthly.map((m: any) => MONTHS[(m.month || 1) - 1]),
                   datasets: [
                     {
-                      label: "Revenue",
+                      label: compare && hasPrev ? `Revenue (${periodLabel(period)})` : "Revenue",
                       data: monthly.map((m: any) => Math.round(m.net_revenue || m.gross_revenue || 0)),
                       backgroundColor: "rgba(255, 56, 92, 0.7)",
                       borderColor: "rgb(255, 56, 92)",
                       borderWidth: 1,
                       borderRadius: 6,
                     },
+                    ...(compare && hasPrev
+                      ? [
+                          {
+                            label: `Prev (${periodLabel(previousPeriod(period))})`,
+                            data: prevMonthly.map((m: any) =>
+                              Math.round(m.net_revenue || m.gross_revenue || 0)
+                            ),
+                            backgroundColor: "rgba(148, 163, 184, 0.35)",
+                            borderColor: "rgb(148, 163, 184)",
+                            borderWidth: 1,
+                            borderRadius: 6,
+                          },
+                        ]
+                      : []),
                   ],
                 }}
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
                   plugins: {
-                    legend: { display: false },
+                    legend: { display: compare && hasPrev },
                     tooltip: {
                       callbacks: {
                         label: (ctx: any) => ` ${formatCurrency(ctx.raw as number, currency)}`,
@@ -290,20 +328,32 @@ function AnalyticsContent() {
                   labels: monthly.map((m: any) => MONTHS[(m.month || 1) - 1]),
                   datasets: [
                     {
-                      label: "Expenses",
+                      label: compare && hasPrev ? `Expenses (${periodLabel(period)})` : "Expenses",
                       data: monthly.map((m: any) => Math.round(m.total_expenses || 0)),
                       backgroundColor: "rgba(0, 132, 137, 0.7)",
                       borderColor: "rgb(0, 132, 137)",
                       borderWidth: 1,
                       borderRadius: 6,
                     },
+                    ...(compare && hasPrev
+                      ? [
+                          {
+                            label: `Prev (${periodLabel(previousPeriod(period))})`,
+                            data: prevMonthly.map((m: any) => Math.round(m.total_expenses || 0)),
+                            backgroundColor: "rgba(148, 163, 184, 0.35)",
+                            borderColor: "rgb(148, 163, 184)",
+                            borderWidth: 1,
+                            borderRadius: 6,
+                          },
+                        ]
+                      : []),
                   ],
                 }}
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
                   plugins: {
-                    legend: { display: false },
+                    legend: { display: compare && hasPrev },
                     tooltip: {
                       callbacks: {
                         label: (ctx: any) => ` ${formatCurrency(ctx.raw as number, currency)}`,
@@ -337,15 +387,31 @@ function AnalyticsContent() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {expCats.map((c: any) => (
-                <div key={c.name} className="flex items-center justify-between text-sm">
-                  <span>{c.name}</span>
-                  <span className="flex items-center gap-4">
-                    <span className="font-medium">{formatCurrency(c.total, currency)}</span>
-                    <span className="w-12 text-right text-xs text-muted-foreground">{c.percentage}%</span>
-                  </span>
-                </div>
-              ))}
+              {expCats.map((c: any) => {
+                const prev = prevExpCats.get(c.category_name);
+                const delta =
+                  prev && prev.total > 0 ? ((c.total - prev.total) / prev.total) * 100 : undefined;
+                return (
+                  <div key={c.category_name} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 truncate">{c.category_name}</span>
+                    <span className="flex shrink-0 items-center gap-4">
+                      {compare && hasPrev && (
+                        <span className="w-16 text-right text-xs">
+                          {delta === undefined ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className={delta > 0 ? "text-destructive" : "text-success"}>
+                              {delta > 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      <span className="font-medium">{formatCurrency(c.total, currency)}</span>
+                      <span className="w-12 text-right text-xs text-muted-foreground">{c.percentage}%</span>
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -393,8 +459,11 @@ function AnalyticsContent() {
                       )}
                       <td className="p-3 text-right text-muted-foreground">{p.reservation_count}</td>
                       <td className="p-3 text-right">
-                        <span className={`font-semibold ${healthColor(p.health_score)}`}>
+                        <span className={`inline-flex items-center gap-1.5 font-semibold ${healthColor(p.health_score)}`}>
                           {p.health_score?.toFixed(0) || "—"}
+                          <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {healthLabel(p.health_score)}
+                          </span>
                         </span>
                       </td>
                     </tr>
@@ -514,13 +583,9 @@ function AnalyticsContent() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {([
-              { label: "Excellent", key: "excellent", color: "bg-emerald-500" },
-              { label: "Good", key: "good", color: "bg-blue-500" },
-              { label: "Average", key: "average", color: "bg-amber-500" },
-              { label: "Poor", key: "poor", color: "bg-red-500" },
-            ] as const).map((item) => {
-              const count = data.health_distribution?.[item.key] || 0;
+            {HEALTH_STATUSES.map((item) => {
+              const count = dist.get(item.key) || 0;
+              const prevCount = prevDist.get(item.key);
               const pct = data.property_count > 0 ? (count / data.property_count) * 100 : 0;
               return (
                 <div key={item.key} className="flex items-center gap-3">
@@ -528,6 +593,11 @@ function AnalyticsContent() {
                   <div className="h-5 flex-1 overflow-hidden rounded bg-muted">
                     <div className={`h-full rounded ${item.color}`} style={{ width: `${Math.max(pct, 2)}%` }} />
                   </div>
+                  {compare && hasPrev && (
+                    <span className="w-16 text-right text-[11px] text-muted-foreground">
+                      {prevCount !== undefined && prevCount !== null ? `prev ${prevCount}` : "prev —"}
+                    </span>
+                  )}
                   <span className="w-6 text-right text-xs font-medium">{count}</span>
                 </div>
               );

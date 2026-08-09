@@ -129,6 +129,19 @@ fn coerce_setting(key: &str, value: Value) -> Result<Value, AppError> {
             &["hostwise", "openai", "deepseek", "anthropic", "ollama"],
             key,
         ),
+        "ai_base_url" => {
+            let s = value
+                .as_str()
+                .ok_or_else(|| AppError::Validation("ai_base_url must be a string".into()))?
+                .trim();
+            let ok = (s.starts_with("http://") || s.starts_with("https://")) && s.len() > 7;
+            if !ok {
+                return Err(AppError::Validation(
+                    "ai_base_url must be an http(s) URL with a host (e.g. https://api.openai.com/v1 or http://localhost:11434)".into(),
+                ));
+            }
+            Ok(Value::String(s.to_string()))
+        }
         "ai_analysis_level" => check_enum(value, &["summary", "detailed", "expert"], key),
         "ai_automatic_analysis" => check_enum(value, &["daily", "weekly", "monthly", "off"], key),
         "appearance_theme" => check_enum(value, &["light", "dark", "system"], key),
@@ -174,9 +187,12 @@ pub async fn update(pool: &SqlitePool, settings: Map<String, Value>) -> Result<V
     let now = now_iso();
     for (key, raw) in settings {
         if key == API_KEY_KEY {
+            // The masked placeholder (e.g. "••••••••") is sent back by the client
+            // whenever the key is left untouched — keep the stored secret then.
+            // An empty string (the UI's "Clear" button) is stored as-is so it
+            // actually removes the saved key.
             if let Some(s) = raw.as_str() {
-                if s.is_empty() || s.starts_with("••") {
-                    // Masked placeholder / empty -> keep the stored secret.
+                if s.starts_with("••") {
                     continue;
                 }
             }

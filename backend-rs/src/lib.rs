@@ -45,6 +45,7 @@ pub fn build_router(state: AppState) -> Router {
         .allow_methods([
             Method::GET,
             Method::POST,
+            Method::PUT,
             Method::PATCH,
             Method::DELETE,
             Method::OPTIONS,

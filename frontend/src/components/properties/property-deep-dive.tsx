@@ -61,7 +61,7 @@ export function PropertyDeepDive({ id }: { id: string }) {
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight">{property?.name || "Property"}</h1>
             {health && (
-              <Badge variant={health.status === "no_data" ? "outline" : health.status === "healthy" ? "success" : health.status === "average" ? "secondary" : "destructive"}>
+              <Badge variant={health.status === "excellent" || health.status === "good" ? "success" : health.status === "fair" ? "secondary" : health.status === "poor" ? "destructive" : "outline"}>
                 <Gauge className="mr-1 h-3 w-3" /> {health.health_score === null ? "No data" : `${health.health_score}/100`}
               </Badge>
             )}

@@ -1817,7 +1817,7 @@ dependencies = [
 
 [[package]]
 name = "hostwise"
-version = "0.7.6"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1835,7 +1835,7 @@ dependencies = [
 
 [[package]]
 name = "hostwise-backend"
-version = "0.7.6"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1844,6 +1844,7 @@ dependencies = [
  "chrono",
  "csv",
  "dotenvy",
+ "encoding_rs",
  "jsonwebtoken",
  "printpdf",
  "rand 0.8.7",

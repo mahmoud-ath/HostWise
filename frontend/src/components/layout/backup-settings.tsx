@@ -36,7 +36,7 @@ export function BackupSettings() {
   const loadBackups = async () => {
     setLoading(true);
     try {
-      const data = await api.get<Backup[]>("/backups/");
+      const data = await api.get<Backup[]>("/backups");
       setBackups(data);
     } catch {
       // Backups API might not be available

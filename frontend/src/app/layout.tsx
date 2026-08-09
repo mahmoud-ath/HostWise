@@ -24,6 +24,10 @@ export const metadata: Metadata = {
   title: "HostWise — Vacation Rental Intelligence",
   description:
     "AI-powered analytics platform for vacation rental hosts. Maximize revenue, optimize operations, and make data-driven decisions.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

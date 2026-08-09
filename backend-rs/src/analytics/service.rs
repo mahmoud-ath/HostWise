@@ -76,8 +76,19 @@ fn round1(v: f64) -> f64 {
     (v * 10.0).round() / 10.0
 }
 
-fn year_bounds(year: i32) -> (String, String) {
+pub(crate) fn year_bounds(year: i32) -> (String, String) {
     (format!("{year:04}-01-01"), format!("{year:04}-12-31"))
+}
+
+/// Number of days in an inclusive [start, end] date range.
+fn days_between(start: &str, end: &str) -> f64 {
+    match (
+        chrono::NaiveDate::parse_from_str(start, "%Y-%m-%d"),
+        chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d"),
+    ) {
+        (Ok(s), Ok(e)) => ((e - s).num_days() + 1).max(1) as f64,
+        _ => 365.0,
+    }
 }
 
 /// Shift an inclusive [start, end] window one year back (YoY comparison).
@@ -99,13 +110,18 @@ fn shift_year_back(start: &str, end: &str) -> (String, String) {
     }
 }
 
-/// Comprehensive property performance analytics for a year.
+/// Comprehensive property performance analytics for a date range.
 pub async fn get_property_analytics(
     pool: &SqlitePool,
     property_id: &str,
-    year: i32,
+    start: &str,
+    end: &str,
 ) -> Result<Value, AppError> {
-    let (start, end) = year_bounds(year);
+    let start = start.to_string();
+    let end = end.to_string();
+    let year = start[0..4]
+        .parse::<i32>()
+        .unwrap_or_else(|_| chrono::Local::now().year());
 
     // Revenue
     let (gross, net): (f64, f64) = sqlx::query_as(
@@ -119,7 +135,7 @@ pub async fn get_property_analytics(
     .await?;
 
     // Reservations (confirmed + completed)
-    let (total, _nights, avg_rev, avg_nights): (i64, i64, f64, f64) = sqlx::query_as(
+    let (total, nights, avg_rev, avg_nights): (i64, i64, f64, f64) = sqlx::query_as(
         "SELECT COUNT(*), COALESCE(SUM(nights),0), COALESCE(AVG(gross_revenue),0.0), \
                 COALESCE(AVG(nights),0.0) \
          FROM reservations WHERE property_id = ? AND is_deleted = 0 \
@@ -240,11 +256,15 @@ pub async fn get_property_analytics(
     Ok(json!({
         "property_id": property_id,
         "year": year,
+        "start_date": start,
+        "end_date": end,
         "gross_revenue": round2(gross),
         "net_revenue": round2(net),
         "total_expenses": round2(total_expenses),
         "profit": profit,
         "profit_margin": profit_margin,
+        "reservation_count": total,
+        "nights": nights,
         "cancellation_rate": cancellation_rate,
         "cancelled_reservations": cancelled,
         "avg_booking_window_days": avg_booking_window,
@@ -400,10 +420,10 @@ pub async fn get_portfolio_analytics(
 
     // Category splits.
     let rev_cats: Vec<(String, f64, i64)> = sqlx::query_as(
-        "SELECT COALESCE(c.name,'Uncategorized'), COALESCE(SUM(r.net_amount),0.0), COUNT(*) \
+        "SELECT COALESCE(NULLIF(TRIM(c.name), ''), NULLIF(TRIM(r.description), ''), 'Uncategorized'), COALESCE(SUM(r.net_amount),0.0), COUNT(*) \
          FROM revenues r LEFT JOIN revenue_categories c ON c.id = r.category_id \
          WHERE r.is_deleted = 0 AND r.date >= ? AND r.date <= ? \
-         GROUP BY r.category_id ORDER BY 2 DESC",
+         GROUP BY COALESCE(NULLIF(TRIM(c.name), ''), NULLIF(TRIM(r.description), ''), 'Uncategorized') ORDER BY 2 DESC",
     )
     .bind(&start_s)
     .bind(&end_s)
@@ -426,10 +446,10 @@ pub async fn get_portfolio_analytics(
         })
         .collect();
     let exp_cats: Vec<(String, f64, i64)> = sqlx::query_as(
-        "SELECT COALESCE(c.name,'Uncategorized'), COALESCE(SUM(e.amount),0.0), COUNT(*) \
+        "SELECT COALESCE(NULLIF(TRIM(c.name), ''), NULLIF(TRIM(e.description), ''), 'Uncategorized'), COALESCE(SUM(e.amount),0.0), COUNT(*) \
          FROM expenses e LEFT JOIN expense_categories c ON c.id = e.category_id \
          WHERE e.is_deleted = 0 AND e.date >= ? AND e.date <= ? \
-         GROUP BY e.category_id ORDER BY 2 DESC",
+         GROUP BY COALESCE(NULLIF(TRIM(c.name), ''), NULLIF(TRIM(e.description), ''), 'Uncategorized') ORDER BY 2 DESC",
     )
     .bind(&start_s)
     .bind(&end_s)
@@ -452,7 +472,7 @@ pub async fn get_portfolio_analytics(
         })
         .collect();
 
-    // Seasonality: net revenue by month.
+    // Seasonality: net/gross revenue and expenses by month.
     let monthly_net: Vec<(i64, f64)> = sqlx::query_as(
         "SELECT CAST(substr(date,6,2) AS INTEGER), COALESCE(SUM(net_amount),0.0) \
          FROM revenues WHERE is_deleted = 0 AND date >= ? AND date <= ? GROUP BY 1 ORDER BY 1",
@@ -461,12 +481,32 @@ pub async fn get_portfolio_analytics(
     .bind(&end_s)
     .fetch_all(pool)
     .await?;
+    let monthly_gross: Vec<(i64, f64)> = sqlx::query_as(
+        "SELECT CAST(substr(date,6,2) AS INTEGER), COALESCE(SUM(gross_amount),0.0) \
+         FROM revenues WHERE is_deleted = 0 AND date >= ? AND date <= ? GROUP BY 1 ORDER BY 1",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_all(pool)
+    .await?;
+    let monthly_exp: Vec<(i64, f64)> = sqlx::query_as(
+        "SELECT CAST(substr(date,6,2) AS INTEGER), COALESCE(SUM(amount),0.0) \
+         FROM expenses WHERE is_deleted = 0 AND date >= ? AND date <= ? GROUP BY 1 ORDER BY 1",
+    )
+    .bind(&start_s)
+    .bind(&end_s)
+    .fetch_all(pool)
+    .await?;
     let month_map: HashMap<i64, f64> = monthly_net.into_iter().collect();
+    let gross_map: HashMap<i64, f64> = monthly_gross.into_iter().collect();
+    let exp_map: HashMap<i64, f64> = monthly_exp.into_iter().collect();
     let seasonality: Vec<Value> = (1..=12)
         .map(|m| {
             json!({
                 "month": m,
                 "net_revenue": round2(month_map.get(&m).copied().unwrap_or(0.0)),
+                "gross_revenue": round2(gross_map.get(&m).copied().unwrap_or(0.0)),
+                "total_expenses": round2(exp_map.get(&m).copied().unwrap_or(0.0)),
             })
         })
         .collect();
@@ -475,7 +515,7 @@ pub async fn get_portfolio_analytics(
     let mut ranking: Vec<Value> = Vec::new();
     let mut dist: HashMap<String, i64> = HashMap::new();
     for (id, name, pnet, pexp, pres) in &per_prop {
-        let h = get_property_health_score(pool, id).await?;
+        let h = get_property_health_score(pool, id, &start_s, &end_s).await?;
         let score = h["health_score"]
             .as_i64()
             .unwrap_or_else(|| h["score"].as_i64().unwrap_or(0));
@@ -499,6 +539,8 @@ pub async fn get_portfolio_analytics(
             "net_revenue": round2(*pnet),
             "profit": pprofit,
             "reservation_count": *pres,
+            "expense_ratio": h["expense_ratio"].as_f64().unwrap_or(0.0),
+            "occupancy": h["occupancy"].as_f64().unwrap_or(0.0),
         }));
     }
     ranking.sort_by(|a, b| {
@@ -556,16 +598,46 @@ pub async fn get_portfolio_analytics(
 }
 
 /// Property health score (0-100), mirroring the spirit of the Python heuristic.
+/// Weighted composite health score (0-100) for a property over a date range.
+///
+/// Transparent weights so the score is easy to explain:
+///   profit margin 30 pts (up to 30% margin),
+///   occupancy     20 pts (nights vs 60% of the window's nights),
+///   expense ratio 20 pts (lower is better, up to 50% ratio),
+///   cancellations 15 pts (lower is better, up to 40% rate),
+///   booking value 15 pts (up to 300 per booking).
 pub async fn get_property_health_score(
     pool: &SqlitePool,
     property_id: &str,
+    start: &str,
+    end: &str,
 ) -> Result<Value, AppError> {
-    let year = chrono::Local::now().year();
-    let pa = get_property_analytics(pool, property_id, year).await?;
+    let pa = get_property_analytics(pool, property_id, start, end).await?;
+
     let pm = pa["profit_margin"].as_f64().unwrap_or(0.0);
     let cr = pa["cancellation_rate"].as_f64().unwrap_or(0.0);
+    let expense_ratio = pa["expense_ratio"].as_f64().unwrap_or(0.0);
+    let net_revenue = pa["net_revenue"].as_f64().unwrap_or(0.0);
+    let gross_revenue = pa["gross_revenue"].as_f64().unwrap_or(0.0);
+    let avg_booking_value = pa["avg_booking_value"].as_f64().unwrap_or(0.0);
+    let reservations = pa["reservation_count"].as_i64().unwrap_or(0);
+    let nights = pa["nights"].as_i64().unwrap_or(0) as f64;
 
-    let mut score = 50.0 + (pm.clamp(0.0, 25.0) / 25.0) * 40.0 - (cr / 100.0) * 25.0;
+    // Occupancy proxy: nights booked vs 60% of the window's nights.
+    let days = days_between(start, end);
+    let occupancy = if days > 0.0 {
+        (nights / (days * 0.6)).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
+    let pm_pts = (pm.clamp(0.0, 30.0) / 30.0) * 30.0;
+    let occ_pts = occupancy * 20.0;
+    let exp_pts = (1.0 - (expense_ratio.clamp(0.0, 50.0) / 50.0)) * 20.0;
+    let cr_pts = (1.0 - (cr.clamp(0.0, 40.0) / 40.0)) * 15.0;
+    let value_pts = (avg_booking_value.clamp(0.0, 300.0) / 300.0) * 15.0;
+
+    let mut score = pm_pts + occ_pts + exp_pts + cr_pts + value_pts;
     score = score.clamp(0.0, 100.0).round();
 
     let label = if score >= 80.0 {
@@ -578,8 +650,9 @@ pub async fn get_property_health_score(
         "poor"
     };
 
-    let expense_ratio = pa["expense_ratio"].as_f64().unwrap_or(0.0);
-    let net_revenue = pa["net_revenue"].as_f64().unwrap_or(0.0);
+    let year = start[0..4]
+        .parse::<i32>()
+        .unwrap_or_else(|_| chrono::Local::now().year());
     let property_name: Option<String> =
         sqlx::query_scalar("SELECT name FROM properties WHERE id = ? AND is_deleted = 0")
             .bind(property_id)
@@ -591,12 +664,18 @@ pub async fn get_property_health_score(
         "property_id": property_id,
         "property_name": property_name,
         "year": year,
+        "start_date": start,
+        "end_date": end,
         "health_score": score as i64,
         "status": label,
         "profit_margin": pm,
         "cancellation_rate": cr,
         "expense_ratio": expense_ratio,
-        "net_revenue": net_revenue,
+        "gross_revenue": round2(gross_revenue),
+        "net_revenue": round2(net_revenue),
+        "reservation_count": reservations,
+        "nights": nights as i64,
+        "occupancy": round1(occupancy * 100.0),
         // Legacy aliases.
         "score": score as i64,
         "label": label,

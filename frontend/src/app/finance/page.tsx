@@ -17,6 +17,8 @@ import {
   useUpdateExpense,
   useDeleteExpense,
   useFinancialSummary,
+  useExpenseCategories,
+  useRevenueCategories,
   useProperties,
   type Revenue,
   type Expense,
@@ -135,6 +137,7 @@ function RevenueSection() {
     ...(filters.end_date ? { end_date: filters.end_date } : {}),
   };
   const { data: revenue, isLoading } = useRevenue(qs);
+  const { data: revCats } = useRevenueCategories();
   const create = useCreateRevenue();
   const update = useUpdateRevenue();
   const del = useDeleteRevenue();
@@ -157,6 +160,7 @@ function RevenueSection() {
             kind="revenue"
             properties={properties || []}
             currency={currency}
+            categoryOptions={(revCats || []).map((c) => c.name)}
             initial={editing}
             onCancel={() => { setShowForm(false); setEditing(null); }}
             onSubmit={async (data) => {
@@ -221,6 +225,7 @@ function ExpenseSection() {
     ...(filters.end_date ? { end_date: filters.end_date } : {}),
   };
   const { data: expenses, isLoading } = useExpenses(qs);
+  const { data: expCats } = useExpenseCategories();
   const create = useCreateExpense();
   const update = useUpdateExpense();
   const del = useDeleteExpense();
@@ -243,6 +248,7 @@ function ExpenseSection() {
             kind="expense"
             properties={properties || []}
             currency={currency}
+            categoryOptions={(expCats || []).map((c) => c.name)}
             initial={editing}
             onCancel={() => { setShowForm(false); setEditing(null); }}
             onSubmit={async (data) => {
@@ -301,6 +307,7 @@ function EntryForm({
   kind,
   properties,
   currency,
+  categoryOptions,
   initial,
   onCancel,
   onSubmit,
@@ -309,21 +316,22 @@ function EntryForm({
   kind: "revenue" | "expense";
   properties: { id: string; name: string }[];
   currency: string;
+  categoryOptions: string[];
   initial: Revenue | Expense | null;
   onCancel: () => void;
   onSubmit: (data: Record<string, unknown>) => Promise<void>;
   pending: boolean;
 }) {
+  const { t, tWith } = useI18n();
   const [form, setForm] = useState<any>({
     property_id: initial?.property_id || "",
     date: (initial?.date || new Date().toISOString().slice(0, 10)) as string,
     gross_amount: initial ? String((initial as Revenue).gross_amount ?? "") : "",
     commission_amount: initial ? String((initial as Revenue).commission_amount ?? "0") : "0",
     amount: initial ? String((initial as Expense).amount ?? "") : "",
-    description: initial?.description || "",
+    category: initial?.description || "",
     vendor: (initial as Expense)?.vendor || "",
     is_recurring: (initial as Expense)?.is_recurring || false,
-    currency: initial?.currency || currency,
   });
 
   const submit = (e: React.FormEvent) => {
@@ -331,9 +339,11 @@ function EntryForm({
     const base: Record<string, unknown> = {
       property_id: form.property_id,
       date: form.date,
-      description: form.description,
-      currency: form.currency || currency,
+      description: form.category,
     };
+    // Currency is managed centrally in Settings — only send it on create so
+    // editing an existing record preserves its stored currency.
+    if (!initial) base.currency = currency;
     if (kind === "revenue") {
       base.gross_amount = parseFloat(form.gross_amount);
       base.commission_amount = parseFloat(form.commission_amount || "0");
@@ -347,6 +357,7 @@ function EntryForm({
 
   return (
     <form onSubmit={submit} className="mb-4 space-y-3 rounded-lg border bg-muted/30 p-3">
+      <p className="text-[11px] text-muted-foreground">{tWith("finance.currencyNote", { currency })}</p>
       <div>
         <Label className="text-xs">Property</Label>
         <select className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })} required>
@@ -358,36 +369,43 @@ function EntryForm({
         <div><Label className="text-xs">Date</Label><Input type="date" className="mt-1" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></div>
         {kind === "revenue" ? (
           <>
-            <div><Label className="text-xs">Gross ({form.currency || currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.gross_amount} onChange={(e) => setForm({ ...form, gross_amount: e.target.value })} required /></div>
-            <div><Label className="text-xs">Commission ({form.currency || currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.commission_amount} onChange={(e) => setForm({ ...form, commission_amount: e.target.value })} /></div>
+            <div><Label className="text-xs">Gross</Label><Input type="number" step="0.01" className="mt-1" value={form.gross_amount} onChange={(e) => setForm({ ...form, gross_amount: e.target.value })} required /></div>
+            <div><Label className="text-xs">Commission</Label><Input type="number" step="0.01" className="mt-1" value={form.commission_amount} onChange={(e) => setForm({ ...form, commission_amount: e.target.value })} /></div>
           </>
         ) : (
           <>
-            <div><Label className="text-xs">Amount ({form.currency || currency})</Label><Input type="number" step="0.01" className="mt-1" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
-            <div><Label className="text-xs">Vendor</Label><Input className="mt-1" value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /></div>
+            <div><Label className="text-xs">{t("finance.amount")}</Label><Input type="number" step="0.01" className="mt-1" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
+            <div><Label className="text-xs">{t("finance.vendor")}</Label><Input className="mt-1" value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /></div>
           </>
         )}
       </div>
       <div>
-        <Label className="text-xs">Currency</Label>
-        <select className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.currency || currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
-          {["MAD", "EUR", "USD", "GBP", "CAD", "AUD", "CHF"].map((c) => (
-            <option key={c} value={c}>{c}</option>
+        <Label className="text-xs">{t("finance.category")}</Label>
+        <Input
+          className="mt-1"
+          list="finance-category-options"
+          placeholder={t("finance.categoryPlaceholder")}
+          value={form.category}
+          onChange={(e) => setForm({ ...form, category: e.target.value })}
+        />
+        <datalist id="finance-category-options">
+          {categoryOptions.map((c) => (
+            <option key={c} value={c} />
           ))}
-        </select>
+        </datalist>
+        <p className="mt-1 text-[11px] text-muted-foreground">{t("finance.categoryHint")}</p>
       </div>
-      <div className="flex items-end gap-2">
-        <div className="flex-1"><Label className="text-xs">Description</Label><Input className="mt-1" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+      <div className="flex items-center justify-between gap-2">
         {kind === "expense" && (
-          <label className="flex items-center gap-1.5 pb-2 text-xs">
+          <label className="flex items-center gap-1.5 text-xs">
             <input type="checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} />
-            Recurring
+            {t("finance.recurring")}
           </label>
         )}
-      </div>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving..." : "Save"}</Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+        <div className="ml-auto flex gap-2">
+          <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving..." : "Save"}</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+        </div>
       </div>
     </form>
   );

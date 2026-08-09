@@ -64,6 +64,22 @@ These decisions supersede any earlier notes that contradict them.
   no-key fallback), settings (export/wipe), connectors (CSV + JSON import), and
   auth-free operation. Tests run against a throwaway SQLite DB in `backend/tests/`.
 
+### 0.7 AI advisor — deterministic section logic and a single scoring model
+- **Problem:** Several advisor sections were empty or illogical — `opportunities`
+  was a flat array that crashed the page, `lost_revenue` a bare number, and
+  property reviews / trend explanations / goals / achievements were hardcoded `[]`.
+- **Chosen:** One transparent composite health score (profit margin 30 ·
+  occupancy 20 · expense ratio 20 · cancellations 15 · booking value 15) used
+  consistently at portfolio and per-property level; every section derives from
+  real metrics (portfolio analytics + the same window one year earlier) with
+  itemized, explainable outputs (opportunity upside = cancellation leakage +
+  |YoY growth|; risks from underperforming properties; reviews/goals/achievements
+  from per-property signals).
+- **Trade-offs:** Output is heuristic (e.g. 60% occupancy benchmark, revenue/12
+  monthly forecast) rather than an LLM; stays deterministic, free, and private.
+- **Why right:** Reinforces the "rules engine by default" decision (0.4) — the
+  AI Advisor page is fully populated and logical with no LLM key.
+
 ---
 
 ## 1. Local-first desktop with a bundled Python backend
@@ -217,6 +233,58 @@ These decisions supersede any earlier notes that contradict them.
 - **Why right:** MVP scope — three chart types reused across pages.
 
 ---
+
+## 14. Production & settings audit (2026-08-08)
+
+### 14.1 Settings are the single source of truth — no hardcoded display values
+- **Problem:** Several pages hardcoded currency/behaviour (the dashboard/reports
+  chart Y-axis was `$`, tooltips defaulted to EUR, About showed hardcoded
+  versions) so settings didn't actually change what users saw.
+- **Chosen:** Every displayed value reads from the `default_currency` setting
+  (EUR fallback); `/api/health` exposes `version` + `schema_version` and the
+  About tab renders those; the shared chart components take a `currency` prop
+  that falls back to the setting.
+- **Trade-offs:** A little prop plumbing on the chart call sites.
+- **Why right:** "Settings affect the app" is the product promise; hardcoded
+  values made settings effectively dead.
+
+### 14.2 AI API-key clear semantics: empty clears, `••` mask keeps
+- **Problem:** The "Clear" button couldn't remove a saved key — the backend
+  treated an empty string as "keep the stored secret".
+- **Chosen:** Only the masked placeholder (`••…`) is preserved; an empty string
+  stores "" (clears); a real value stores it. `GET /settings` masks non-empty
+  keys.
+- **Trade-offs:** The client must send `••…` (untouched) to keep, `""` to
+  clear. Enforced in the settings service, not the UI.
+- **Why right:** Lets users rotate/remove keys without wiping them on every
+  unrelated settings save.
+
+### 14.3 `ai_base_url` validated (http(s) + host)
+- **Problem:** Invalid endpoints (`not-a-url`, `ftp://…`) were saved and only
+  failed at connection time.
+- **Chosen:** `coerce_setting` rejects non-http(s) / hostless `ai_base_url`
+  values with 422, matching the earlier Python-era behaviour.
+
+### 14.4 Backup restore needs a backend restart (WAL/SHM)
+- **Problem:** `fs::copy` over an open SQLite DB + stale `-wal`/`-shm` made
+  restore a silent no-op for the running app.
+- **Chosen:** The restore endpoint deletes the `-wal`/`-shm` sidecars after
+  copying; the desktop frontend then calls `restart_backend` so the embedded
+  backend reopens the restored file. Browser dev falls back to a reload.
+- **Trade-offs:** Restore briefly restarts the backend (new port, connection
+  banner). Acceptable for a destructive operation.
+- **Why right:** A restore that reports success but changes nothing is worse
+  than a visible restart.
+
+### 14.5 Import encodings via `encoding_rs`
+- **Problem:** `import_encoding` was ignored — files were always decoded as
+  UTF-8, garbling ISO-8859-1 / Windows-1252 / UTF-16 CSVs.
+- **Chosen:** Added the pure-Rust `encoding_rs` crate; decode honours
+  `import_encoding` (ISO-8859-1 → windows-1252 per WHATWG; UTF-16 reads the
+  BOM). The upload preview uses the same setting so users don't see mojibake.
+- **Trade-offs:** One new dependency; no system libraries required.
+- **Why right:** Real-world host exports are often not UTF-8; a setting that
+  does nothing is worse than no setting.
 
 ## What is deliberate and should NOT be changed casually
 

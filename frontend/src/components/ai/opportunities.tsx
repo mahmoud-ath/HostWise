@@ -8,8 +8,10 @@ import { useSettings } from "@/contexts/settings-context";
 import type { AdvisorReport } from "@/lib/ai-types";
 
 export function Opportunities({ report }: { report: AdvisorReport }) {
-  const opp = report.opportunities;
-  const lost = report.lost_revenue;
+  const opp = report.opportunities || {};
+  const actions = Array.isArray(opp.actions) ? opp.actions : [];
+  const lost = report.lost_revenue || {};
+  const reasons = Array.isArray(lost.reasons) ? lost.reasons : [];
   const { get } = useSettings();
   const currency = get("default_currency", "EUR") as string;
 
@@ -29,14 +31,14 @@ export function Opportunities({ report }: { report: AdvisorReport }) {
                 Potential Revenue
               </p>
               <span className="text-xs text-muted-foreground">
-                Confidence {opp.confidence}%
+                Confidence {opp.confidence ?? 0}%
               </span>
             </div>
             <p className="mt-1 text-2xl font-bold tracking-tight text-success">
-              +{formatCurrency(opp.potential_revenue, currency)}
+              +{formatCurrency(opp.potential_revenue ?? 0, currency)}
             </p>
             <div className="mt-3 space-y-2">
-              {opp.actions.map((a) => (
+              {actions.map((a) => (
                 <div
                   key={a.title}
                   className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm"
@@ -62,10 +64,10 @@ export function Opportunities({ report }: { report: AdvisorReport }) {
               Estimated Lost Revenue
             </p>
             <p className="mt-1 text-2xl font-bold tracking-tight text-destructive">
-              {formatCurrency(lost.estimated_lost_revenue, currency)}
+              {formatCurrency(lost.estimated_lost_revenue ?? 0, currency)}
             </p>
             <div className="mt-3 space-y-2">
-              {lost.reasons.map((r) => (
+              {reasons.map((r) => (
                 <div
                   key={r.reason}
                   className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm"
@@ -79,7 +81,7 @@ export function Opportunities({ report }: { report: AdvisorReport }) {
                   </span>
                 </div>
               ))}
-              {lost.reasons.length === 0 && (
+              {reasons.length === 0 && (
                 <p className="text-sm text-muted-foreground">
                   No major leakages detected.
                 </p>

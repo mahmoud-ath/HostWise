@@ -119,7 +119,17 @@ pub async fn restore_backup(db_path: &Path, backup_name: &str) -> bool {
         return false;
     }
     let _ = create_backup(db_path, "pre_restore").await;
-    fs::copy(&backup_path, db_path).is_ok()
+    if !fs::copy(&backup_path, db_path).is_ok() {
+        return false;
+    }
+    // Remove stale WAL/SHM sidecars from the previous session so the next pool
+    // open (after the app restarts the backend) reads the *restored* database
+    // instead of replaying the old journal. Without this the restore looks
+    // like a no-op because SQLite merges the pre-restore WAL over the new file.
+    let db_str = db_path.to_string_lossy();
+    let _ = fs::remove_file(format!("{db_str}-wal"));
+    let _ = fs::remove_file(format!("{db_str}-shm"));
+    true
 }
 
 /// Verify a backup by name (quick_check), mirroring the router response.

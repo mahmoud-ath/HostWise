@@ -14,7 +14,8 @@ import {
   Legend,
   Filler,
 } from "chart.js";
-import { formatCurrency, getMonthName } from "@/lib/utils";
+import { formatCurrency, formatCurrencyCompact, getMonthName } from "@/lib/utils";
+import { useSettings } from "@/contexts/settings-context";
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -46,9 +47,12 @@ interface MonthlyData {
 interface RevenueChartProps {
   data: MonthlyData[];
   title?: string;
+  currency?: string;
 }
 
-export function RevenueBarChart({ data, title = "Monthly Revenue" }: RevenueChartProps) {
+export function RevenueBarChart({ data, title = "Monthly Revenue", currency }: RevenueChartProps) {
+  const { get } = useSettings();
+  const cur = currency || (get("default_currency", "EUR") as string) || "EUR";
   const labels = data.map((item) => getMonthName(item.month).slice(0, 3));
   
   const chartData = {
@@ -86,14 +90,14 @@ export function RevenueBarChart({ data, title = "Monthly Revenue" }: RevenueChar
         borderWidth: 1,
         padding: 12,
         cornerRadius: 8,
-        callbacks: { label: (ctx: any) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.raw)}` },
+        callbacks: { label: (ctx: any) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.raw, cur)}` },
       },
     },
     scales: {
       x: { grid: { display: false }, ticks: { color: COLORS.textMuted, font: { size: 11 } } },
       y: {
         grid: { color: "rgba(221,221,221,0.4)" },
-        ticks: { color: COLORS.textMuted, font: { size: 11 }, callback: (v: any) => `$${(v / 1000).toFixed(0)}k` },
+        ticks: { color: COLORS.textMuted, font: { size: 11 }, callback: (v: any) => formatCurrencyCompact(v, cur) },
       },
     },
   };
@@ -113,7 +117,9 @@ export function RevenueBarChart({ data, title = "Monthly Revenue" }: RevenueChar
   );
 }
 
-export function CashflowLineChart({ data, title = "Cashflow Trend" }: RevenueChartProps) {
+export function CashflowLineChart({ data, title = "Cashflow Trend", currency }: RevenueChartProps) {
+  const { get } = useSettings();
+  const cur = currency || (get("default_currency", "EUR") as string) || "EUR";
   const labels = data.map((item) => getMonthName(item.month).slice(0, 3));
 
   const chartData = {
@@ -149,14 +155,14 @@ export function CashflowLineChart({ data, title = "Cashflow Trend" }: RevenueCha
         borderWidth: 1,
         padding: 12,
         cornerRadius: 8,
-        callbacks: { label: (ctx: any) => ` ${formatCurrency(ctx.raw)}` },
+        callbacks: { label: (ctx: any) => ` ${formatCurrency(ctx.raw, cur)}` },
       },
     },
     scales: {
       x: { grid: { display: false }, ticks: { color: COLORS.textMuted, font: { size: 11 } } },
       y: {
         grid: { color: "rgba(221,221,221,0.4)" },
-        ticks: { color: COLORS.textMuted, font: { size: 11 }, callback: (v: any) => `$${(v / 1000).toFixed(0)}k` },
+        ticks: { color: COLORS.textMuted, font: { size: 11 }, callback: (v: any) => formatCurrencyCompact(v, cur) },
       },
     },
   };

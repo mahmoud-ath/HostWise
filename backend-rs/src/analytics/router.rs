@@ -7,6 +7,7 @@
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
 use axum::{Json, Router};
+use chrono::Datelike;
 use serde::Deserialize;
 use serde_json::Value;
 use uuid::Uuid;
@@ -45,7 +46,8 @@ async fn property_analytics(
     if let Some(cached) = service::cache_get(&key) {
         return Ok(Json(cached));
     }
-    let result = service::get_property_analytics(&state.pool, &property_id, q.year).await?;
+    let (s, e) = service::year_bounds(q.year);
+    let result = service::get_property_analytics(&state.pool, &property_id, &s, &e).await?;
     service::cache_set(&key, result.clone());
     Ok(Json(result))
 }
@@ -54,7 +56,9 @@ async fn property_health(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, AppError> {
-    let result = service::get_property_health_score(&state.pool, &id.to_string()).await?;
+    let year = chrono::Local::now().year();
+    let (s, e) = service::year_bounds(year);
+    let result = service::get_property_health_score(&state.pool, &id.to_string(), &s, &e).await?;
     Ok(Json(result))
 }
 

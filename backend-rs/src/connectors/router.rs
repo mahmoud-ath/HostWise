@@ -125,7 +125,13 @@ async fn upload_csv(
     std::fs::write(&path, content)
         .map_err(|e| AppError::Internal(anyhow::anyhow!(e.to_string())))?;
 
-    match service::read_file(&path, None, None) {
+    // Preview with the same encoding + delimiter the import will use, so the
+    // user doesn't see mojibake for non-UTF-8 files.
+    let all = crate::settings::service::get_all(&state.pool).await?;
+    let enc = all["import_encoding"].as_str().unwrap_or("UTF-8");
+    let delim = all["import_delimiter"].as_str().unwrap_or(",");
+
+    match service::read_file(&path, Some(enc), Some(delim)) {
         Ok((fmt, columns, rows)) => {
             let preview: Vec<Value> = rows
                 .iter()

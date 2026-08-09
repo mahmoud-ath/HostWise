@@ -1,7 +1,7 @@
 
 # HostWise — Run Locally & Ship to Production
 
-> HostWise v0.7.4 is a **100% native Rust backend** (`backend-rs/`) embedded
+> HostWise v0.7.6 is a **100% native Rust backend** (`backend-rs/`) embedded
 > **in-process** inside a **Tauri** desktop shell, serving a **Next.js static**
 > frontend. No Python, no PyInstaller, no external runtime, no database server —
 > SQLite is built into the binary.
@@ -123,7 +123,7 @@ cargo run            # http://127.0.0.1:8000
 
 # smoke check
 curl http://127.0.0.1:8000/api/health
-# → {"database":"up","status":"ok","version":"0.7.0"}
+# → {"database":"up","status":"ok","version":"0.7.6","schema_version":4}
 
 # tests
 cargo test           # 8 suites: domains, analytics, connectors, AI/reports, …
@@ -142,7 +142,7 @@ cargo test           # 8 suites: domains, analytics, connectors, AI/reports, …
 | `SQLITE_PATH` | `<data_dir>/hostwise.db` | SQLite database file |
 | `HOSTWISE_DATA_DIR` | `<data_dir>` | Backups + uploads live here |
 | `CORS_ORIGINS` | dev: `["http://localhost:3000"]`; desktop: `["tauri://localhost","http://tauri.localhost","https://tauri.localhost"]` | Allowed origins |
-| `APP_NAME` / `APP_VERSION` / `ENVIRONMENT` | `HostWise` / `0.7.0` / `development` | Metadata |
+| `APP_NAME` / `APP_VERSION` / `ENVIRONMENT` | `HostWise` / `0.7.6` / `development` | Metadata |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | *(empty)* | Optional BYOK AI providers |
 | `DATABASE_TYPE` | `sqlite` | Reserved |
 
@@ -220,13 +220,13 @@ git add -A && git commit -m "chore: fix backend api connection"
 git push origin main
 
 # 2. Tag and push → the release pipeline starts
-git tag -a v0.7.4 -m "v0.7.4"
-git push origin v0.7.4
+git tag -a v0.7.6 -m "v0.7.6"
+git push origin v0.7.6
 ```
 
 Watch it run at **`https://github.com/<owner>/HostWise/actions`**. When green,
 installers are attached to the release at
-**`https://github.com/<owner>/HostWise/releases/tag/v0.7.4`**.
+**`https://github.com/<owner>/HostWise/releases/tag/v0.7.6`**.
 
 CI checks (`.github/workflows/ci.yml`) run on every push/PR to `main`:
 Rust `fmt` + `clippy` + `test`, plus a frontend `bun` lint + build.
@@ -242,7 +242,7 @@ Rust `fmt` + `clippy` + `test`, plus a frontend `bun` lint + build.
       AI advisor, portfolio report, property model).
 - [x] Frontend `bun run build` passes (type-checked, 14 static pages).
 - [x] All 8 Rust test suites green (`cargo test`).
-- [x] Version metadata synced to `0.7.0` (`tauri.conf.json`,
+- [x] Version metadata synced to `0.7.6` (`tauri.conf.json`,
       `frontend/src-tauri/Cargo.toml`, `backend-rs/Cargo.toml`).
 - [x] CI + release pipelines Rust-only and bun-based.
 - [ ] (Optional) Configure Windows signing / macOS notarization secrets.
