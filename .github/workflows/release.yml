@@ -108,6 +108,7 @@ jobs:
             frontend/src-tauri/target/release/bundle/nsis/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
+          overwrite: true
 
   # ── macOS ────────────────────────────────────────────────────────────
   macos:
@@ -175,6 +176,7 @@ jobs:
             frontend/src-tauri/target/release/bundle/dmg/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
+          overwrite: true
 
   # ── Linux ────────────────────────────────────────────────────────────
   linux:
@@ -260,6 +262,7 @@ jobs:
             frontend/src-tauri/target/release/bundle/appimage/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
+          overwrite: true
 
   # ── Updater manifest (latest.json) ──────────────────────────────────
   # Runs after all three OS jobs: merges their installers + signatures into
@@ -290,11 +293,14 @@ jobs:
         run: |
           set -e
           mkdir -p bundle/nsis bundle/dmg bundle/deb bundle/rpm bundle/appimage
-          # Each artifact preserves its subfolder structure (nsis/, dmg/, ...).
-          cp -n artifacts/hostwise-windows/nsis/* bundle/nsis/ 2>/dev/null || true
-          cp -n artifacts/hostwise-macos/dmg/* bundle/dmg/ 2>/dev/null || true
-          cp -n artifacts/hostwise-linux-deb/deb/* bundle/deb/ 2>/dev/null || true
-          cp -n artifacts/hostwise-linux-appimage/appimage/* bundle/appimage/ 2>/dev/null || true
+          # upload-artifact@v4 FLATTENS files to the artifact root, so copy
+          # every file from each artifact (installer + its .sig) into the
+          # matching subdir the manifest generator expects. find-based so it
+          # works whether artifacts are nested or flattened.
+          find artifacts/hostwise-windows -type f -exec cp -n {} bundle/nsis/ \; 2>/dev/null || true
+          find artifacts/hostwise-macos -type f -exec cp -n {} bundle/dmg/ \; 2>/dev/null || true
+          find artifacts/hostwise-linux-deb -type f -exec cp -n {} bundle/deb/ \; 2>/dev/null || true
+          find artifacts/hostwise-linux-appimage -type f -exec cp -n {} bundle/appimage/ \; 2>/dev/null || true
           find bundle -type f | sort
 
       - name: Generate latest.json
