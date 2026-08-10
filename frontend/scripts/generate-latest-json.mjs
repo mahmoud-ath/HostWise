@@ -43,9 +43,6 @@ if (existsSync(bundleDir)) {
   }
 }
 
-const argTag = process.argv.find((a) => a.startsWith("--tag="))?.split("=")[1];
-const dryRun = process.argv.includes("--dry-run");
-
 function tauriTarget(bundleSub, file) {
   const lower = file.toLowerCase();
   if (bundleSub === "nsis" && lower.endsWith(".exe")) return "windows-x86_64";
@@ -59,6 +56,27 @@ function tauriTarget(bundleSub, file) {
   if (bundleSub === "rpm" && lower.endsWith(".rpm")) return "linux-x86_64";
   if (bundleSub === "appimage" && lower.endsWith(".appimage")) return "linux-x86_64";
   return null;
+}
+
+// When several installers map to the same target, prefer the friendliest one:
+// AppImage > deb > rpm on Linux; NSIS > MSI on Windows; dmg > app on macOS.
+const PREFERENCE = {
+  "linux-x86_64": ["appimage", "deb", "rpm"],
+  "windows-x86_64": ["nsis", "msi"],
+  "darwin-x86_64": ["dmg", "app"],
+  "darwin-aarch64": ["dmg", "app"],
+};
+
+function isPreferred(sub, target) {
+  const order = PREFERENCE[target];
+  if (!order) return true;
+  const cur = order.indexOf(sub);
+  if (cur === -1) return true;
+  // Keep the current entry only if it is strictly more preferred.
+  const existing = platforms[target];
+  if (!existing) return true;
+  const prev = order.indexOf(existing.bundleSub ?? "");
+  return prev === -1 || cur < prev;
 }
 
 function sha256(file) {
@@ -94,8 +112,9 @@ for (const sub of readdirSync(bundleDir)) {
     }
     const signature = readFileSync(sigPath, "utf8").trim();
     const url = `${baseUrl}/${encodeURIComponent(file)}`;
-    // Prefer a better installer if one already mapped (e.g. AppImage over deb).
-    platforms[target] = { url, signature, sha256: sha256(installerPath) };
+    // Prefer the friendliest installer per target (AppImage > deb > rpm, etc.).
+    if (!isPreferred(sub, target)) continue;
+    platforms[target] = { bundleSub: sub, url, signature, sha256: sha256(installerPath) };
     uploadFiles.push(installerPath, sigPath);
     console.log(`Mapped ${target} <- ${file}`);
   }
@@ -106,11 +125,18 @@ if (Object.keys(platforms).length === 0) {
   process.exit(1);
 }
 
+// Strip the internal `bundleSub` bookkeeping field from the public manifest.
+const publicPlatforms = {};
+for (const [target, entry] of Object.entries(platforms)) {
+  const { bundleSub: _omit, ...rest } = entry;
+  publicPlatforms[target] = rest;
+}
+
 const manifest = {
   version,
   notes,
   pub_date: new Date().toISOString(),
-  platforms,
+  platforms: publicPlatforms,
 };
 const manifestPath = join(bundleDir, "latest.json");
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
