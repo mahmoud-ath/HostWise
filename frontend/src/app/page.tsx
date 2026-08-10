@@ -26,7 +26,7 @@ import {
 import { Brain, AlertTriangle, TrendingUp, CheckCircle, Info, Building2, Upload, DollarSign, FileText, Sparkles, Download, Trophy, CalendarRange, Sparkle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { ReportPeriod, isCustomPeriod, periodLabel } from "@/lib/report-period";
+import { ReportPeriod, isCustomPeriod, periodLabel, normalizeRange } from "@/lib/report-period";
 
 export default function Home() {
   return (
@@ -68,12 +68,22 @@ function DashboardContent() {
 
   const handleCustomStart = (value: string) => {
     setCustomStart(value);
-    if (value && customEnd) setPeriod({ start: value, end: customEnd });
+    if (value && customEnd) {
+      const { start, end } = normalizeRange(value, customEnd);
+      setCustomStart(start);
+      setCustomEnd(end);
+      setPeriod({ start, end });
+    }
   };
 
   const handleCustomEnd = (value: string) => {
     setCustomEnd(value);
-    if (customStart && value) setPeriod({ start: customStart, end: value });
+    if (customStart && value) {
+      const { start, end } = normalizeRange(customStart, value);
+      setCustomStart(start);
+      setCustomEnd(end);
+      setPeriod({ start, end });
+    }
   };
 
   const { data: summary, isLoading: summaryLoading, error: summaryError } = useFinancialSummary(
@@ -90,7 +100,16 @@ function DashboardContent() {
   if (summaryError || reportError || (aiError && showAiSummary) || portfolioError) {
     return (
       <div className="space-y-4 py-8">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <Button variant="outline" size="sm" onClick={() => {
+            setPeriod({ year: currentYear });
+            setCustomStart("");
+            setCustomEnd("");
+          }}>
+            Reset to {currentYear}
+          </Button>
+        </div>
         <div className="p-4 border border-destructive/50 rounded-lg bg-destructive/5">
           <p className="text-sm font-medium text-destructive mb-2">API Connection Error</p>
           {summaryError && <p className="text-xs text-muted-foreground">Summary: {(summaryError as Error).message}</p>}

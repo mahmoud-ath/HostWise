@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { normalizeRange } from "@/lib/report-period";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -131,10 +132,11 @@ function RevenueSection() {
   const currency = useCurrency();
   const { t } = useI18n();
   const [filters, setFilters] = useState<Filters>({ property_id: "", start_date: "", end_date: "" });
+  const range = normalizeRange(filters.start_date, filters.end_date);
   const qs = {
     ...(filters.property_id ? { property_id: filters.property_id } : {}),
-    ...(filters.start_date ? { start_date: filters.start_date } : {}),
-    ...(filters.end_date ? { end_date: filters.end_date } : {}),
+    ...(range.start ? { start_date: range.start } : {}),
+    ...(range.end ? { end_date: range.end } : {}),
   };
   const { data: revenue, isLoading } = useRevenue(qs);
   const { data: revCats } = useRevenueCategories();
@@ -219,10 +221,11 @@ function ExpenseSection() {
   const currency = useCurrency();
   const { t } = useI18n();
   const [filters, setFilters] = useState<Filters>({ property_id: "", start_date: "", end_date: "" });
+  const range = normalizeRange(filters.start_date, filters.end_date);
   const qs = {
     ...(filters.property_id ? { property_id: filters.property_id } : {}),
-    ...(filters.start_date ? { start_date: filters.start_date } : {}),
-    ...(filters.end_date ? { end_date: filters.end_date } : {}),
+    ...(range.start ? { start_date: range.start } : {}),
+    ...(range.end ? { end_date: range.end } : {}),
   };
   const { data: expenses, isLoading } = useExpenses(qs);
   const { data: expCats } = useExpenseCategories();

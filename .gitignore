@@ -15,6 +15,14 @@ frontend/playwright-report/
 .env.local
 .env.production
 
+# Tauri updater signing secrets — NEVER commit. The real key lives at
+# ~/.tauri/hostwise.key (outside the repo) and is referenced via
+# TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
+*.key
+*.pass
+.tauri/
+frontend/src-tauri/.tauri/
+
 # IDE
 .vscode/
 .idea/

@@ -6,7 +6,7 @@ import { Target } from "lucide-react";
 import type { AdvisorReport } from "@/lib/ai-types";
 
 export function RecommendedGoals({ report }: { report: AdvisorReport }) {
-  const goals = report.recommended_goals;
+  const goals = Array.isArray(report.recommended_goals) ? report.recommended_goals : [];
 
   return (
     <ReportSection
@@ -23,13 +23,13 @@ export function RecommendedGoals({ report }: { report: AdvisorReport }) {
               <div className="mb-1 flex items-center justify-between text-sm">
                 <span className="font-medium">{g.label}</span>
                 <span className="text-muted-foreground">
-                  {g.current} <span className="text-muted-foreground/60">→</span>{" "}
-                  <span className="font-semibold text-foreground">{g.target}</span>
+                  {g.current ?? 0} <span className="text-muted-foreground/60">→</span>{" "}
+                  <span className="font-semibold text-foreground">{g.target ?? 0}</span>
                 </span>
               </div>
               <ProgressBar value={g.progress} color="bg-primary" />
               <p className="mt-0.5 text-right text-xs text-muted-foreground">
-                {Math.round(g.progress)}% of target
+                {Math.round(g.progress ?? 0)}% of target
               </p>
             </div>
           ))}

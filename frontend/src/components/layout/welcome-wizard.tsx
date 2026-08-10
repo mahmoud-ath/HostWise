@@ -12,6 +12,9 @@ import { Logo } from "./logo";
 
 const WELCOME_KEY = "hostwise_welcome_shown_v3";
 
+const CURRENCIES = ["EUR", "USD", "GBP", "MAD", "AED", "CAD", "AUD", "CHF"];
+const LANGUAGES = ["English", "Français", "Español", "العربية", "Deutsch"];
+
 interface SetupStep {
   id: string;
   label: string;
@@ -21,12 +24,14 @@ interface SetupStep {
 
 export function WelcomeWizard() {
   const { t } = useI18n();
-  const { ready, settings } = useSettings();
+  const { ready, settings, updateSettings, save } = useSettings();
   const [show, setShow] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [currency, setCurrency] = useState<string>((settings.default_currency as string) || "EUR");
+  const [language, setLanguage] = useState<string>((settings.language as string) || "English");
   const [saving, setSaving] = useState(false);
 
   const [steps, setSteps] = useState<SetupStep[]>([
@@ -95,22 +100,24 @@ export function WelcomeWizard() {
     if (!businessName) return;
     setSaving(true);
     try {
-      // The business identity lives in the settings store — write the same
-      // keys the Settings → Business tab edits, so the sidebar/dashboard
-      // reflect what was entered here.
-      await api.put("/settings", {
-        settings: {
-          business_name: businessName,
-          profile_email: email.trim() || "",
-          profile_name: businessName,
-        },
+      // Persist through the settings context so the sidebar/dashboard and the
+      // language/currency side-effects apply immediately (not just on reload).
+      updateSettings({
+        business_name: businessName,
+        profile_email: email.trim() || "",
+        profile_name: businessName,
+        default_currency: currency,
+        language: language,
       });
+      await save();
       // Keep the legacy setup endpoint in sync (DB init + profile row) so a
       // reinstall that calls /setup/initialize still has coherent data.
-      await api.post("/setup/initialize", {
-        name: businessName,
-        email: email.trim() || undefined,
-      }).catch(() => undefined);
+      await api
+        .post("/setup/initialize", {
+          name: businessName,
+          email: email.trim() || undefined,
+        })
+        .catch(() => undefined);
     } catch {
       // ignore — local app; the wizard can still be dismissed.
     }
@@ -214,6 +221,34 @@ export function WelcomeWizard() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
+            </div>
+            <div>
+              <Label className="text-xs">Default currency</Label>
+              <select
+                className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">Language</Label>
+              <select
+                className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
             </div>
             <Button size="lg" className="w-full" onClick={saveProfile} disabled={!name.trim() || saving}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

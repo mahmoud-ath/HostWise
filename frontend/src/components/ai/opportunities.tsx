@@ -48,7 +48,7 @@ export function Opportunities({ report }: { report: AdvisorReport }) {
                     <p className="truncate text-xs text-muted-foreground">{a.detail}</p>
                   </div>
                   <span className="shrink-0 font-semibold text-success">
-                    +{formatCurrency(a.gain, currency)}
+                    +{formatCurrency(a.gain ?? 0, currency)}
                   </span>
                 </div>
               ))}
@@ -77,7 +77,7 @@ export function Opportunities({ report }: { report: AdvisorReport }) {
                     <p className="truncate text-xs text-muted-foreground">{r.detail}</p>
                   </div>
                   <span className="shrink-0 font-semibold text-muted-foreground">
-                    {formatCurrency(r.amount, currency)}
+                    {formatCurrency(r.amount ?? 0, currency)}
                   </span>
                 </div>
               ))}

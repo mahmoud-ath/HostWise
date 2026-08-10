@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SectionCard } from "./section-card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { downloadFile } from "@/lib/download";
 import { useBackupStatus } from "@/hooks/use-api";
 import { useBackend } from "@/contexts/backend-context";
 import { useI18n } from "@/lib/i18n";
@@ -117,16 +118,7 @@ export function BackupSection() {
 
   const download = async (b: Backup) => {
     try {
-      const host = await api.getApiHost();
-      const resp = await fetch(`${host}/api/v1/backups/download/${encodeURIComponent(b.name)}`);
-      if (!resp.ok) throw new Error("Download failed");
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = b.name;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFile(`/backups/download/${encodeURIComponent(b.name)}`, b.name);
     } catch (err) {
       console.error("Download failed:", err);
     }

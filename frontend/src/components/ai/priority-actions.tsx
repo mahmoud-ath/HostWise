@@ -20,7 +20,7 @@ function ActionCard({ action }: { action: AiAction }) {
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold">{action.title}</p>
         <Badge variant={variant as "destructive" | "secondary" | "success" | "outline"}>
-          {Math.round(action.confidence_score * 100)}%
+          {Math.round((action.confidence_score ?? 0) * 100)}%
         </Badge>
       </div>
       {action.cause && (
@@ -70,7 +70,10 @@ function Group({
 }
 
 export function PriorityActions({ report }: { report: AdvisorReport }) {
-  const { critical, medium, low } = report.priority_actions;
+  const priority = report.priority_actions || {};
+  const critical = Array.isArray(priority.critical) ? priority.critical : [];
+  const medium = Array.isArray(priority.medium) ? priority.medium : [];
+  const low = Array.isArray(priority.low) ? priority.low : [];
 
   return (
     <ReportSection

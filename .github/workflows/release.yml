@@ -61,9 +61,15 @@ jobs:
         working-directory: frontend
         run: bun install --frozen-lockfile
 
+      # createUpdaterArtifacts:true signs each installer with the Tauri
+      # updater key (TAURI_SIGNING_PRIVATE_KEY + PASSWORD) so the built-in
+      # updater can verify downloads. Add these two secrets to the repo.
       - name: Build Tauri installer (NSIS)
         working-directory: frontend
         run: bunx tauri build --bundles nsis
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       # Optional Windows code signing. No-op unless the cert secrets are set.
       # (secrets cannot be referenced in `if:`, so we check them in-script.)
@@ -88,14 +94,18 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-windows
-          path: frontend/src-tauri/target/release/bundle/nsis/*.exe
+          path: |
+            frontend/src-tauri/target/release/bundle/nsis/*.exe
+            frontend/src-tauri/target/release/bundle/nsis/*.sig
           if-no-files-found: error
 
       - name: Publish GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: frontend/src-tauri/target/release/bundle/nsis/*.exe
+          files: |
+            frontend/src-tauri/target/release/bundle/nsis/*.exe
+            frontend/src-tauri/target/release/bundle/nsis/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
 
@@ -126,6 +136,9 @@ jobs:
       - name: Build Tauri .dmg
         working-directory: frontend
         run: bunx tauri build --bundles dmg
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       # Optional notarization. No-op unless the Apple secrets are set.
       # (secrets cannot be referenced in `if:`, so we check them in-script.)
@@ -148,14 +161,18 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-macos
-          path: frontend/src-tauri/target/release/bundle/dmg/*.dmg
+          path: |
+            frontend/src-tauri/target/release/bundle/dmg/*.dmg
+            frontend/src-tauri/target/release/bundle/dmg/*.sig
           if-no-files-found: error
 
       - name: Publish GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: frontend/src-tauri/target/release/bundle/dmg/*.dmg
+          files: |
+            frontend/src-tauri/target/release/bundle/dmg/*.dmg
+            frontend/src-tauri/target/release/bundle/dmg/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
 
@@ -197,6 +214,9 @@ jobs:
       - name: Build Tauri .deb
         working-directory: frontend
         run: bunx tauri build --bundles deb
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       # AppImage is currently blocked by an upstream linuxdeploy issue
       # (old strip vs .relr.dyn on Ubuntu 24.04, tauri-apps/tauri#14796).
@@ -207,20 +227,26 @@ jobs:
         continue-on-error: true
         env:
           NO_STRIP: "true"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bunx tauri build --bundles appimage --verbose
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-linux-deb
-          path: frontend/src-tauri/target/release/bundle/deb/*.deb
+          path: |
+            frontend/src-tauri/target/release/bundle/deb/*.deb
+            frontend/src-tauri/target/release/bundle/deb/*.sig
           if-no-files-found: error
 
       - name: Upload AppImage artifact (if built)
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-linux-appimage
-          path: frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+          path: |
+            frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+            frontend/src-tauri/target/release/bundle/appimage/*.sig
           if-no-files-found: warn
 
       - name: Publish GitHub release
@@ -229,6 +255,54 @@ jobs:
         with:
           files: |
             frontend/src-tauri/target/release/bundle/deb/*.deb
+            frontend/src-tauri/target/release/bundle/deb/*.sig
             frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+            frontend/src-tauri/target/release/bundle/appimage/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
+
+  # ── Updater manifest (latest.json) ──────────────────────────────────
+  # Runs after all three OS jobs: merges their installers + signatures into
+  # one bundle dir, generates latest.json (the Tauri updater manifest the
+  # app polls at /releases/latest/download/latest.json), and uploads it.
+  # Without this the built-in updater finds no manifest and no update is
+  # offered. Requires the signing secrets on the repo (same as the build jobs).
+  updater-manifest:
+    name: Publish updater manifest (latest.json)
+    needs: [windows, macos, linux]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Download installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+
+      - name: Merge installers into one bundle dir
+        run: |
+          set -e
+          mkdir -p bundle/nsis bundle/dmg bundle/deb bundle/rpm bundle/appimage
+          # Each artifact preserves its subfolder structure (nsis/, dmg/, ...).
+          cp -n artifacts/hostwise-windows/nsis/* bundle/nsis/ 2>/dev/null || true
+          cp -n artifacts/hostwise-macos/dmg/* bundle/dmg/ 2>/dev/null || true
+          cp -n artifacts/hostwise-linux-deb/deb/* bundle/deb/ 2>/dev/null || true
+          cp -n artifacts/hostwise-linux-appimage/appimage/* bundle/appimage/ 2>/dev/null || true
+          find bundle -type f | sort
+
+      - name: Generate latest.json
+        working-directory: frontend
+        run: bun scripts/generate-latest-json.mjs --bundle-dir=../bundle --dry-run
+
+      - name: Upload latest.json to release
+        run: |
+          gh release upload "${{ github.ref_name }}" bundle/latest.json --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

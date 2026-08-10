@@ -84,6 +84,9 @@ export interface AdvisorReport {
   generated_at: string;
   /** Engine that produced the report: 'hostwise' (rules) or an external provider id. */
   provider?: string;
+  /** True when an external provider was configured but unreachable — the report is rules-based but reflects the configured provider. */
+  llm_fallback?: boolean;
+  llm_fallback_message?: string;
   executive_summary: string;
   key_metrics: Record<string, number>;
   current_metrics: {

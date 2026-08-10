@@ -1,8 +1,8 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { Sparkles, AlertTriangle } from "lucide-react";
+import { cn, formatDate } from "@/lib/utils";
 import type { AdvisorReport } from "@/lib/ai-types";
 
 export function AIHeader({
@@ -37,12 +37,27 @@ export function AIHeader({
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>Generated {formatDate(report.generated_at)}</span>
                 {report.provider && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                      report.llm_fallback
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                        : "bg-muted"
+                    )}
+                  >
                     {report.provider === "hostwise"
                       ? "HostWise rules engine"
+                      : report.llm_fallback
+                      ? `Powered by ${report.provider} (fallback)`
                       : `Powered by ${report.provider}`}
                   </span>
                 )}
+              </p>
+            )}
+            {report?.provider && report.provider !== "hostwise" && report.llm_fallback && (
+              <p className="mt-1 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{report.llm_fallback_message || "LLM connection failed — showing built-in analysis."}</span>
               </p>
             )}
           </div>

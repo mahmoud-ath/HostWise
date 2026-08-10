@@ -29,7 +29,7 @@ const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string }> = {
 };
 
 export function AISection() {
-  const { get, updateSetting } = useSettings();
+  const { get, updateSetting, save, dirty } = useSettings();
   const { t } = useI18n();
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -41,6 +41,16 @@ export function AISection() {
     setTesting(true);
     setResult(null);
     try {
+      // The backend tests against the SAVED settings (API key, base URL, model).
+      // Persist any unsaved edits first so the test uses what's on screen.
+      if (dirty) {
+        const ok = await save();
+        if (!ok) {
+          setResult({ ok: false, message: "Could not save your settings — check and try again." });
+          setTesting(false);
+          return;
+        }
+      }
       const res = await api.post<{ ok: boolean; message: string }>("/ai/test-connection");
       setResult(res);
     } catch (err: any) {

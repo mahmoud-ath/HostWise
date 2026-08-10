@@ -1,10 +1,11 @@
 
 # HostWise — Run Locally & Ship to Production
 
-> HostWise v0.7.6 is a **100% native Rust backend** (`backend-rs/`) embedded
+> HostWise v0.8.1 is a **100% native Rust backend** (`backend-rs/`) embedded
 > **in-process** inside a **Tauri** desktop shell, serving a **Next.js static**
 > frontend. No Python, no PyInstaller, no external runtime, no database server —
-> SQLite is built into the binary.
+> SQLite is built into the binary. Updates ship through the **Tauri Updater**
+> (see `docs/RELEASING.md`).
 >
 > - API: `http://127.0.0.1:<port>/api/v1` (Rust + axum)
 > - Desktop: Tauri 2 (Linux/macOS/Windows), Rust backend runs inside the app
@@ -123,7 +124,7 @@ cargo run            # http://127.0.0.1:8000
 
 # smoke check
 curl http://127.0.0.1:8000/api/health
-# → {"database":"up","status":"ok","version":"0.7.6","schema_version":4}
+# → {"database":"up","status":"ok","version":"0.8.1","schema_version":4}
 
 # tests
 cargo test           # 8 suites: domains, analytics, connectors, AI/reports, …
@@ -142,7 +143,7 @@ cargo test           # 8 suites: domains, analytics, connectors, AI/reports, …
 | `SQLITE_PATH` | `<data_dir>/hostwise.db` | SQLite database file |
 | `HOSTWISE_DATA_DIR` | `<data_dir>` | Backups + uploads live here |
 | `CORS_ORIGINS` | dev: `["http://localhost:3000"]`; desktop: `["tauri://localhost","http://tauri.localhost","https://tauri.localhost"]` | Allowed origins |
-| `APP_NAME` / `APP_VERSION` / `ENVIRONMENT` | `HostWise` / `0.7.6` / `development` | Metadata |
+| `APP_NAME` / `APP_VERSION` / `ENVIRONMENT` | `HostWise` / `0.8.1` / `development` | Metadata; `ENVIRONMENT=production` enables the automatic startup backup |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | *(empty)* | Optional BYOK AI providers |
 | `DATABASE_TYPE` | `sqlite` | Reserved |
 
@@ -159,6 +160,27 @@ Inside: `hostwise.db` (WAL), `backups/` (created by the backup feature),
 
 > **Backup/restore** is built in: Settings → Maintenance, or the API
 > (`/api/v1/backups/create`, `/restore`, `/verify`, `/download`).
+
+### Logs
+
+- **Backend** logs every request (method, path, status, ms, request ID — never
+  query strings, bodies or headers, so no secrets) to **stdout** and to
+  `<data_dir>/logs/hostwise.log`. Both the desktop app and the standalone
+  binary do this.
+- **Frontend** captures uncaught errors, rejected promises and failed API calls
+  into an in-memory ring buffer (`localStorage`), visible under
+  Settings → Maintenance → **Client Logs**, with **Export Client Logs**
+  (downloads a `.log` file). Bodies and Authorization headers are never stored.
+- View backend logs in-app: Settings → Maintenance → **View Logs**, or read the
+  file at `<data_dir>/logs/hostwise.log`.
+
+### Automatic backups
+
+Every **production** launch (`ENVIRONMENT=production`, which the packaged
+desktop app sets) creates an automatic backup if the newest one is older than
+24 h: `hostwise_auto_<timestamp>.db`, keeping the newest 7. Manual backups
+(`hostwise_manual_*`) are never pruned automatically. This is the "daily
+backup" the status screen advertises.
 
 ---
 
@@ -208,25 +230,35 @@ Output installers land in `frontend/src-tauri/target/release/bundle/…`.
 
 ---
 
-## 7. Releasing a new version (CI pipeline)
+## 7. Releasing a new version
 
-Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds the
-Windows (NSIS), macOS (dmg) and Linux (deb) installers on GitHub and publishes
-them to a **GitHub Release**.
+Releases ship through the **built-in Tauri Updater**. Every release must be
+**signed** with the updater keypair and publish a `latest.json` manifest to the
+GitHub Release — otherwise the in-app updater can't offer it.
 
 ```bash
-# 1. Commit everything on main and push
-git add -A && git commit -m "chore: fix backend api connection"
+# 1. Bump the version in tauri.conf.json + Cargo.toml (x2) + package.json
+# 2. Commit and push main
+git add -A && git commit -m "v0.8.1: ..."
 git push origin main
 
-# 2. Tag and push → the release pipeline starts
-git tag -a v0.7.6 -m "v0.7.6"
-git push origin v0.7.6
+# 3. Tag and push → CI builds + signs installers for all three OSes
+git tag -a v0.8.1 -m "v0.8.1"
+git push origin v0.8.1
+
+# 4. Local signed build + upload installers & latest.json to the release
+#    (also what makes the updater work on Linux)
+scripts/release.sh v0.8.1
 ```
 
-Watch it run at **`https://github.com/<owner>/HostWise/actions`**. When green,
-installers are attached to the release at
-**`https://github.com/<owner>/HostWise/releases/tag/v0.7.6`**.
+See **`docs/RELEASING.md`** for the full workflow: signing keys (generated,
+secured, gitignored), the CI secrets to configure
+(`TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`), the
+`latest.json` manifest job, how to test the update flow, and why user data
+survives updates (the DB lives in the app-data dir).
+
+Watch CI at `https://github.com/mahmoud-ath/HostWise/actions`. Installers land
+on `https://github.com/mahmoud-ath/HostWise/releases/tag/v0.8.1`.
 
 CI checks (`.github/workflows/ci.yml`) run on every push/PR to `main`:
 Rust `fmt` + `clippy` + `test`, plus a frontend `bun` lint + build.
@@ -242,11 +274,17 @@ Rust `fmt` + `clippy` + `test`, plus a frontend `bun` lint + build.
       AI advisor, portfolio report, property model).
 - [x] Frontend `bun run build` passes (type-checked, 14 static pages).
 - [x] All 8 Rust test suites green (`cargo test`).
-- [x] Version metadata synced to `0.7.6` (`tauri.conf.json`,
-      `frontend/src-tauri/Cargo.toml`, `backend-rs/Cargo.toml`).
+- [x] Version metadata synced to `0.8.1` (`tauri.conf.json`,
+      `frontend/src-tauri/Cargo.toml`, `backend-rs/Cargo.toml`, `package.json`).
 - [x] CI + release pipelines Rust-only and bun-based.
+- [x] Production logging: backend (stdout + `<data_dir>/logs/hostwise.log`,
+      no secrets) and frontend (client log capture + export).
+- [x] Automatic daily backup on production launch (keeps newest 7 auto
+      backups; manual backups untouched).
+- [x] Auto-update: Tauri updater configured, keypair generated + secured,
+      signed `latest.json` pipeline (see `docs/RELEASING.md`).
 - [ ] (Optional) Configure Windows signing / macOS notarization secrets.
-- [ ] (Optional) Pin a `v*` tag → the release pipeline publishes installers.
+- [ ] (Optional) Pin a `v*` tag → CI publishes signed installers for all OSes.
 
 ---
 

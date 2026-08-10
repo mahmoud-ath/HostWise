@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { SectionCard } from "./section-card";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { downloadFile } from "@/lib/download";
 import { useWipeAllData } from "@/hooks/use-api";
 import { useI18n } from "@/lib/i18n";
 import { Lock, Download, Trash2, Loader2, CheckCircle2 } from "lucide-react";
@@ -17,9 +17,8 @@ export function SecuritySection() {
   const exportData = async () => {
     setExporting(true);
     try {
-      const host = await api.getApiHost();
-      // Direct navigation triggers the file download (multi-sheet Excel).
-      window.location.href = `${host}/api/v1/settings/export`;
+      // Desktop: native "Save As"; browser: standard download (multi-sheet Excel).
+      await downloadFile("/settings/export", "hostwise-export.xls");
       setDone(true);
       setTimeout(() => setDone(false), 3000);
     } catch (err) {

@@ -152,3 +152,38 @@ pub async fn verify_backup_by_name(backup_name: &str) -> serde_json::Value {
         }
     }
 }
+
+/// Auto-backup at startup: create a backup only if the newest existing one is
+/// older than `max_age_hours` (or none exists). This is what makes the
+/// advertised "daily backup" real in production without a long-running
+/// scheduler — every production launch re-arms the daily cadence.
+///
+/// After creating one, prunes old `hostwise_auto_*` backups (keeps the newest
+/// `keep_auto`), so auto-backups never grow unbounded. Manual backups
+/// (`hostwise_manual_*`, `hostwise_pre_restore_*`) are never pruned.
+pub async fn maybe_auto_backup(db_path: &Path, max_age_hours: i64) -> Option<PathBuf> {
+    let keep_auto: usize = 7;
+    if let Some(latest) = list_backups().into_iter().next() {
+        if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&latest.created) {
+            let age_hours = chrono::Utc::now()
+                .signed_duration_since(created.with_timezone(&chrono::Utc))
+                .num_hours();
+            if age_hours < max_age_hours {
+                return None; // recent backup exists — nothing to do
+            }
+        }
+    }
+    let created = create_backup(db_path, "auto").await?;
+
+    // Prune auto backups beyond the newest `keep_auto`.
+    let auto: Vec<PathBuf> = list_backups()
+        .into_iter()
+        .filter(|b| b.name.starts_with("hostwise_auto_"))
+        .map(|b| PathBuf::from(&b.path))
+        .collect();
+    for path in auto.iter().skip(keep_auto) {
+        let _ = fs::remove_file(path);
+    }
+
+    Some(created)
+}

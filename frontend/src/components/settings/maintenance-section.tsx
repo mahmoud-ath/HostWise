@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   RefreshCw,
   ClipboardCopy,
+  Download,
 } from "lucide-react";
 import {
   useMaintenanceStatus,
@@ -27,6 +28,7 @@ import {
 import { useBackend } from "@/contexts/backend-context";
 import { useI18n } from "@/lib/i18n";
 import { formatBytes } from "./backup-section";
+import { getLogs, formatLogs, clearLogs, type LogEntry } from "@/lib/logger";
 
 // Merged Maintenance + Developer tab (one tab, no redundancy):
 // database housekeeping + backend diagnostics + a single shared log viewer.
@@ -39,8 +41,24 @@ export function MaintenanceSection() {
   const resetAll = useResetAllData();
   const { status: backendStatus, isReady, restartBackend } = useBackend();
   const [showLogs, setShowLogs] = useState(false);
+  const [showClientLogs, setShowClientLogs] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [clientLogs, setClientLogs] = useState<LogEntry[]>([]);
   const logs = useBackendLogs(200);
+
+  useEffect(() => {
+    if (showClientLogs) setClientLogs(getLogs());
+  }, [showClientLogs]);
+
+  const exportClientLogs = () => {
+    const blob = new Blob([formatLogs(getLogs())], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hostwise-client-logs-${new Date().toISOString().slice(0, 10)}.log`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Resolve the ACTUAL backend URL the app is talking to (via the API client,
   // which calls get_backend_url in Tauri or the /api/v1 proxy in the browser).
@@ -80,10 +98,14 @@ export function MaintenanceSection() {
   };
 
   const resetAllData = () => {
-    if (!confirm("Reset ALL data?\nThis deletes properties, reservations, revenues, expenses and categories. Your settings (currency, AI, business name) are kept. This cannot be undone.")) return;
+    if (!confirm("Reset ALL data?\nThis deletes everything — properties, reservations, revenues, expenses, categories, notifications, AND all settings (business name, currency, AI provider, API keys, appearance). The app returns to its very first-run state. This cannot be undone.")) return;
     if (!confirm("Are you absolutely sure? This is destructive.")) return;
     resetAll.mutate(undefined, {
-      onSuccess: (res) => alert(`All data reset: ${Object.entries(res.deleted).map(([k, v]) => `${k} (${v})`).join(", ")}`),
+      onSuccess: (res) => {
+        alert(`Factory reset complete: ${Object.entries(res.deleted).map(([k, v]) => `${k} (${v})`).join(", ")} deleted. The app is back to its first-run state.`);
+        // Reload so the app re-reads the cleared settings (first-run defaults).
+        window.location.reload();
+      },
       onError: () => alert("Failed to reset all data."),
     });
   };
@@ -194,6 +216,12 @@ export function MaintenanceSection() {
         <Button variant="outline" size="sm" onClick={() => setShowLogs((v) => !v)}>
           <FileText className="mr-1.5 h-4 w-4" /> View Logs
         </Button>
+        <Button variant="outline" size="sm" onClick={() => setShowClientLogs((v) => !v)}>
+          <FileText className="mr-1.5 h-4 w-4" /> Client Logs
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportClientLogs} title="Download the client-side error/event log">
+          <Download className="mr-1.5 h-4 w-4" /> Export Client Logs
+        </Button>
         <Button variant="outline" size="sm" onClick={restartBackend}>
           <RefreshCw className="mr-1.5 h-4 w-4" /> Restart Backend
         </Button>
@@ -226,6 +254,30 @@ export function MaintenanceSection() {
             ? "Loading logs..."
             : logs.data?.content || "No log file available in this environment."}
         </pre>
+      )}
+
+      {showClientLogs && (
+        <div className="mt-3 rounded-md border bg-muted/40">
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <span className="text-xs font-medium">Client log ({clientLogs.length} entries, newest last)</span>
+            <button
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+              onClick={() => {
+                clearLogs();
+                setClientLogs([]);
+              }}
+            >
+              Clear
+            </button>
+          </div>
+          <pre className="max-h-64 overflow-auto p-3 text-xs font-mono">
+            {clientLogs.length
+              ? clientLogs
+                  .map((e) => `[${e.ts}] ${e.level.toUpperCase()} ${e.msg}${e.detail ? ` — ${e.detail}` : ""}`)
+                  .join("\n")
+              : "No client-side events captured yet."}
+          </pre>
+        </div>
       )}
     </SectionCard>
   );

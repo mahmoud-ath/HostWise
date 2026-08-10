@@ -71,6 +71,21 @@ pub async fn serve(config: Config) -> Result<(), AppError> {
     };
     let app = build_router(state);
 
+    // Production: re-arm the daily backup cadence on every launch. Runs in a
+    // background task so it never delays window/API startup, and only touches
+    // the real data DB (dev/test runs use `ENVIRONMENT != production`).
+    if config.is_production() {
+        let db_path = config.sqlite_path.clone();
+        tokio::spawn(async move {
+            match crate::backup::service::maybe_auto_backup(&db_path, 24).await {
+                Some(p) => {
+                    tracing::info!(backup = %p.display(), "created automatic startup backup")
+                }
+                None => tracing::debug!("automatic backup skipped (recent backup exists)"),
+            }
+        });
+    }
+
     // Dynamic port: try the configured port (PORT env or 8000), but never fail
     // if it is taken — fall back to an OS-assigned free port instead.
     let addr = format!("{}:{}", config.host, config.port);

@@ -6,9 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FileText, CalendarRange, Loader2, Printer } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import { api } from "@/lib/api";
+import { downloadFile } from "@/lib/download";
 import type { PortfolioReport } from "@/lib/report-types";
-import { isCustomPeriod, type ReportPeriod } from "@/lib/report-period";
+import { isCustomPeriod, normalizeRange, type ReportPeriod } from "@/lib/report-period";
 
 const CURRENCIES = ["EUR", "USD", "GBP", "MAD", "AED", "CAD", "AUD", "CHF"];
 const MAX_YEAR_RANGE = 6;
@@ -45,20 +45,16 @@ export function ReportHeader({
     if (!report) return;
     setGenerating(true);
     try {
-      const host = await api.getApiHost();
       const params = new URLSearchParams();
       params.set("format", "pdf");
       if (period.year) params.set("year", String(period.year));
       if (period.start) params.set("start_date", period.start);
       if (period.end) params.set("end_date", period.end);
       params.set("currency", currency);
-      const url = `${host}/api/v1/reports/export?${params.toString()}`;
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // Desktop opens a native "Save As" dialog; the browser downloads.
+      await downloadFile(`/reports/export?${params.toString()}`, "hostwise-report.pdf");
+    } catch (err) {
+      console.error("Could not export report:", err);
     } finally {
       setGenerating(false);
     }
@@ -78,12 +74,22 @@ export function ReportHeader({
 
   const handleCustomStart = (value: string) => {
     setCustomStart(value);
-    if (value && customEnd) onPeriodChange({ start: value, end: customEnd });
+    if (value && customEnd) {
+      const { start, end } = normalizeRange(value, customEnd);
+      setCustomStart(start);
+      setCustomEnd(end);
+      onPeriodChange({ start, end });
+    }
   };
 
   const handleCustomEnd = (value: string) => {
     setCustomEnd(value);
-    if (customStart && value) onPeriodChange({ start: customStart, end: value });
+    if (customStart && value) {
+      const { start, end } = normalizeRange(customStart, value);
+      setCustomStart(start);
+      setCustomEnd(end);
+      onPeriodChange({ start, end });
+    }
   };
 
   const selectCls =

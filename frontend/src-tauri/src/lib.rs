@@ -23,6 +23,18 @@ fn restart_backend(app: tauri::AppHandle) -> String {
     rust_backend::start(&app)
 }
 
+/// Write file bytes to an absolute path the user picked via the native
+/// "Save As" dialog (report PDFs, backups, exports). Keeps the file write in
+/// the Rust shell so the webview only ever touches user-approved absolute paths.
+#[tauri::command]
+fn save_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    let target = std::path::Path::new(&path);
+    if !target.is_absolute() {
+        return Err("Refusing to write to a non-absolute path".into());
+    }
+    std::fs::write(target, &bytes).map_err(|e| e.to_string())
+}
+
 /// Install a tracing subscriber so the embedded backend's logs (every request
 /// with method/path/status, plus any error) are printed to the terminal. The
 /// Tauri shell previously initialized NO subscriber, so all `tracing` output
@@ -86,7 +98,13 @@ pub fn run() {
                 rust_backend::stop(window.app_handle());
             }
         })
-        .invoke_handler(tauri::generate_handler![get_backend_url, restart_backend])
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            get_backend_url,
+            restart_backend,
+            save_file
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

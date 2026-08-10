@@ -6,6 +6,13 @@
 > `docs/run-and-production.md`, `docs/BUILD.md`, `docs/CHANGELOG.md` and
 > `docs/rust-rewrite-prompt.md`.
 
+> **Update (2026-08-10):** the production-hardening passes below are done —
+> automatic daily backup (was advertised but absent), production logging
+> (backend file + stdout, frontend client log), and the **Tauri Updater** as
+> the official update mechanism (signing keypair, `latest.json` manifest,
+> in-app check + install banner). See `docs/RELEASING.md` for the release
+> workflow and `docs/run-and-production.md` §Logs/§Automatic-backups.
+
 > **Built on the existing audit** (`AUDIT.md`, `decision-log.md`,
 > `overall-architecture.md`, `database-audit.md`, page audits, `roadmap.md`),
 > **not a new audit**. Re-verified against the codebase on **Aug 4, 2026**.

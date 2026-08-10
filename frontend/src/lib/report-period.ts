@@ -19,6 +19,16 @@ export function isCustomPeriod(p: ReportPeriod): boolean {
   return !!p.start && !!p.end;
 }
 
+/**
+ * Ensure a custom range is well-formed: if the start is AFTER the end, swap
+ * them. The backend rejects inverted ranges (422 "start_date must not be after
+ * end_date"), which previously made the dashboard show misleading zeros.
+ */
+export function normalizeRange(start: string, end: string): { start: string; end: string } {
+  if (start && end && start > end) return { start: end, end: start };
+  return { start, end };
+}
+
 /** Stable string key for React Query caches / notes. */
 export function periodKey(p: ReportPeriod): string {
   if (p.year) return String(p.year);

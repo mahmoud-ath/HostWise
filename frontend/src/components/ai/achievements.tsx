@@ -16,11 +16,11 @@ function AchievementCard({ a }: { a: Achievement }) {
   return (
     <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card">
-        {ICONS[a.icon] || <PartyPopper className="h-5 w-5 text-primary" />}
+        {ICONS[a.icon || ""] || <PartyPopper className="h-5 w-5 text-primary" />}
       </div>
       <div>
-        <p className="text-sm font-semibold">{a.title}</p>
-        <p className="text-xs text-muted-foreground">{a.detail}</p>
+        <p className="text-sm font-semibold">{a.title || ""}</p>
+        <p className="text-xs text-muted-foreground">{a.detail || ""}</p>
       </div>
     </div>
   );
@@ -34,7 +34,7 @@ export function Achievements({ report }: { report: AdvisorReport }) {
       description="Celebrate what's going well"
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        {report.achievements.map((a) => (
+        {(Array.isArray(report.achievements) ? report.achievements : []).map((a) => (
           <AchievementCard key={a.title} a={a} />
         ))}
       </div>

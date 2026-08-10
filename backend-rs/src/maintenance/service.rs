@@ -21,6 +21,7 @@ fn find_log_file() -> Option<PathBuf> {
     }
     let data_dir = crate::core::config::default_data_dir();
     for candidate in [
+        data_dir.join("logs").join("hostwise.log"),
         data_dir.join("hostwise.log"),
         PathBuf::from("hostwise.log"),
         PathBuf::from("logs/hostwise.log"),
@@ -188,7 +189,10 @@ pub async fn reset_demo(pool: &SqlitePool) -> Result<Value, AppError> {
     Ok(json!({ "deleted": deleted }))
 }
 
-/// Delete ALL business data (children before parents), keeping schema/settings/users.
+/// Full factory reset — delete ALL business data (children before parents) AND
+/// every setting (AI config + API keys, business identity, currency, appearance,
+/// notifications…) so the app returns to a first-run state, exactly like the
+/// first launch (schema and users are kept).
 pub async fn reset_all(pool: &SqlitePool) -> Result<Value, AppError> {
     let mut deleted = Map::new();
     for table in [
@@ -209,5 +213,13 @@ pub async fn reset_all(pool: &SqlitePool) -> Result<Value, AppError> {
             .await?;
         deleted.insert(table.to_string(), json!(count));
     }
+    // Clear every setting so the backend defaults take over again (no API key,
+    // rules engine, default business name, EUR, light theme…).
+    let settings_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM settings")
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+    sqlx::query("DELETE FROM settings").execute(pool).await?;
+    deleted.insert("settings".to_string(), json!(settings_count));
     Ok(json!({ "deleted": deleted }))
 }

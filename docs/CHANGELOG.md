@@ -6,6 +6,67 @@
 
 ---
 
+## 0. v0.8.1 — production hardening, updater & logging (2026-08-10)
+
+### Custom-date crash fixed (root cause: inverted ranges)
+- Selecting a custom period where **start > end** made the backend return 422,
+  which surfaced as misleading zero data and a stuck error state hiding the
+  selector. Added `normalizeRange(start, end)` (`frontend/src/lib/report-period.ts`)
+  that auto-swaps inverted ranges, wired into the **Dashboard**, **Analytics**,
+  **Reports** and **Finance** custom-date handlers. The Dashboard error state
+  also gained a **"Reset to {year}"** escape hatch so a failed period query
+  never locks the page again. Verified live: `2026-09-01 → 2026-03-01` now
+  auto-swaps and loads data.
+
+### Settings / wizard — currency + language
+- The **welcome wizard** now captures **Default currency** (EUR/USD/GBP/MAD/
+  AED/CAD/AUD/CHF) and **Language** (English/Français/Español/العربية/Deutsch)
+  alongside business name/email, and persists them through the settings context
+  on submit. Coherent with the Settings → Business tab.
+
+### Downloads — user chooses the save location
+- Added a `save_file` Tauri command + a shared `frontend/src/lib/download.ts`
+  helper. In the desktop app, PDF reports, backup downloads and the Excel
+  export now open the **native "Save As" dialog** (the user picks where to save
+  — no more dumping into a hidden folder). In the browser it falls back to the
+  standard blob download.
+
+### Production logging
+- Backend logs every request (method, path, status, ms, request ID) to stdout
+  **and** `<data_dir>/logs/hostwise.log` — in both the desktop app and the
+  standalone binary. Paths only — no query strings, bodies or headers, so no
+  API keys/secrets can leak.
+- Frontend added `frontend/src/lib/logger.ts`: captures uncaught errors,
+  unhandled rejections and failed API calls into a ring buffer
+  (Settings → Maintenance → **Client Logs**, with **Export Client Logs**).
+  Bodies/Authorization headers are never logged.
+
+### Automatic daily backup (data safety)
+- The status screen always advertised "schedule: daily" but nothing created
+  backups automatically. `serve()` now creates an **automatic backup on every
+  production launch** if the newest is older than 24 h
+  (`hostwise_auto_*.db`, keeping the newest 7; manual backups untouched).
+
+### Tauri Updater (auto-update)
+- Wired the official **Tauri updater**: `tauri-plugin-updater` (Rust + JS +
+  capability), `createUpdaterArtifacts: true`, endpoint
+  `https://github.com/mahmoud-ath/HostWise/releases/latest/download/latest.json`,
+  `passive` install mode on Windows.
+- **Signing keypair generated** (2026-08-10) at `~/.tauri/hostwise.key`
+  (+ `.pub`, + passphrase). Public key embedded in `tauri.conf.json`; private
+  key gitignored and **never committed**. If lost, no further updates can be
+  signed.
+- Frontend checks for updates ~2.5 s after startup and shows a **banner** with
+  "Download & Install" + progress; failures are silent + logged.
+- `frontend/scripts/generate-latest-json.mjs` builds the updater manifest;
+  `scripts/release.sh` performs a local signed build + upload;
+  `release.yml` now signs all OS installers, uploads `.sig` files and publishes
+  `latest.json` via a new `updater-manifest` job.
+- **User data survives updates**: the SQLite DB/backups/logs live in the
+  per-OS app-data dir, not the app bundle. See `docs/RELEASING.md`.
+
+---
+
 ## 1. Recent changes (2026-08-09)
 
 ### v0.8.0 — official logo, production-ready settings save, coherent settings UX

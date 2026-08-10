@@ -13,10 +13,11 @@ const COMPONENT_COLORS: Record<string, string> = {
 };
 
 export function BusinessHealthScore({ report }: { report: AdvisorReport }) {
-  const health = report.health_score;
+  const health = report.health_score || {};
+  const components = health.components || {};
 
   // No properties/financial records yet → nothing to score (no fabricated 50s).
-  if (health.score === null || health.status === "no_data") {
+  if (health.score == null || health.status === "no_data") {
     return (
       <ReportSection
         title="Business Health Score"
@@ -75,10 +76,10 @@ export function BusinessHealthScore({ report }: { report: AdvisorReport }) {
               <div className="mb-1 flex items-center justify-between text-sm">
                 <span className="font-medium">{b.label}</span>
                 <span className="text-muted-foreground">
-                  {health.components[b.key]}/100
+                  {components[b.key] ?? 0}/100
                 </span>
               </div>
-              <ProgressBar value={health.components[b.key] ?? 0} color={COMPONENT_COLORS[b.key]} />
+              <ProgressBar value={components[b.key] ?? 0} color={COMPONENT_COLORS[b.key]} />
             </div>
           ))}
           <p className="pt-1 text-xs leading-relaxed text-muted-foreground">

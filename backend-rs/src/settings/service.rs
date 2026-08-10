@@ -182,6 +182,19 @@ pub async fn get_all(pool: &SqlitePool) -> Result<Value, AppError> {
     Ok(Value::Object(merged))
 }
 
+/// Fetch the raw (unmasked) API key for internal use.
+/// `get_all()` masks the key for the client, but LLM calls need the real secret.
+pub async fn get_raw_api_key(pool: &SqlitePool) -> Option<String> {
+    sqlx::query_scalar::<_, String>("SELECT value FROM settings WHERE key = 'ai_api_key'")
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|encoded| serde_json::from_str::<Value>(&encoded).ok())
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .filter(|s| !s.is_empty())
+}
+
 /// Upsert the given settings and return the full updated map.
 pub async fn update(pool: &SqlitePool, settings: Map<String, Value>) -> Result<Value, AppError> {
     let now = now_iso();

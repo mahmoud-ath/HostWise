@@ -18,14 +18,14 @@ function RiskCard({ risk }: { risk: PropertyRisk }) {
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-md bg-card px-3 py-2">
           <p className="text-xs text-muted-foreground">Profit Margin</p>
-          <p className={`font-semibold ${risk.profit_margin < 0 ? "text-destructive" : "text-success"}`}>
-            {risk.profit_margin}%
+          <p className={`font-semibold ${(risk.profit_margin ?? 0) < 0 ? "text-destructive" : "text-success"}`}>
+            {risk.profit_margin ?? 0}%
           </p>
         </div>
         <div className="rounded-md bg-card px-3 py-2">
           <p className="text-xs text-muted-foreground">Revenue Trend</p>
           <p className={`font-semibold ${(risk.revenue_trend_pct ?? 0) < 0 ? "text-destructive" : "text-success"}`}>
-            {risk.revenue_trend_pct === null ? "—" : `${risk.revenue_trend_pct}%`}
+            {risk.revenue_trend_pct == null ? "—" : `${risk.revenue_trend_pct}%`}
           </p>
         </div>
       </div>
@@ -40,7 +40,7 @@ function RiskCard({ risk }: { risk: PropertyRisk }) {
 }
 
 export function RiskDetection({ report }: { report: AdvisorReport }) {
-  const risks = report.risks;
+  const risks = Array.isArray(report.risks) ? report.risks : [];
 
   return (
     <ReportSection

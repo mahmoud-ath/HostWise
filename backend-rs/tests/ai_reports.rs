@@ -151,15 +151,18 @@ async fn ai_and_reports_flow() {
     // ── AI: service (scenario + connection) ──
     let svc = AiAdvisorService { pool: pool.clone() };
     let sc = svc
-        .simulate_scenario(
-            "price_increase",
-            &serde_json::json!({"increase_pct": 5}),
-            2026,
-        )
+        .simulate_scenario("price_increase", &serde_json::json!({"pct": 5}), 2026)
         .await
         .unwrap();
     assert_eq!(sc["scenario"], "price_increase");
-    assert!(sc["projected_profit"].as_f64().unwrap() > 0.0);
+    assert_eq!(sc["label"], "Increase prices 5%");
+    assert!(sc["baseline"]["revenue"].as_f64().unwrap() > 0.0);
+    assert!(sc["impact"]["profit_delta"].as_f64().unwrap() > 0.0);
+    assert_eq!(
+        sc["projected"]["profit"].as_f64().unwrap(),
+        sc["baseline"]["profit"].as_f64().unwrap() + sc["impact"]["profit_delta"].as_f64().unwrap()
+    );
+    assert!(sc["confidence"].is_number());
 
     let conn = svc.test_llm_connection().await.unwrap();
     assert_eq!(conn["ok"], true);

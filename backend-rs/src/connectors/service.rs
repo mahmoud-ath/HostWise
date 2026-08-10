@@ -152,13 +152,18 @@ pub fn detect_type(import_type: &str, columns: &[String]) -> String {
         return import_type.to_string();
     }
     let cols = columns.join(" ");
-    if (cols.contains("gross_revenue") || cols.contains("gross_amount"))
-        && cols.contains("reservation_id")
-    {
-        return "revenues".into();
-    }
+    // Reservations win: a file with check_in/check_out is a reservations file,
+    // even if it also carries a per-booking `gross_amount` column. Checked
+    // before revenues/expenses so the official reservations sample is not
+    // misclassified as revenues.
     if cols.contains("check_in") && cols.contains("check_out") {
         return "reservations".into();
+    }
+    if cols.contains("gross_revenue")
+        || (cols.contains("gross_amount") && cols.contains("date"))
+        || (cols.contains("gross_amount") && cols.contains("reservation_id"))
+    {
+        return "revenues".into();
     }
     if (cols.contains("expense") || cols.contains("category")) && cols.contains("amount") {
         return "expenses".into();
@@ -715,4 +720,58 @@ pub async fn import_ical(
         "properties_created": 0,
         "errors": [],
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::detect_type;
+
+    fn cols(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn detects_reservations_before_revenues() {
+        // Official reservations sample has gross_amount + reservation_id AND
+        // check_in/check_out — must be classified as reservations.
+        let c = cols(&[
+            "property_id",
+            "property_name",
+            "reservation_id",
+            "check_in",
+            "check_out",
+            "nights",
+            "guest_name",
+            "status",
+            "gross_amount",
+            "city",
+            "country",
+        ]);
+        assert_eq!(detect_type("auto", &c), "reservations");
+    }
+
+    #[test]
+    fn detects_revenues() {
+        let c = cols(&[
+            "property_name",
+            "date",
+            "gross_revenue",
+            "management_commission",
+            "net_revenue",
+            "source",
+        ]);
+        assert_eq!(detect_type("auto", &c), "revenues");
+    }
+
+    #[test]
+    fn detects_expenses() {
+        let c = cols(&["property_name", "date", "amount", "category", "vendor"]);
+        assert_eq!(detect_type("auto", &c), "expenses");
+    }
+
+    #[test]
+    fn explicit_type_wins() {
+        let c = cols(&["check_in", "check_out", "gross_amount", "reservation_id"]);
+        assert_eq!(detect_type("revenues", &c), "revenues");
+    }
 }

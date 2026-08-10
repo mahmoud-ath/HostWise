@@ -8,7 +8,10 @@ import { useSettings } from "@/contexts/settings-context";
 import type { AdvisorReport } from "@/lib/ai-types";
 
 export function ExecutiveAISummary({ report }: { report: AdvisorReport }) {
-  const m = report.current_metrics;
+  const m =
+    report.current_metrics && typeof report.current_metrics === "object"
+      ? report.current_metrics
+      : ({} as AdvisorReport["current_metrics"]);
   const { get } = useSettings();
   const currency = get("default_currency", "EUR") as string;
 

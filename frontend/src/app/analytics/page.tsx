@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePortfolioAnalytics } from "@/hooks/use-api";
 import { formatCurrency } from "@/lib/utils";
 import { useSettings } from "@/contexts/settings-context";
-import { ReportPeriod, isCustomPeriod, periodLabel, previousPeriod } from "@/lib/report-period";
+import { ReportPeriod, isCustomPeriod, periodLabel, previousPeriod, normalizeRange } from "@/lib/report-period";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -113,12 +113,22 @@ function AnalyticsContent() {
 
   const handleCustomStart = (value: string) => {
     setCustomStart(value);
-    if (value && customEnd) setPeriod({ start: value, end: customEnd });
+    if (value && customEnd) {
+      const { start, end } = normalizeRange(value, customEnd);
+      setCustomStart(start);
+      setCustomEnd(end);
+      setPeriod({ start, end });
+    }
   };
 
   const handleCustomEnd = (value: string) => {
     setCustomEnd(value);
-    if (customStart && value) setPeriod({ start: customStart, end: value });
+    if (customStart && value) {
+      const { start, end } = normalizeRange(customStart, value);
+      setCustomStart(start);
+      setCustomEnd(end);
+      setPeriod({ start, end });
+    }
   };
 
   if (isLoading)

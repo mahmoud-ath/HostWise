@@ -15,7 +15,10 @@ function riskVariant(level: string) {
 }
 
 export function ForecastNext30({ report }: { report: AdvisorReport }) {
-  const f = report.forecast;
+  const f =
+    report.forecast && typeof report.forecast === "object"
+      ? report.forecast
+      : ({} as AdvisorReport["forecast"]);
   const { get } = useSettings();
   const currency = get("default_currency", "EUR") as string;
 
@@ -30,7 +33,7 @@ export function ForecastNext30({ report }: { report: AdvisorReport }) {
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Expected Revenue</p>
             <p className="mt-1 text-2xl font-bold tracking-tight">
-              {formatCurrency(f.expected_revenue, currency)}
+              {formatCurrency(f.expected_revenue ?? 0, currency)}
             </p>
           </CardContent>
         </Card>
@@ -56,7 +59,7 @@ export function ForecastNext30({ report }: { report: AdvisorReport }) {
               Best Property
             </p>
             <p className="mt-1 text-lg font-bold">{f.best_property || "—"}</p>
-            <p className="text-xs text-muted-foreground">Confidence {f.confidence}%</p>
+            <p className="text-xs text-muted-foreground">Confidence {f.confidence ?? 0}%</p>
           </CardContent>
         </Card>
       </div>
