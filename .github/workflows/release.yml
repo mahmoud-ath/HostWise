@@ -144,6 +144,30 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+      # Tauri leaves the .app as a directory; the updater needs it as a signed
+      # .app.tar.gz (normally produced by tauri-action). Tar + sign it here so
+      # latest.json can serve macOS auto-updates.
+      - name: Package + sign macOS .app for updater
+        working-directory: frontend
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -e
+          app_dir=$(find src-tauri/target/release/bundle -maxdepth 2 -name '*.app' -type d | head -1)
+          if [ -z "$app_dir" ]; then
+            echo "No .app bundle found; skipping updater package."
+            exit 0
+          fi
+          mkdir -p src-tauri/target/release/bundle/app
+          name=$(basename "$app_dir")
+          out="src-tauri/target/release/bundle/app/${name}.tar.gz"
+          tar -czf "$out" -C "$(dirname "$app_dir")" "$name"
+          # Reads TAURI_SIGNING_PRIVATE_KEY / _PASSWORD env vars; writes $out.sig
+          bunx tauri signer sign "$out"
+          ls -la src-tauri/target/release/bundle/app
+
       # Optional notarization. No-op unless the Apple secrets are set.
       # (secrets cannot be referenced in `if:`, so we check them in-script.)
       - name: Notarize (optional)
