@@ -160,4 +160,5 @@ version will never be offered.
 | Banner never appears | Endpoint unreachable, or `latest.json` missing from the release, or version not bumped. `curl https://github.com/mahmoud-ath/HostWise/releases/latest/download/latest.json` should return JSON. |
 | "Update failed" on install | Signature mismatch — rebuild with the **same** keypair that's in `tauri.conf.json`. Check `TAURI_SIGNING_PRIVATE_KEY`/password are the correct pair. |
 | CI fails with signing error | `TAURI_SIGNING_PRIVATE_KEY` / `_PASSWORD` secrets missing or wrong on the repo. |
+| CI "failed to decode secret key … Invalid symbol 37" | The secret was copied from a terminal `cat` and includes zsh's trailing **`%`** marker (the key/pass files have **no trailing newline**, so `cat` output ends with `%`). Re-add the secret, copying from an editor (`code ~/.tauri/hostwise.key`) so the `%` is not included. |
 | Data "gone" after update | It isn't — it's in the app-data dir (see §1). If the DB file is intact, use `Settings → Maintenance → Backups → Restore`. |
