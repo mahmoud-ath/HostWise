@@ -51,7 +51,11 @@ function tauriTarget(bundleSub, file) {
     if (/arm64|aarch64|universal/.test(lower)) return "darwin-aarch64";
     return "darwin-x86_64";
   }
-  if (bundleSub === "app" && lower.endsWith(".tar.gz")) return "darwin-x86_64";
+  if (bundleSub === "app" && lower.endsWith(".tar.gz")) {
+    // The .app bundle name has no arch; derive it from the .dmg in the same
+    // release (GitHub macos-latest is arm64 → aarch64).
+    return macosArch === "aarch64" ? "darwin-aarch64" : "darwin-x86_64";
+  }
   if (bundleSub === "deb" && lower.endsWith(".deb")) return "linux-x86_64";
   if (bundleSub === "rpm" && lower.endsWith(".rpm")) return "linux-x86_64";
   if (bundleSub === "appimage" && lower.endsWith(".appimage")) return "linux-x86_64";
@@ -96,6 +100,17 @@ if (!existsSync(bundleDir)) {
   console.error(`Bundle dir not found: ${bundleDir}`);
   console.error("Build first with: TAURI_SIGNING_PRIVATE_KEY=... bunx tauri build");
   process.exit(1);
+}
+
+// Derive the macOS arch from the .dmg name (macOS .app bundles have no arch in
+// their filename). GitHub's macos-latest runners are arm64 → aarch64.
+let macosArch = "x86_64";
+for (const sub of readdirSync(bundleDir)) {
+  const subDir = join(bundleDir, sub);
+  if (!statSync(subDir).isDirectory()) continue;
+  for (const file of readdirSync(subDir)) {
+    if (sub === "dmg" && /arm64|aarch64|universal/i.test(file)) macosArch = "aarch64";
+  }
 }
 
 for (const sub of readdirSync(bundleDir)) {

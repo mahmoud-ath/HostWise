@@ -134,9 +134,12 @@ jobs:
         working-directory: frontend
         run: bun install --frozen-lockfile
 
-      - name: Build Tauri .dmg
+      # Build BOTH the .dmg (manual installs) and the .app bundle — Tauri only
+      # generates updater signatures for the .app (the .dmg gets no .sig), so
+      # the .app is what the built-in updater needs on macOS.
+      - name: Build Tauri .dmg + .app
         working-directory: frontend
-        run: bunx tauri build --bundles dmg
+        run: bunx tauri build --bundles dmg app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -158,13 +161,15 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID"
           xcrun stapler staple "$dmg"
 
-      - name: Upload dmg artifact
+      - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-macos
           path: |
             frontend/src-tauri/target/release/bundle/dmg/*.dmg
             frontend/src-tauri/target/release/bundle/dmg/*.sig
+            frontend/src-tauri/target/release/bundle/app/*.app.tar.gz
+            frontend/src-tauri/target/release/bundle/app/*.sig
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -174,6 +179,8 @@ jobs:
           files: |
             frontend/src-tauri/target/release/bundle/dmg/*.dmg
             frontend/src-tauri/target/release/bundle/dmg/*.sig
+            frontend/src-tauri/target/release/bundle/app/*.app.tar.gz
+            frontend/src-tauri/target/release/bundle/app/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
           overwrite: true
@@ -292,13 +299,15 @@ jobs:
       - name: Merge installers into one bundle dir
         run: |
           set -e
-          mkdir -p bundle/nsis bundle/dmg bundle/deb bundle/rpm bundle/appimage
+          mkdir -p bundle/nsis bundle/dmg bundle/app bundle/deb bundle/rpm bundle/appimage
           # upload-artifact@v4 FLATTENS files to the artifact root, so copy
           # every file from each artifact (installer + its .sig) into the
           # matching subdir the manifest generator expects. find-based so it
           # works whether artifacts are nested or flattened.
           find artifacts/hostwise-windows -type f -exec cp -n {} bundle/nsis/ \; 2>/dev/null || true
-          find artifacts/hostwise-macos -type f -exec cp -n {} bundle/dmg/ \; 2>/dev/null || true
+          # macOS: .dmg (manual) + .app.tar.gz (updater target) go to different dirs.
+          find artifacts/hostwise-macos -type f \( -name '*.dmg' -o -name '*.dmg.sig' \) -exec cp -n {} bundle/dmg/ \; 2>/dev/null || true
+          find artifacts/hostwise-macos -type f \( -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \) -exec cp -n {} bundle/app/ \; 2>/dev/null || true
           find artifacts/hostwise-linux-deb -type f -exec cp -n {} bundle/deb/ \; 2>/dev/null || true
           find artifacts/hostwise-linux-appimage -type f -exec cp -n {} bundle/appimage/ \; 2>/dev/null || true
           find bundle -type f | sort
