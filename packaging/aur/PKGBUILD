@@ -1,0 +1,34 @@
+# Maintainer: HostWise <markuspub4@gmail.com>
+# Contributor: mahmoud-ath <markuspub4@gmail.com>
+
+pkgname=hostwise-bin
+pkgver=0.8.1
+pkgrel=1
+pkgdesc="AI-powered financial intelligence for vacation rental hosts (AppImage)"
+arch=('x86_64')
+url="https://github.com/mahmoud-ath/HostWise"
+license=('custom:HostWise')
+depends=('fuse2' 'gtk3' 'libayatana-appindicator' 'webkit2gtk-4.1')
+provides=('hostwise')
+conflicts=('hostwise')
+source=("hostwise-${pkgver}.AppImage::https://github.com/mahmoud-ath/HostWise/releases/download/v${pkgver}/HostWise_${pkgver}_amd64.AppImage"
+        'LICENSE')
+sha256sums=('9ae47c0ac70b87fedf376ba7b49ba87802213950f74655827dace32e801a7fc4'
+            'fc57bbccecb979a8209e9dd85af773be17d67072357e9cf8d0842e97d4849fc7')
+
+package() {
+  # Install the AppImage as a plain executable (it extracts to ~/.cache on run).
+  install -Dm755 "$srcdir/hostwise-${pkgver}.AppImage" "$pkgdir/usr/bin/hostwise"
+  install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+  # Desktop entry so HostWise shows in the application menu.
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/hostwise.desktop" <<'EOF'
+[Desktop Entry]
+Name=HostWise
+Comment=AI-powered financial intelligence for vacation rental hosts
+Exec=/usr/bin/hostwise
+Type=Application
+Categories=Office;Finance;
+Terminal=false
+EOF
+}

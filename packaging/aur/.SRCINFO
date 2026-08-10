@@ -1,0 +1,19 @@
+pkgbase = hostwise-bin
+	pkgdesc = AI-powered financial intelligence for vacation rental hosts (AppImage)
+	pkgver = 0.8.1
+	pkgrel = 1
+	url = https://github.com/mahmoud-ath/HostWise
+	arch = x86_64
+	license = custom:HostWise
+	depends = fuse2
+	depends = gtk3
+	depends = libayatana-appindicator
+	depends = webkit2gtk-4.1
+	provides = hostwise
+	conflicts = hostwise
+	source = hostwise-0.8.1.AppImage::https://github.com/mahmoud-ath/HostWise/releases/download/v0.8.1/HostWise_0.8.1_amd64.AppImage
+	source = LICENSE
+	sha256sums = 9ae47c0ac70b87fedf376ba7b49ba87802213950f74655827dace32e801a7fc4
+	sha256sums = fc57bbccecb979a8209e9dd85af773be17d67072357e9cf8d0842e97d4849fc7
+
+pkgname = hostwise-bin
