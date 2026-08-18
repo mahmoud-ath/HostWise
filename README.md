@@ -1,437 +1,376 @@
-  # HostWise — Vacation Rental Intelligence Platform
+# HostWise — Vacation Rental Intelligence Platform
 
-  > **Own your data. Work offline. Sync when you want.**
-  >
-  > A local-first financial intelligence system for vacation rental hosts.
+> **Own your data. Work offline. Sync when you want.**
+>
+> A local-first, AI-powered financial intelligence platform for vacation rental hosts — delivered as a fast native desktop app with a fully offline, single-file database.
 
-  ---
+---
 
-  ## 📖 Overview
+<p align="center">
+  <img src="screenshots/overview_image.jpeg" alt="HostWise" />
+</p>
 
-  **HostWise** is an AI-powered analytics and financial intelligence layer for vacation rental hosts. It sits above your existing data sources — Airbnb, Booking.com, CSV exports — and transforms raw booking data into strategic insights, automated reports, and actionable recommendations.
+---
 
-  **What HostWise is NOT:** It's not a PMS. It doesn't manage bookings, process payments, or handle guest communication. It's the brain, not the hands.
+## 📖 Overview
 
-  ### Who It's For
-  - Individual vacation rental hosts managing 3–50 properties
-  - Property managers who need portfolio-level financial visibility
-  - Hosts who want to understand *why* their revenue is changing, not just *that* it changed
+**HostWise** sits above your existing data sources — Airbnb, Booking.com, VRBO, iCal feeds, and CSV exports — and turns raw booking and financial data into **professional reports, strategic insights, and actionable recommendations**.
 
-  ---
+It is a **desktop application** (Tauri + Rust) with a **100% native Rust backend** compiled directly into the binary. No Python, no Docker, no database server, no cloud, no account: your data lives in one SQLite file on your machine.
 
-  ## 🎯 The Problem
+**What HostWise is NOT:** It's not a PMS. It doesn't manage bookings, process payments, or handle guest communication. It's the brain, not the hands — the layer that explains *why* your numbers changed and *what to do* next.
 
-  Vacation rental hosts are drowning in data but starving for insight.
+### Who It's For
+- Individual vacation rental hosts managing 3–50 properties
+- Property managers who need portfolio-level financial visibility
+- Owners / investors who receive executive summaries and tax-oriented reports
 
-  - Airbnb and Booking.com give you raw booking data but **no financial analysis**
-  - Spreadsheets become unmanageable beyond 3 properties
-  - PMS tools focus on operations, not financial intelligence
-  - Hosts can't answer basic questions like *"Which property has the best profit margin?"* or *"Why did my net revenue drop 15% this month?"*
-  - Tax preparation and financial reporting is entirely manual
+---
 
-  **Current solutions** force hosts to be part-time accountants, Excel wizards, and data analysts — roles they never signed up for.
+## 🎯 The Problem
 
-  ---
+Vacation rental hosts are drowning in data but starving for insight.
 
-  ## 💡 The Solution
+- Airbnb and Booking.com give you raw booking data but **no financial analysis**
+- Spreadsheets become unmanageable beyond a few properties
+- PMS tools focus on operations, not financial intelligence
+- Hosts can't answer basic questions like *"Which property has the best profit margin?"* or *"Why did my net revenue drop 15% this month?"*
+- Tax preparation and owner reporting is entirely manual
 
-  HostWise ingests your booking data (CSV imports today, direct API connectors tomorrow), normalizes it, and computes every financial KPI that matters:
+**Current solutions** force hosts to be part-time accountants, Excel wizards, and data analysts — roles they never signed up for.
 
-  - Revenue, expenses, and cashflow per property and across your portfolio
-  - Occupancy rates, ADR, RevPAR, cancellation rates
-  - AI-powered recommendations that explain *why* and tell you *what to do*
-  - Automated monthly and annual financial reports
-
-  ---
-
-  ## 📈 System Impact
-
-  | Metric | Before HostWise | After HostWise |
-  |---|---|---|
-  | Financial report generation | 4–8 hours manually | Instant |
-  | Identifying underperformers | Guesswork | Data-driven ranking |
-  | Profit margin visibility | None | Per-property breakdowns |
-  | Tax preparation | Scattered spreadsheets | Single export |
-  | Revenue trend analysis | Manual charting | Built-in dashboards |
-
-  ---
-
-  ## 🚀 Core Features
-
-  - **Financial Dashboard** — Gross revenue, net revenue, expenses, cashflow, and profit margin across your entire portfolio
-  - **Property Portfolio** — Manage properties, their details, and multiple platform listings
-  - **Revenue & Expense Tracking** — Categorized income and expenses per property, with CSV import
-  - **Monthly & Annual Reports** — Auto-generated financial summaries with KPI breakdowns
-  - **Portfolio Analytics** — Occupancy rates, ADR, RevPAR, booking windows, cancellation rates, seasonality
-  - **Property Health Score (0–100)** — At-a-glance performance indicator for each property
-  - **AI Financial Advisor** — Rule-based engine that detects problems and recommends actions
+---
 
-  ---
+## 💡 The Solution
 
-  ## ✨ Elite Features ⭐
+HostWise ingests your booking data (CSV and iCal today), normalizes it, and computes every financial KPI that matters — **fully offline**:
 
-  ### AI Financial Advisor
-  Not just dashboards — **actionable intelligence**. The AI engine analyzes your data and generates recommendations with:
+- Revenue, expenses, and cashflow per property and across your portfolio
+- Profit margins, expense ratios, and trend explanations
+- Property **health scores (0–100)** and data-driven rankings
+- AI-powered recommendations that explain *why* and tell you *what to do*
+- Automated monthly, annual, and executive financial reports (PDF export)
+- Proactive in-app notifications (profit drops, revenue jumps, occupancy falls, backups, reports)
 
-  ```
-  Type: Warning
-  Cause: "Villa Azur net revenue decreased 22% vs last month"
-  Business Impact: "Estimated $1,240 monthly loss at current trajectory"
-  Suggested Action: "Increase minimum stay to 3 nights and adjust pricing +8% on weekends"
-  Confidence: 0.85
-  ```
+---
 
-  ### Auto-Calculated KPIs
-  Revenue, expenses, cashflow, margins — all computed in real-time, never stored redundantly. Every number is traceable to its source.
+## 📈 System Impact
 
-  ### Domain-Driven Modular Monolith
-  Self-contained business domains (properties, finance, analytics, AI) with clear boundaries — simple enough for one dev, structured enough for a team.
+| Metric | Before HostWise | After HostWise |
+|---|---|---|
+| Financial report generation | 4–8 hours manually | Instant, from real data |
+| Identifying underperformers | Guesswork | Health scores + data-driven ranking |
+| Profit margin visibility | None | Per-property breakdowns |
+| Tax preparation | Scattered spreadsheets | Single export / PDF reports |
+| Revenue trend analysis | Manual charting | Built-in dashboards + AI explanations |
+| Data privacy | Data scattered across SaaS | One offline SQLite file on your disk |
 
-  ### Zero-Config Onboarding
-  Register → you get an organization auto-created → start adding properties. No setup wizard needed.
+---
 
-  ### CSV Connector Architecture
-  The CSV importer implements `ConnectorInterface` — the same interface future Airbnb API, Booking.com, and Vrbo connectors will use. Built for evolution.
+## 🚀 Core Features
 
-  ---
+- **Financial Dashboard** — gross/net revenue, expenses, profit margin, cashflow, and property count, scoped to a year or a custom period
+- **Property Portfolio** — full CRUD for properties + listings, per-property analytics and health badges
+- **Revenue & Expense Tracking** — categorized income and expenses per property, with per-record currency
+- **Portfolio Analytics** — profit-driven KPIs, expense trends, seasonality, and property ranking
+- **Monthly & Annual Reports** — professional PDF documents (executive, portfolio, performance, AI insights)
+- **AI Financial Advisor** — recommendations, period-over-period reviews, and what-if scenario simulation
+- **Property Health Score (0–100)** — at-a-glance performance indicator, with an honest "no data yet" state
+- **Data Import** — CSV (encodings/delimiters honored, **idempotent** — no duplicates on re-import) + **iCal** for Airbnb/Booking calendar-export feeds
+- **Notifications** — profit-drop / revenue-up / occupancy-fall / backup-done / report-ready alerts (deduplicated)
+- **Backups** — automatic daily + manual SQLite backups, with restore and verification
 
-  ## 🛠 Technology Stack
+---
 
-  | Layer | Technology |
-  |---|---|
-  | **Frontend** | Next.js 14, TypeScript, TailwindCSS, shadcn/ui, Recharts |
-  | **Backend** | FastAPI (Python), SQLAlchemy 2.0, Pydantic v2, Alembic |
-  | **Database** | PostgreSQL 16 |
-  | **State Management** | TanStack Query (React Query), React Context |
-  | **Auth** | JWT (python-jose + bcrypt), refresh token rotation |
-  | **AI Engine** | Rule-based analysis (LLM-ready interface) |
-  | **Infra** | Docker Compose (3 services: db, backend, frontend) |
-
-  ---
-
-  ## ⚙️ Architecture
-
-  ```
-  ┌──────────────────────────────────────────────────┐
-  │                  Next.js Frontend                 │
-  │          Dashboard · Finance · Analytics          │
-  │          Properties · Reports · AI Advisor        │
-  └──────────────────────┬───────────────────────────┘
-                        │ HTTP REST + JWT
-                        ▼
-  ┌──────────────────────────────────────────────────┐
-  │                FastAPI Backend                    │
-  │                                                  │
-  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐ │
-  │  │   Auth   │ │Properties│ │     Finance      │ │
-  │  │  JWT     │ │ Listings │ │ Revenue/Expense  │ │
-  │  └──────────┘ └──────────┘ └──────────────────┘ │
-  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐ │
-  │  │ Analytics│ │    AI    │ │    Connectors    │ │
-  │  │ KPIs     │ │ Advisor  │ │ CSV → API future │ │
-  │  └──────────┘ └──────────┘ └──────────────────┘ │
-  │  ┌──────────────────────────────────────────────┐│
-  │  │         Organizations (Tenant Boundary)       ││
-  │  └──────────────────────────────────────────────┘│
-  └──────────────────────┬───────────────────────────┘
-                        │ SQLAlchemy 2.0 (async)
-                        ▼
-  ┌──────────────────────────────────────────────────┐
-  │               PostgreSQL 16                      │
-  │    users · organizations · properties            │
-  │    reservations · revenues · expenses            │
-  │    listings · categories                         │
-  └──────────────────────────────────────────────────┘
-  ```
-
-  ### Data Flow
-
-  ```
-  User uploads CSV  →  Connector normalizes  →  Database (sync_id on every row)
-                                                  ↓
-  User opens Dashboard  →  Query-computed KPIs  →  Recharts visualization
-                                                  ↓
-  AI Engine analyzes  →  Rule-based detection  →  Actionable recommendations
-  ```
-
-  ---
-
-  ## 🧠 Development Journey
-
-  ### Biggest Challenges
-
-  **1. Financial calculation accuracy**
-  Revenue and expense tracking for vacation rentals is more complex than it seems — partial refunds, platform commissions, cleaning fees, taxes. Built a normalized `Revenue` model with `gross_amount`, `commission_amount`, and auto-calculated `net_amount` to ensure every number is correct.
-
-  **2. Making AI useful, not gimmicky**
-  Instead of jumping straight to LLM integration (expensive, unpredictable), built a rule-based engine with structured output (`cause`, `impact`, `action`, `confidence`). The interface is designed for easy LLM replacement later — same output schema, different brain.
-
-  **3. Multi-tenant without complexity**
-  Needed organization-scoped data but didn't want microservice complexity. Solved with a modular monolith where every query filters by `organization_id` and domain boundaries are enforced by package structure, not network calls.
-
-  **4. UUID routing conflicts**
-  FastAPI routes with UUID path parameters collided when `/{org_id}` and `/{property_id}` shared the same pattern. Solved by separating routes with distinct prefixes (`/detail/{property_id}`, `/{property_id}/listings`) and letting FastAPI's type system validate UUIDs automatically.
-
-  ### Interesting Technical Decisions
-
-  - **Modular monolith over microservices** — Zero customers means zero distributed systems overhead
-  - **Rule-based AI over LLM** — Deterministic, free, and the interface is LLM-swappable later
-  - **Query-computed KPIs** — Never store derived data; always compute from source of truth
-  - **Soft deletes everywhere** — Financial audit trail is critical; nothing is truly deleted
-
-  ---
-
-  ## 📚 What I Learned
-
-  ### Technical
-  - FastAPI's dependency injection system enables clean, testable service layers
-  - SQLAlchemy 2.0 async with `mapped_column` is a massive improvement over the old imperative style
-  - TanStack Query eliminates 90% of the state management headaches in React
-  - Pydantic v2's `model_validate()` makes ORM-to-schema mapping trivial
-
-  ### Architecture
-  - Domain-Driven Design works beautifully in a monolith — package boundaries *are* domain boundaries
-  - Always design interfaces before implementations (the ConnectorInterface pattern paid off immediately)
-  - Auto-creating defaults on registration eliminates onboarding friction
-
-  ### Problem Solving
-  - "What's the simplest thing that works?" beats "What's the most scalable architecture?" at MVP stage
-  - Financial software demands correctness over cleverness — every KPI must be traceable
-  - User experience is not just UI — it's also the API contract, error messages, and onboarding flow
+## ✨ Elite Features ⭐
 
-  ---
-
-  ## ⚡ Getting Started
+### AI Financial Advisor (rules + BYOK LLM)
+Not just dashboards — **actionable intelligence**. The built-in rule engine runs **offline and free** by default and generates structured recommendations:
 
-  ### Prerequisites
+```
+Type: Warning
+Cause: "Villa Azur net revenue decreased 22% vs last month"
+Business Impact: "Estimated $1,240 monthly loss at current trajectory"
+Suggested Action: "Increase minimum stay to 3 nights and adjust pricing +8% on weekends"
+Confidence: 0.85
+```
 
-  - **Python 3.10+** (3.12 recommended)
-  - **PostgreSQL 16+** (local or Docker)
-  - **Bun** or **Node.js 22+**
-  - **Docker & Docker Compose** (optional)
+Power users can plug in their **own LLM key** (OpenAI / Anthropic / DeepSeek-compatible / Ollama) through Settings — the AI then writes richer executive summaries while **metrics always come from your real data**. No key? The rules engine keeps working.
 
-  ### Installation
+### Native Rust Backend, Embedded In-Process
+The entire API server (axum + sqlx/SQLite) is **compiled into the desktop binary**. One executable, no sidecar process, no Python runtime, no port conflicts (it binds a free port automatically).
+
+### Auto-Calculated KPIs
+Revenue, expenses, cashflow, margins — computed in real time, never stored redundantly. Every number is traceable to its source.
 
-  ```bash
-  # Clone the repo
-  git clone https://github.com/your-org/HostWise-PMS.git
-  cd HostWise-PMS
+### Health Scores That Don't Lie
+Portfolio and per-property scorers return an honest **"no data yet"** instead of fabricating a neutral score on an empty database.
+
+### Idempotent Import
+Re-importing the same CSV or iCal feed **skips duplicates** (natural-key dedupe) instead of corrupting your books.
+
+### Modular Monolith
+Self-contained domains (properties, finance, analytics, AI, reports, connectors) with clear boundaries — simple enough for one dev, structured enough for a team. Soft deletes + `sync_id` on every row make future cloud sync a schema-compatible step.
+
+---
+
+## 🛠 Technology Stack
+
+| Layer | Technology |
+|---|---|
+| **Desktop shell** | Tauri v2 (Rust) — small binaries, native webview |
+| **Frontend** | Next.js 14 (App Router), TypeScript, TailwindCSS, shadcn/ui, Chart.js + react-chartjs-2, TanStack Query |
+| **Backend** | Rust — axum, sqlx, tokio, tower-http (CORS/tracing), compiled in-process |
+| **Database** | SQLite (single file, WAL mode) — no server required |
+| **PDF Reports** | `printpdf` (Rust) — no external runtime |
+| **AI Engine** | Rule-based engine (offline) + BYOK LLM proxy (OpenAI / Anthropic / DeepSeek / Ollama) |
+| **Data Import** | Pure-Rust CSV (`csv` + `encoding_rs`) and iCal (dependency-free VEVENT parser) |
+| **CI/CD** | GitHub Actions — Windows (NSIS), macOS (dmg), Linux (deb + AppImage) |
 
-  # Option A: Docker (all-in-one)
-  docker compose up -d
-
-  # Option B: Manual setup
-
-  # 1. Database
-  sudo -u postgres psql -c "CREATE USER hostwise WITH PASSWORD 'hostwise' CREATEDB;"
-  sudo -u postgres psql -c "CREATE DATABASE hostwise OWNER hostwise;"
+---
+
+## ⚙️ Architecture
 
-  # 2. Backend
-  cd backend
-  python3 -m venv .venv
-  source .venv/bin/activate
-  pip install -r requirements.txt
-  alembic upgrade head
-  uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-  # 3. Frontend (new terminal)
-  cd app/frontend
-  bun install
-  bun run dev
-  ```
+```
+┌──────────────────────────────────────────────────────┐
+│                Tauri v2 Desktop App (Rust)            │
+│                                                      │
+│  ┌────────────────────────────┐  ┌────────────────┐  │
+│  │  Next.js Frontend (webview) │  │  Rust Backend  │  │
+│  │  static export, client-side │──▶│  axum, in-proc │  │
+│  └────────────────────────────┘  │  /api/v1/*     │  │
+│                                  └───────┬────────┘  │
+│                                          │ sqlx      │
+│                                  ┌───────▼────────┐  │
+│                                  │ SQLite (1 file) │ │
+│                                  └────────────────┘  │
+└──────────────────────────────────────────────────────┘
+        ▲  HTTP /api/v1 (localhost, CORS-scoped)
+        │
+   Host CSV / iCal exports  ──▶  Connector → normalize → import
+```
 
-  ### Environment Variables
+**Data flow**
 
-  | Variable | Default | Description |
-  |---|---|---|
-  | `DATABASE_URL` | `postgresql+asyncpg://hostwise:hostwise@localhost:5432/hostwise` | Async DB connection |
-  | `JWT_SECRET_KEY` | *(change in production)* | JWT signing key |
-  | `CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed frontend origins |
-  | `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | Backend API URL |
-
-  ### Create Your Account
+```
+CSV / iCal upload → Connector normalizes + dedupes → SQLite (sync_id on every row)
+                                                          ↓
+Dashboard / Analytics  →  Query-computed KPIs  →  Chart.js visualizations
+                                                          ↓
+AI engine analyzes → rule-based detection (or BYOK LLM) → recommendations + reports
+```
 
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/auth/register \
-    -H "Content-Type: application/json" \
-    -d '{"email":"demo@hostwise.app","password":"demo123456","full_name":"Demo User"}'
-  ```
+**Repository layout (monorepo)**
 
-  Or open **http://localhost:3000** and use the UI. An organization is auto-created on registration — you can start adding properties immediately.
+```
+app/frontend/   Next.js UI + Tauri shell (src-tauri/)
+app/backend/    Rust backend (axum + sqlx/SQLite), path-dep of src-tauri
+landing/        Marketing website (Next.js)
+packaging/      Distribution: aur/ (Arch), windows/, linux/
+docs/           Architecture, operations, decisions, changelog
+scripts/        Build / release / automation (release.sh, aur-release.sh, …)
+.github/        CI/CD (release.yml, ci.yml)
+```
 
-  ### Services
+---
 
-  | Service | URL |
-  |---|---|
-  | Frontend | http://localhost:3000 |
-  | Backend API | http://localhost:8000 |
-  | API Docs (Swagger) | http://localhost:8000/api/docs |
-  | Database | localhost:5432 |
+## 🧠 Development Journey
 
-  ---
+### Biggest Challenges
 
-  ## 🖼 Screenshots
+**1. Financial calculation accuracy**
+Revenue and expense tracking for vacation rentals is more complex than it seems — partial refunds, platform commissions, cleaning fees, taxes. HostWise normalizes everything into a `Revenue`/`Expense` model and computes net figures at query time, so every number is traceable.
 
-  > *Dashboard, Finance, Analytics, and Properties screenshots coming soon.*
+**2. Making AI useful, not gimmicky**
+Instead of jumping straight to an LLM (expensive, unpredictable, sends data off-device), HostWise ships a deterministic **rule-based engine** with structured output (`cause`, `impact`, `action`, `confidence`) that runs offline. The interface is deliberately **LLM-swappable** — same output schema, different brain — so BYOK is an upgrade, not a rewrite.
 
-  ---
+**3. The native Rust rewrite**
+The backend started as Python/FastAPI, then was rewritten as a **single Rust binary** (axum + sqlx/SQLite) embedded in the Tauri app. No Python runtime, no PyInstaller, no sidecar — faster startup, smaller footprint, and a self-contained executable on every OS.
 
-  ## 🏗️ Architecture Philosophy
+**4. Shipping a working AppImage**
+The CI "succeeded" but the Linux AppImage crashed on real GPUs (`Could not create default EGL display: EGL_BAD_PARAMETER`) because Tauri bundles an old WebKitGTK. The fix: repack the AppImage to use the **system** WebKitGTK (exactly like the `.deb`), then re-sign it. Now a broken AppImage can't silently pass CI.
 
-  ### Local-First, Cloud-Optional
+### Interesting Technical Decisions
 
-  All business logic executes locally. The cloud is an optional enhancement — never a dependency.
+- **Modular monolith over microservices** — one process, one DB transaction; domain boundaries enforced by package structure, not network calls
+- **Rule-based AI first, LLM second** — deterministic, free, offline; BYOK adds depth without removing the safety net
+- **Query-computed KPIs** — never store derived data; always compute from the source of truth
+- **Soft deletes + `sync_id` everywhere** — financial audit trail and a schema-compatible path to optional cloud sync
+- **SQLite over PostgreSQL for the desktop product** — zero infrastructure, automatic backups, one file the user owns
 
-  ```
-  UI → Services → Repository Interface → Storage
-                                            ├── Local PostgreSQL (today)
-                                            └── Cloud API (future)
-  ```
+---
 
-  Storage can change without touching the business layer. Every domain communicates through repository interfaces.
+## 📚 What I Learned
 
-  ### Sync-Ready Database Design
+### Technical
+- Rust + axum + sqlx produce a small, fast, dependency-light backend with excellent compile-time safety
+- Tauri v2 webviews need explicit CORS for every packaged origin (`tauri://localhost`, `http://tauri.localhost`, …)
+- Static Next.js export + client-side rendering keeps the desktop bundle simple and portable
+- TanStack Query removes most server-state boilerplate in the React app
 
-  Every table includes `sync_id` (a globally unique UUID) from day one, alongside `created_at`, `updated_at`, and `deleted_at` — making future cloud synchronization trivial without schema changes.
+### Architecture
+- Domain-driven design works beautifully in a monolith — package boundaries *are* domain boundaries
+- Design interfaces before implementations (the connector interface paid off when adding iCal)
+- A local-first product must treat "no data yet" as a first-class state, not a fake neutral score
 
-  ### AI Strategy
+### Problem Solving
+- "What's the simplest thing that works?" beats "What's the most scalable architecture?" at this stage
+- Financial software demands correctness over cleverness — every KPI must be traceable
+- Green CI ≠ working software: a best-effort build step can hide a broken artifact (the AppImage lesson)
 
-  ```
-  Local data → Calculate KPIs → Create compact summary → Send summary to AI API
-                                                                ↓
-  Display results ← Receive recommendations ←─────────── (never send raw data)
-  ```
+---
 
-  ---
-
-  ## 🔮 Roadmap
-
-  ### Phase 1 — Local Beta (Current)
-
-  Validate the product. Everything works locally. No internet required.
+## ⚡ Getting Started
 
-  - [x] Local PostgreSQL database
-  - [x] FastAPI backend + Next.js frontend
-  - [x] JWT authentication (local)
-  - [x] CSV import (connector architecture)
-  - [x] Financial dashboard with KPIs
-  - [x] Revenue & expense tracking
-  - [x] Property portfolio management
-  - [x] Portfolio analytics (occupancy, ADR, RevPAR)
-  - [x] AI financial advisor (rule-based engine)
-  - [x] Monthly & annual reports
-  - [x] `sync_id` on all tables (sync-ready schema)
-  - [x] Docker Compose deployment (db + backend + frontend)
-
-  ### Phase 2 — Cloud Foundation (After validation)
-
-  Cloud acts as an optional service. Users who never connect keep working locally.
-
-  - [ ] User accounts & licensing
-  - [ ] Cloud backup & restore
-  - [ ] User profile sync
-  - [ ] Email report delivery
-  - [ ] Airbnb iCal & API connector
-  - [ ] LLM-powered AI advisor (OpenAI)
-
-  ### Phase 3 — Synchronization (After product-market fit)
-
-  The cloud becomes a sync layer, not just storage.
-
-  - [ ] Automatic cross-device sync
-  - [ ] Mobile application
-  - [ ] Remote dashboard access
-  - [ ] Team collaboration
-  - [ ] Booking.com & Vrbo connectors
-  - [ ] Revenue forecasting engine
-  - [ ] Multi-currency support
-  - [ ] Public API for partners
-
-  ---
-
-  ## 📄 License
-
-  Private — HostWise Platform. All rights reserved.
-
-  ---
-
-  ## 👨‍💻 Author
-
-  Built with the philosophy:
-
-  > *"Build for the first customer, not the millionth."*
-  >
-  > The local application is the product. The cloud is a premium enhancement.
-  > Product quality and customer value always come before infrastructure complexity.
-
-  ---
-
-  ## ⚡ Quick Actions
-
-  Access the most common tasks right from the header — no navigation required.
-
-  ```
-  +──────────────────────────────────────────+
-  │  📂  Quick Actions                       │
-  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ │
-  │  │ + Add    │ │ + Import │ │ + Add    │ │
-  │  │ Property │ │   CSV    │ │ Expense  │ │
-  │  └──────────┘ └──────────┘ └──────────┘ │
-  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ │
-  │  │ + Add    │ │ Generate │ │  Ask AI  │ │
-  │  │ Revenue  │ │  Report  │ │          │ │
-  │  └──────────┘ └──────────┘ └──────────┘ │
-  +──────────────────────────────────────────+
-  ```
-
-  ---
-
-  ## 📄 Latest Reports
-
-  Jump to your most recent financial reports from the sidebar.
-
-  ```
-  +──────────────────────────────────────────────+
-  │  📄  Latest Reports                          │
-  │                                              │
-  │  ┌─────────────────────────────────────┐     │
-  │  │  July 2026 Report                   │     │
-  │  │  📅 Generated 2 hours ago           │     │
-  │  │  ✅ Ready    [📥 Download PDF]      │     │
-  │  └─────────────────────────────────────┘     │
-  │  ┌─────────────────────────────────────┐     │
-  │  │  2026 Annual Report                 │     │
-  │  │  📊 85% complete                    │     │
-  │  │  ⏳ In progress  [⚡ Generate]       │     │
-  │  └─────────────────────────────────────┘     │
-  +──────────────────────────────────────────────+
-  ```
-
-  ---
-
-  ## 🏆 Property Ranking
-
-  Data-driven performance ranking — identify your top earners and underperformers at a glance.
-
-  ```
-  +──────────────────────────────────────────────+
-  │  🏆  Property Ranking                        │
-  │                                              │
-  │  🥇  Villa Atlas                             │
-  │  Score: 96  📈 Revenue ↑  📈 Occupancy ↑     │
-  │  ───────────────────────────────────────     │
-  │  🥈  Beach House                             │
-  │  Score: 91                                    │
-  │  ───────────────────────────────────────     │
-  │  🥉  Apartment B                              │
-  │  Score: 87                                    │
-  │  ───────────────────────────────────────     │
-  │  ... +3 more                                 │
-  +──────────────────────────────────────────────+
-  ```
-
-  ---
-
-  <p align="center">
-    <b>HostWise</b> — Own your data. Know your numbers. Grow your portfolio.
-  </p>
+### Prerequisites
+
+| Tool | Version | Notes |
+|---|---|---|
+| **Rust** | 1.77.2+ | stable toolchain (`rustc`, `cargo`) |
+| **bun** | 1.x | frontend install / build / dev / tauri |
+| **git** | — | clone the repo |
+
+Linux desktop deps (Debian/Ubuntu):
+
+```bash
+sudo apt update
+sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+```
+
+macOS/Windows need no extra system packages.
+
+### Option A — Desktop app (recommended)
+
+```bash
+cd app/frontend
+bun install          # first time only
+bun run tauri:dev    # opens the native app window
+```
+
+The Tauri shell starts the Rust backend **in-process** on a free port and tells the frontend the real URL — port collisions never matter.
+
+### Option B — Web / browser dev mode
+
+```bash
+cd app/frontend
+bun install          # first time only
+bun run dev:app      # starts app/backend (cargo run, :8000) + Next dev (:3000)
+```
+
+Or in two terminals:
+
+```bash
+# Terminal 1 — Rust backend (start FIRST) → http://127.0.0.1:8000
+cd app/backend
+cargo run
+
+# Terminal 2 — Next.js dev server → http://localhost:3000
+cd app/frontend
+bun install          # first time only
+bun run dev
+```
+
+### Backend only / API testing
+
+```bash
+cd app/backend
+cargo run                       # http://127.0.0.1:8000
+
+curl http://127.0.0.1:8000/api/health   # → {"database":"up","status":"ok",…}
+
+cargo test                  # domains, analytics, connectors, AI/reports suites
+```
+
+### Environment Variables
+
+All optional; a `app/backend/.env` file is supported.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8000` | HTTP port |
+| `HOST` | `127.0.0.1` | Bind address |
+| `SQLITE_PATH` | `<data_dir>/hostwise.db` | SQLite database file |
+| `HOSTWISE_DATA_DIR` | `<data_dir>` | Backups + uploads live here |
+| `CORS_ORIGINS` | dev: `["http://localhost:3000"]`; desktop: `["tauri://localhost","http://tauri.localhost","https://tauri.localhost"]` | Allowed origins |
+| `APP_NAME` / `APP_VERSION` / `ENVIRONMENT` | `HostWise` / `0.8.2` / `development` | Metadata; `ENVIRONMENT=production` enables the automatic startup backup |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | *(empty)* | Optional BYOK AI providers |
+
+> **Gotcha:** a stale `PORT` env var makes the backend bind the wrong port → "Could not connect to the backend." `unset PORT` before running.
+
+### Data lives on your device
+
+| OS | Data directory |
+|---|---|
+| Linux | `~/.local/share/hostwise` |
+| macOS | `~/Library/Application Support/hostwise` |
+| Windows | `%APPDATA%\hostwise` |
+
+Inside: `hostwise.db` (WAL), `backups/` (automatic daily + manual), `uploads/` (import staging), `logs/`.
+
+### Production build (installers)
+
+```bash
+cd app/frontend
+bun install --frozen-lockfile
+bun run build                     # Next.js static export → out/
+bunx tauri build --bundles nsis   # Windows
+bunx tauri build --bundles dmg    # macOS
+bunx tauri build --bundles deb    # Linux (.deb)
+bunx tauri build --bundles appimage  # Linux (repacked to use system WebKitGTK)
+```
+
+CI builds all three platforms on a `v*` tag push and publishes installers + the updater manifest to a GitHub Release.
+
+---
+
+## 🖼 Screenshots
+
+<p align="center">
+  <img src="screenshots/dashboard.png" alt="Dashboard" width="400" />
+  <img src="screenshots/analytics.png" alt="Analytics" width="400" />
+  <img src="screenshots/ai-advisor.png" alt="AI Advisor" width="400" />
+  <img src="screenshots/finance.png" alt="Finance" width="400" />
+  <img src="screenshots/reports.png" alt="Reports" width="400" />
+  <img src="screenshots/properties.png" alt="Properties" width="400" />
+  <img src="screenshots/settings.png" alt="Settings" width="400" />
+</p>
+
+---
+
+## 🔮 Roadmap
+
+**Done** ✅ — CSV + iCal import (idempotent), notifications engine, BYOK LLM, category management, health scores, PDF reports, automatic backups, native Rust backend, Tauri desktop packaging (Win/macOS/Linux), e2e harness.
+
+**Next / planned:**
+- Email delivery of scheduled reports
+- Optional cloud sync (schema already has `sync_id` on every table)
+- Official Airbnb/Booking/VRBO API connectors where they exist (iCal is the supported host-accessible path today)
+- Column-mapping wizard for imports
+- Advanced tax/accounting export + owner statements
+- Licensing, mobile, and team features as the product grows
+
+> See `docs/planning/roadmap.md` for the full phase-classified roadmap, and `docs/` for architecture, operations, and decision records.
+
+---
+
+## 📄 License
+
+Proprietary — HostWise. All rights reserved. See `LICENSE`.
+
+---
+
+## 👨‍💻 Author
+
+Built with the philosophy:
+
+> *"Build for the first customer, not the millionth."*
+>
+> The local application is the product. The cloud is an optional enhancement.
+> Product quality and customer value always come before infrastructure complexity.
+
+---
+
+<p align="center">
+  <b>HostWise</b> — Own your data. Know your numbers. Grow your portfolio.
+</p>
