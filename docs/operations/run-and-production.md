@@ -194,7 +194,11 @@ bun install --frozen-lockfile
 bunx tauri build                     # default bundles for the current OS
 bunx tauri build --bundles nsis      # Windows
 bunx tauri build --bundles dmg       # macOS
-bunx tauri build --bundles deb       # Linux (.deb; AppImage is best-effort)
+bunx tauri build --bundles deb       # Linux (.deb)
+bunx tauri build --bundles appimage  # Linux (raw; repack to use system webkit)
+# Linux AppImage that works on real GPUs (system WebKitGTK, re-signed):
+scripts/repack-appimage-system-webkit.sh \
+  src-tauri/target/release/bundle/appimage/HostWise_*.AppImage
 ```
 
 Output installers land in `frontend/src-tauri/target/release/bundle/…`.

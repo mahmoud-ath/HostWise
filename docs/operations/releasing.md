@@ -119,8 +119,8 @@ notarization — these make installers less scary to SmartScreen/Gatekeeper but
 are separate from the updater signing.)
 
 > On this machine only **Linux** bundles can be produced locally
-> (`.deb` + `.rpm`; AppImage is best-effort). Windows/macOS installers are
-> produced by CI on their native runners.
+> (`.deb` + `.rpm` + AppImage, repacked to use the system WebKitGTK).
+> Windows/macOS installers are produced by CI on their native runners.
 
 ---
 

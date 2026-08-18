@@ -71,6 +71,14 @@ bunx tauri build --bundles appimage,deb  # Linux
 
 Artifacts land in `frontend/src-tauri/target/release/bundle/`.
 
+> **Linux AppImage note:** the raw AppImage from `tauri build` bundles the CI
+> base image's OLD WebKitGTK, whose web process aborts on many real GPUs
+> ("Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...",
+> WebKit bug #297921). CI and `scripts/release.sh` therefore repack it with
+> `scripts/repack-appimage-system-webkit.sh` to use the **system**
+> `webkit2gtk-4.1` (exactly like the `.deb`), then re-sign it. The AppImage is
+> a required artifact — a failed AppImage build fails the workflow.
+
 ## Continuous integration
 
 Separate workflows build each OS (export the frontend, compile the Rust
