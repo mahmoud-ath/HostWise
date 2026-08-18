@@ -235,7 +235,7 @@
   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
   # 3. Frontend (new terminal)
-  cd frontend
+  cd app/frontend
   bun install
   bun run dev
   ```

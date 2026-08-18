@@ -11,7 +11,7 @@
 ### Custom-date crash fixed (root cause: inverted ranges)
 - Selecting a custom period where **start > end** made the backend return 422,
   which surfaced as misleading zero data and a stuck error state hiding the
-  selector. Added `normalizeRange(start, end)` (`frontend/src/lib/report-period.ts`)
+  selector. Added `normalizeRange(start, end)` (`app/frontend/src/lib/report-period.ts`)
   that auto-swaps inverted ranges, wired into the **Dashboard**, **Analytics**,
   **Reports** and **Finance** custom-date handlers. The Dashboard error state
   also gained a **"Reset to {year}"** escape hatch so a failed period query
@@ -25,7 +25,7 @@
   on submit. Coherent with the Settings → Business tab.
 
 ### Downloads — user chooses the save location
-- Added a `save_file` Tauri command + a shared `frontend/src/lib/download.ts`
+- Added a `save_file` Tauri command + a shared `app/frontend/src/lib/download.ts`
   helper. In the desktop app, PDF reports, backup downloads and the Excel
   export now open the **native "Save As" dialog** (the user picks where to save
   — no more dumping into a hidden folder). In the browser it falls back to the
@@ -36,7 +36,7 @@
   **and** `<data_dir>/logs/hostwise.log` — in both the desktop app and the
   standalone binary. Paths only — no query strings, bodies or headers, so no
   API keys/secrets can leak.
-- Frontend added `frontend/src/lib/logger.ts`: captures uncaught errors,
+- Frontend added `app/frontend/src/lib/logger.ts`: captures uncaught errors,
   unhandled rejections and failed API calls into a ring buffer
   (Settings → Maintenance → **Client Logs**, with **Export Client Logs**).
   Bodies/Authorization headers are never logged.
@@ -58,7 +58,7 @@
   signed.
 - Frontend checks for updates ~2.5 s after startup and shows a **banner** with
   "Download & Install" + progress; failures are silent + logged.
-- `frontend/scripts/generate-latest-json.mjs` builds the updater manifest;
+- `app/frontend/scripts/generate-latest-json.mjs` builds the updater manifest;
   `scripts/release.sh` performs a local signed build + upload;
   `release.yml` now signs all OS installers, uploads `.sig` files and publishes
   `latest.json` via a new `updater-manifest` job.
@@ -75,28 +75,28 @@
 - Adopted the official HostWise logo (white rounded tile, two gradient house
   loops with a chimney, and the window / checklist / bar-chart glyphs).
   Source master: `logo_hostwise.png` → cropped to a square
-  `frontend/public/logo-1024.png` (`frontend/src/app/icon.png` = web favicon).
+  `app/frontend/public/logo-1024.png` (`app/frontend/src/app/icon.png` = web favicon).
 - Regenerated the entire Tauri icon set (`src-tauri/icons/*`: `icon.png`,
   `icon.ico`, `icon.icns`, Square* + Windows/macOS/iOS/Android variants) from
   the new logo via `tauri icon`.
 - Replaced the in-app placeholder marks (lucide `Home` / `Rocket`) with the new
-  `Logo` component (`frontend/src/components/layout/logo.tsx`) in the sidebar,
+  `Logo` component (`app/frontend/src/components/layout/logo.tsx`) in the sidebar,
   the mobile header (`app-shell`) and the welcome wizard; added favicon metadata
   in `app/layout.tsx`.
 
 **Root cause fix — desktop could not save settings (CORS missing PUT)**
-- See the dedicated section below: `backend-rs/src/lib.rs` CORS now allows
+- See the dedicated section below: `app/backend/src/lib.rs` CORS now allows
   `PUT`, so saving settings works in the Tauri desktop window, not just the
   browser dev proxy.
 
 **Settings workflow (previous section below) + version bump to 0.8.0**
-- Version bumped to `0.8.0` across `backend-rs/Cargo.toml`,
-  `frontend/src-tauri/Cargo.toml`, `tauri.conf.json` and `frontend/package.json`.
+- Version bumped to `0.8.0` across `app/backend/Cargo.toml`,
+  `app/frontend/src-tauri/Cargo.toml`, `tauri.conf.json` and `app/frontend/package.json`.
 
 ### Root cause: desktop (Tauri) could not save settings — missing PUT in CORS
 - **Symptom:** saving settings worked in the browser (`localhost:3000`) but not
   in the desktop window (`bun run tauri:dev`) — changes looked "not applied".
-- **Root cause:** the backend CORS layer (`backend-rs/src/lib.rs`) allowed
+- **Root cause:** the backend CORS layer (`app/backend/src/lib.rs`) allowed
   `GET, POST, PATCH, DELETE, OPTIONS` but **not `PUT`**. In the browser the
   Next dev server proxies `/api/*` to the backend (same-origin, no CORS), so
   every method worked. In the Tauri webview the frontend calls the backend
@@ -166,7 +166,7 @@
 
 ### AI Advisor — crash fix + logical section outputs (rules engine)
 
-- **Contract fix:** `generate_advisor_report` (`backend-rs/src/ai/rules.rs`) now
+- **Contract fix:** `generate_advisor_report` (`app/backend/src/ai/rules.rs`) now
   emits exactly the shapes the frontend `AdvisorReport` type expects. Previously
   `opportunities` was a flat array and `lost_revenue` a bare number, which
   crashed the AI Advisor page (`undefined is not an object (evaluating
@@ -201,7 +201,7 @@
 - Frontend `opportunities.tsx` hardened with array guards so it never throws on
   partial / LLM-shaped data.
 - **Note:** the desktop backend is compiled by `tauri dev` into
-  `frontend/src-tauri/target/debug/hostwise`; backend-rs source changes go live
+  `app/frontend/src-tauri/target/debug/hostwise`; backend-rs source changes go live
   after restarting `bun run tauri:dev`.
 
 ## 2. Recent changes (2026-08-08)
@@ -216,7 +216,7 @@ Feedback and Settings** (frontend + Rust backend together, verified against
   endpoint (the category manager called it; only the expense version existed).
   `PATCH /finance/revenue|expense/{id}` now persists `date` and `property_id`
   (previously ignored).
-- **Reports PDF** (`backend-rs/src/reports/pdf_service.rs`) — the PDF read
+- **Reports PDF** (`app/backend/src/reports/pdf_service.rs`) — the PDF read
   `executive_summary` as a string but the API returns an object (so the
   section rendered empty), and risk lines used the wrong key (`risk` vs
   `title`). Both fixed.
@@ -245,7 +245,7 @@ Feedback and Settings** (frontend + Rust backend together, verified against
 - **Settings → Business** — field labels were hardcoded English while the
   section title/description were translated; labels now use i18n keys across
   all 5 languages.
-- **`frontend/package.json`** version synced `0.4.0 → 0.7.6` to match
+- **`app/frontend/package.json`** version synced `0.4.0 → 0.7.6` to match
   `backend-rs` / `src-tauri` / `tauri.conf.json`.
 
 ### v0.7.6 — diagnostics + version sync
@@ -260,17 +260,17 @@ Feedback and Settings** (frontend + Rust backend together, verified against
 - **Persistent file logging.** The Tauri shell now appends backend logs to
   `<app-data>/logs/hostwise.log` as well as the terminal, so startup failures
   are visible on packaged Windows release builds (which have no console).
-- **Version synced to 0.7.6** across `backend-rs/Cargo.toml`,
+- **Version synced to 0.7.6** across `app/backend/Cargo.toml`,
   `src-tauri/Cargo.toml` and `tauri.conf.json` (+ lockfiles).
 - Docs updated for the Rust architecture: `BUILD.md` rewritten; stale
   Python/PyInstaller docs (`ARCHITECTURE.md`, `overall-architecture.md`,
   `README-config.md`, `production-overview.md`, `production-roadmap.md`,
   `frontend-architecture.md`) marked SUPERSEDED.
 - **Browser dev single-command runner** (`bun run dev:app` →
-  `frontend/scripts/dev.mjs`): starts `backend-rs` (`cargo run`, :8000) first,
+  `app/frontend/scripts/dev.mjs`): starts `backend-rs` (`cargo run`, :8000) first,
   waits for it to listen, then boots Next (:3000) — no more `ECONNREFUSED`
   proxy spam. Both logs show in one terminal; Ctrl+C stops both.
-- **Legacy-schema reconciliation** (`backend-rs/src/core/db.rs`): databases
+- **Legacy-schema reconciliation** (`app/backend/src/core/db.rs`): databases
   created by the old Python backend carry an unused `organization_id NOT NULL`
   column (plus `is_deleted`/`sync_id` nullability differences) on the core
   tables, so **every insert** (property / revenue / expense / reservation /
@@ -281,7 +281,7 @@ Feedback and Settings** (frontend + Rust backend together, verified against
   Verified: property/revenue/expense inserts now return 201.
 
 ### v0.7.5 — production CORS fix
-- **`frontend/src-tauri/src/rust_backend.rs`**: the embedded backend's CORS
+- **`app/frontend/src-tauri/src/rust_backend.rs`**: the embedded backend's CORS
   allow-list now includes **`http://tauri.localhost`** — the packaged webview's
   origin on **Windows** (Tauri v2 uses the http scheme there; WebView2 can't
   fetch custom schemes). Without it the built Windows app CORS-blocks every
@@ -304,7 +304,7 @@ Feedback and Settings** (frontend + Rust backend together, verified against
   backend reports `healthy`, so pages clear cached "Request failed" without a
   manual reload.
 
-### v0.7.4 — dev proxy hardening (`frontend/next.config.js`)
+### v0.7.4 — dev proxy hardening (`app/frontend/next.config.js`)
 - The `/api` dev proxy is **unconditionally** `['/api/:path*' →
   'http://127.0.0.1:8000/api/:path*']` in dev. `rewrites()` is only evaluated at
   boot — *before* the embedded backend exists under `tauri:dev` — so any gating
@@ -341,8 +341,8 @@ Tauri shell (Rust)                     browser dev (localhost:3000)
   so the embedded backend's logs are visible in the `tauri:dev` terminal —
   every request is logged as `request method=GET path=/api/v1/... status=200`.
 - Filter via `RUST_LOG`, e.g. `RUST_LOG=debug bun run tauri:dev`.
-- The middleware lives in `backend-rs/src/core/middleware.rs` (request ID +
-  timing). If you edit `backend-rs/`, restart `bun run tauri:dev` — tauri dev
+- The middleware lives in `app/backend/src/core/middleware.rs` (request ID +
+  timing). If you edit `app/backend/`, restart `bun run tauri:dev` — tauri dev
   only auto-rebuilds on `src-tauri/` changes.
 
 ---
@@ -351,7 +351,7 @@ Tauri shell (Rust)                     browser dev (localhost:3000)
 
 ### Desktop app (the product)
 ```bash
-cd frontend
+cd app/frontend
 bun run tauri:dev        # single command: frontend + embedded backend
 ```
 Do **not** also run `cargo run` — the backend is embedded in the app. Two
@@ -360,17 +360,17 @@ backends would fight over port 8000 and the `hostwise.port` file.
 ### Browser-only dev (API debugging)
 ```bash
 # Terminal 1 — start the backend FIRST
-cd backend-rs && cargo run                     # http://127.0.0.1:8000
+cd app/backend && cargo run                     # http://127.0.0.1:8000
 
 # Terminal 2 — then the frontend
-cd frontend && bun run dev                     # http://localhost:3000
+cd app/frontend && bun run dev                     # http://localhost:3000
 ```
 If you started Next first (or the backend restarted on a new port), restart
 `next dev` (or touch `next.config.js`) so the proxy re-targets the live port.
 
 ### Production build
 ```bash
-cd frontend
+cd app/frontend
 bun run build            # static export → out/
 cd src-tauri && cargo build --release          # embeds out/ + backend
 # or the full installer:

@@ -2,14 +2,14 @@
 /**
  * Combined browser-dev runner.
  *
- * Runs the Rust backend (`backend-rs`, `cargo run` → 127.0.0.1:8000) and the
- * Next.js dev server (`frontend`, port 3000) together, so browser dev at
+ * Runs the Rust backend (`app/backend`, `cargo run` → 127.0.0.1:8000) and the
+ * Next.js dev server (`app/frontend`, port 3000) together, so browser dev at
  * http://localhost:3000 works with ONE command and no `ECONNREFUSED` spam.
  *
  * It waits for the backend to be listening on 8000 BEFORE starting Next (Next's
  * dev proxy targets 127.0.0.1:8000 at boot). Ctrl+C stops both.
  *
- * Usage:  cd frontend && bun run dev:app
+ * Usage:  cd app/frontend && bun run dev:app
  */
 import { spawn } from "node:child_process";
 import net from "node:net";
@@ -17,9 +17,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..", "..");
-const backendDir = path.join(repoRoot, "backend-rs");
-const frontendDir = path.join(repoRoot, "frontend");
+// scripts/ lives at app/frontend/scripts/ → repo root is 3 levels up.
+const repoRoot = path.resolve(__dirname, "..", "..", "..");
+const backendDir = path.join(repoRoot, "app", "backend");
+const frontendDir = path.join(repoRoot, "app", "frontend");
 
 const BACKEND_PORT = 8000;
 const FRONTEND_PORT = 3000;

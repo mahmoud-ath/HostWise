@@ -36,16 +36,16 @@ jobs:
       - name: Clear bun cache (avoid tarball extraction issues)
         run: |
           rm -rf ~/.bun/install/cache
-          rm -rf frontend/node_modules
+          rm -rf app/frontend/node_modules
 
       - name: Install frontend dependencies
         run: |
-          cd frontend
+          cd app/frontend
           bun install --frozen-lockfile
 
       - name: Frontend lint (Next.js)
         run: |
-          cd frontend
+          cd app/frontend
           bun run lint || echo "Lint warnings found (non-blocking)"
 
   # ── Rust Backend (native) ─────────────────────────────
@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Rust backend — fmt, clippy, test
-        working-directory: backend-rs
+        working-directory: app/backend
         run: |
           cargo fmt --check || echo "fmt issues (non-blocking)"
           cargo clippy --all-targets -- -D warnings || echo "Clippy warnings (non-blocking)"
@@ -78,14 +78,14 @@ jobs:
       - name: Clear bun cache (avoid tarball extraction issues)
         run: |
           rm -rf ~/.bun/install/cache
-          rm -rf frontend/node_modules
+          rm -rf app/frontend/node_modules
 
       - name: Install dependencies
         run: |
-          cd frontend
+          cd app/frontend
           bun install --frozen-lockfile
 
       - name: Build Next.js
         run: |
-          cd frontend
+          cd app/frontend
           bun run build

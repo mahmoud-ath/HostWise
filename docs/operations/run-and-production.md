@@ -1,7 +1,7 @@
 
 # HostWise — Run Locally & Ship to Production
 
-> HostWise v0.8.1 is a **100% native Rust backend** (`backend-rs/`) embedded
+> HostWise v0.8.1 is a **100% native Rust backend** (`app/backend/`) embedded
 > **in-process** inside a **Tauri** desktop shell, serving a **Next.js static**
 > frontend. No Python, no PyInstaller, no external runtime, no database server —
 > SQLite is built into the binary. Updates ship through the **Tauri Updater**
@@ -42,7 +42,7 @@ on a free port and tells the frontend the actual URL, so port collisions never
 matter.
 
 ```bash
-cd frontend
+cd app/frontend
 bun install          # first time only
 bun run tauri:dev    # opens the native app window
 ```
@@ -63,12 +63,12 @@ in-process backend prefer port 8000 in dev.
 ### Recommended: single command
 
 ```bash
-cd frontend
+cd app/frontend
 bun install          # first time only
-bun run dev:app      # starts backend-rs (cargo run, :8000) + Next dev (:3000)
+bun run dev:app      # starts app/backend (cargo run, :8000) + Next dev (:3000)
 ```
 
-`dev:app` (`frontend/scripts/dev.mjs`) starts the Rust backend **first**, waits
+`dev:app` (`app/frontend/scripts/dev.mjs`) starts the Rust backend **first**, waits
 for it to listen on 8000, then boots Next — so the proxy never sees
 `ECONNREFUSED`. Both logs print in one terminal with `[backend]` / `[frontend]`
 prefixes; Ctrl+C stops both.
@@ -77,11 +77,11 @@ prefixes; Ctrl+C stops both.
 
 ```bash
 # Terminal 1 — Rust backend → http://127.0.0.1:8000  (start this FIRST)
-cd backend-rs
+cd app/backend
 cargo run
 
 # Terminal 2 — Next.js dev server → http://localhost:3000
-cd frontend
+cd app/frontend
 bun install          # first time only
 bun run dev
 ```
@@ -119,7 +119,7 @@ PORT=8000 cargo run
 ## 4. Backend only / API testing
 
 ```bash
-cd backend-rs
+cd app/backend
 cargo run            # http://127.0.0.1:8000
 
 # smoke check
@@ -134,7 +134,7 @@ cargo test           # 8 suites: domains, analytics, connectors, AI/reports, …
 
 ## 5. Environment variables & where your data lives
 
-### Env vars (all optional; a `backend-rs/.env` file is supported)
+### Env vars (all optional; a `app/backend/.env` file is supported)
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -189,7 +189,7 @@ backup" the status screen advertises.
 Build a release installer for the current OS:
 
 ```bash
-cd frontend
+cd app/frontend
 bun install --frozen-lockfile
 bunx tauri build                     # default bundles for the current OS
 bunx tauri build --bundles nsis      # Windows
@@ -201,7 +201,7 @@ scripts/repack-appimage-system-webkit.sh \
   src-tauri/target/release/bundle/appimage/HostWise_*.AppImage
 ```
 
-Output installers land in `frontend/src-tauri/target/release/bundle/…`.
+Output installers land in `app/frontend/src-tauri/target/release/bundle/…`.
 
 ### Production facts
 
@@ -279,7 +279,7 @@ Rust `fmt` + `clippy` + `test`, plus a frontend `bun` lint + build.
 - [x] Frontend `bun run build` passes (type-checked, 14 static pages).
 - [x] All 8 Rust test suites green (`cargo test`).
 - [x] Version metadata synced to `0.8.1` (`tauri.conf.json`,
-      `frontend/src-tauri/Cargo.toml`, `backend-rs/Cargo.toml`, `package.json`).
+      `app/frontend/src-tauri/Cargo.toml`, `app/backend/Cargo.toml`, `package.json`).
 - [x] CI + release pipelines Rust-only and bun-based.
 - [x] Production logging: backend (stdout + `<data_dir>/logs/hostwise.log`,
       no secrets) and frontend (client log capture + export).

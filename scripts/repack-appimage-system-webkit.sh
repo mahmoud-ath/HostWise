@@ -20,7 +20,7 @@
 # USAGE
 #   scripts/repack-appimage-system-webkit.sh <AppImage> [output AppImage]
 #     AppImage      the tauri-built AppImage (e.g.
-#                   frontend/src-tauri/target/release/bundle/appimage/HostWise_0.8.1_amd64.AppImage)
+#                   app/frontend/src-tauri/target/release/bundle/appimage/HostWise_0.8.1_amd64.AppImage)
 #     output        optional; defaults to <AppImage> (in-place, atomic via tmp)
 #
 #   Finds appimagetool via $APPIMAGETOOL, else extracts it from

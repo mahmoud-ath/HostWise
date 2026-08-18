@@ -12,7 +12,7 @@ platform. It was written for **future developers**, **software architects**,
 > See the **What changed** note in [decision-log.md](./decision-log.md).
 
 > **Current status (2026-08-08):** v0.7.6 runs a **native Rust backend**
-> (`backend-rs/`, axum + sqlx/SQLite) embedded in-process inside the Tauri
+> (`app/backend/`, axum + sqlx/SQLite) embedded in-process inside the Tauri
 > desktop shell — no Python, no sidecar. A full production & settings audit
 > fixed several functional gaps (finance category merge, PDF export fields,
 > backup list + restore, AI key clear + base-url validation, CSV import

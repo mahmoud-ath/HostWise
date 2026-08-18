@@ -27,7 +27,7 @@ AUR_GIT="ssh://aur@aur.archlinux.org/$PKGNAME.git"
 
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
-  VERSION="$(node -p "require('$ROOT/frontend/src-tauri/tauri.conf.json').version")"
+  VERSION="$(node -p "require('$ROOT/app/frontend/src-tauri/tauri.conf.json').version")"
 fi
 echo "══ HostWise AUR release — v$VERSION ══"
 

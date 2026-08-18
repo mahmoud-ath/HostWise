@@ -42,7 +42,7 @@ Tauri updates must be **signed** or they are rejected. The keypair is generated
 with the Tauri CLI:
 
 ```bash
-cd frontend
+cd app/frontend
 bunx tauri signer generate -w ~/.tauri/hostwise.key -p '<a-strong-passphrase>'
 ```
 
@@ -51,7 +51,7 @@ bunx tauri signer generate -w ~/.tauri/hostwise.key -p '<a-strong-passphrase>'
   updates. **Never commit it.** It is already covered by `.gitignore` guards
   (`*.key`, `*.pass`, `.tauri/`).
 - **Public key:** `~/.tauri/hostwise.key.pub` — this one is **embedded in the
-  app** via `frontend/src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.
+  app** via `app/frontend/src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.
   Already done for the current key.
 - **If you lose the private key or passphrase you can never publish another
   update** — back it up (password manager / offline drive). Rotating the key
@@ -74,7 +74,7 @@ What it does:
 1. Reads the signing key from `~/.tauri/` (or `TAURI_SIGNING_PRIVATE_KEY*` env).
 2. `bunx tauri build --bundles <os defaults>` with `createUpdaterArtifacts: true`,
    producing the installer **plus a `<installer>.sig` signature file**.
-3. Runs `frontend/scripts/generate-latest-json.mjs` → `latest.json` (merges all
+3. Runs `app/frontend/scripts/generate-latest-json.mjs` → `latest.json` (merges all
    installers, computes sha256, reads signatures).
 4. With a tag: uploads installers + `.sig` + `latest.json` to the GitHub
    Release via `gh release upload --clobber`.
@@ -128,10 +128,10 @@ are separate from the updater signing.)
 
 Bump **all four** places to the same value:
 
-- `frontend/src-tauri/tauri.conf.json` → `version`
-- `frontend/src-tauri/Cargo.toml` → `version`
-- `backend-rs/Cargo.toml` → `version`
-- `frontend/package.json` → `version`
+- `app/frontend/src-tauri/tauri.conf.json` → `version`
+- `app/frontend/src-tauri/Cargo.toml` → `version`
+- `app/backend/Cargo.toml` → `version`
+- `app/frontend/package.json` → `version`
 
 The updater compares the installed version (from `tauri.conf.json` at build
 time) against `latest.json`'s `version`. A release that does not bump the

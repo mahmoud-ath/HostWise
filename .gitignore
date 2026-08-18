@@ -1,14 +1,20 @@
 # Rust build artifacts
-backend-rs/target/
-frontend/src-tauri/target/
+app/backend/target/
+app/frontend/src-tauri/target/
 
 # Frontend / JS
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/test-results/
-frontend/playwright-report/
+app/frontend/node_modules/
+app/frontend/.next/
+app/frontend/out/
+app/frontend/test-results/
+app/frontend/playwright-report/
 *.tsbuildinfo
+
+# Landing site
+landing/node_modules/
+landing/.next/
+landing/out/
+landing/build/
 
 # Environment
 .env
@@ -21,7 +27,7 @@ frontend/playwright-report/
 *.key
 *.pass
 .tauri/
-frontend/src-tauri/.tauri/
+app/frontend/src-tauri/.tauri/
 
 # IDE
 .vscode/

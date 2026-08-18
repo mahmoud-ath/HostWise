@@ -22,7 +22,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT/frontend"
+cd "$ROOT/app/frontend"
 
 TAG="${1:-}"
 if [ "${TAG:-}" = "--no-upload" ]; then TAG=""; fi

@@ -331,7 +331,7 @@ See [frontend-architecture.md](./frontend-architecture.md).
 
 ## 10. Weaknesses (current limitations)
 
-- **Test suite covers the backend** (36 tests) but there is no frontend/e2e
+- **Test suite covers the backend** (36 tests) but there is no app/frontend/e2e
   test suite yet.
 - **No multi-currency conversion** — settings pick a display currency only.
 - **No organizations / multi-tenancy** — `business_name` is a setting, not a

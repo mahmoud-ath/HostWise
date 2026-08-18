@@ -4,7 +4,7 @@
 # Builds the desktop app for Windows (NSIS), macOS (dmg) and Linux (deb +
 # AppImage), then publishes installers to a GitHub Release.
 #
-# The backend is 100% native Rust (backend-rs/), embedded in the Tauri app —
+# The backend is 100% native Rust (app/backend/), embedded in the Tauri app —
 # no Python, no PyInstaller, no external runtime. This pipeline only builds
 # the Next.js static frontend + the Tauri shell.
 #
@@ -15,7 +15,7 @@
 # Design notes:
 #   - Each OS is an INDEPENDENT job so one platform failing never blocks the
 #     others from publishing.
-#   - The Rust backend crate is a path dependency of frontend/src-tauri, so
+#   - The Rust backend crate is a path dependency of app/frontend/src-tauri, so
 #     `tauri build` compiles it automatically (no separate build step).
 #   - The AppImage is repacked after building to use the SYSTEM WebKitGTK
 #     (the bundled CI webkit crashes on real GPUs, WebKit bug #297921).
@@ -55,19 +55,19 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            frontend/src-tauri/target
-          key: win-cargo-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
+            app/frontend/src-tauri/target
+          key: win-cargo-${{ hashFiles('app/frontend/src-tauri/Cargo.lock') }}
           restore-keys: win-cargo-
 
       - name: Install frontend deps
-        working-directory: frontend
+        working-directory: app/frontend
         run: bun install --frozen-lockfile
 
       # createUpdaterArtifacts:true signs each installer with the Tauri
       # updater key (TAURI_SIGNING_PRIVATE_KEY + PASSWORD) so the built-in
       # updater can verify downloads. Add these two secrets to the repo.
       - name: Build Tauri installer (NSIS)
-        working-directory: frontend
+        working-directory: app/frontend
         run: bunx tauri build --bundles nsis
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -87,7 +87,7 @@ jobs:
           $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\" -Recurse -Filter signtool.exe | Sort-Object FullName -Descending | Select-Object -First 1
           & $signtool.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:WINDOWS_CERT_PASSWORD `
             /tr http://timestamp.digicert.com /td sha256 /fd sha256 `
-            (Get-ChildItem frontend/src-tauri/target/release/bundle/nsis/*.exe).FullName
+            (Get-ChildItem app/frontend/src-tauri/target/release/bundle/nsis/*.exe).FullName
         env:
           WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
@@ -97,8 +97,8 @@ jobs:
         with:
           name: hostwise-windows
           path: |
-            frontend/src-tauri/target/release/bundle/nsis/*.exe
-            frontend/src-tauri/target/release/bundle/nsis/*.sig
+            app/frontend/src-tauri/target/release/bundle/nsis/*.exe
+            app/frontend/src-tauri/target/release/bundle/nsis/*.sig
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -106,8 +106,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            frontend/src-tauri/target/release/bundle/nsis/*.exe
-            frontend/src-tauri/target/release/bundle/nsis/*.sig
+            app/frontend/src-tauri/target/release/bundle/nsis/*.exe
+            app/frontend/src-tauri/target/release/bundle/nsis/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
           overwrite: true
@@ -128,19 +128,19 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            frontend/src-tauri/target
-          key: mac-cargo-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
+            app/frontend/src-tauri/target
+          key: mac-cargo-${{ hashFiles('app/frontend/src-tauri/Cargo.lock') }}
           restore-keys: mac-cargo-
 
       - name: Install frontend deps
-        working-directory: frontend
+        working-directory: app/frontend
         run: bun install --frozen-lockfile
 
       # Build BOTH the .dmg (manual installs) and the .app bundle — Tauri only
       # generates updater signatures for the .app (the .dmg gets no .sig), so
       # the .app is what the built-in updater needs on macOS.
       - name: Build Tauri .dmg + .app
-        working-directory: frontend
+        working-directory: app/frontend
         run: bunx tauri build --bundles dmg app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -150,7 +150,7 @@ jobs:
       # .app.tar.gz (normally produced by tauri-action). Tar + sign it here so
       # latest.json can serve macOS auto-updates.
       - name: Package + sign macOS .app for updater
-        working-directory: frontend
+        working-directory: app/frontend
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -182,7 +182,7 @@ jobs:
             echo "Notarization skipped: Apple credentials not configured."
             exit 0
           fi
-          dmg=$(find frontend/src-tauri/target/release/bundle/dmg -name '*.dmg' | head -1)
+          dmg=$(find app/frontend/src-tauri/target/release/bundle/dmg -name '*.dmg' | head -1)
           xcrun notarytool submit "$dmg" --wait --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID"
           xcrun stapler staple "$dmg"
@@ -192,10 +192,10 @@ jobs:
         with:
           name: hostwise-macos
           path: |
-            frontend/src-tauri/target/release/bundle/dmg/*.dmg
-            frontend/src-tauri/target/release/bundle/dmg/*.sig
-            frontend/src-tauri/target/release/bundle/app/*.app.tar.gz
-            frontend/src-tauri/target/release/bundle/app/*.sig
+            app/frontend/src-tauri/target/release/bundle/dmg/*.dmg
+            app/frontend/src-tauri/target/release/bundle/dmg/*.sig
+            app/frontend/src-tauri/target/release/bundle/app/*.app.tar.gz
+            app/frontend/src-tauri/target/release/bundle/app/*.sig
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -203,10 +203,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            frontend/src-tauri/target/release/bundle/dmg/*.dmg
-            frontend/src-tauri/target/release/bundle/dmg/*.sig
-            frontend/src-tauri/target/release/bundle/app/*.app.tar.gz
-            frontend/src-tauri/target/release/bundle/app/*.sig
+            app/frontend/src-tauri/target/release/bundle/dmg/*.dmg
+            app/frontend/src-tauri/target/release/bundle/dmg/*.sig
+            app/frontend/src-tauri/target/release/bundle/app/*.app.tar.gz
+            app/frontend/src-tauri/target/release/bundle/app/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
           overwrite: true
@@ -227,8 +227,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            frontend/src-tauri/target
-          key: lin-cargo-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
+            app/frontend/src-tauri/target
+          key: lin-cargo-${{ hashFiles('app/frontend/src-tauri/Cargo.lock') }}
           restore-keys: lin-cargo-
 
       - name: Install Tauri system deps
@@ -243,11 +243,11 @@ jobs:
           sudo apt-get install -y libfuse2t64 || sudo apt-get install -y libfuse2 || true
 
       - name: Install frontend deps
-        working-directory: frontend
+        working-directory: app/frontend
         run: bun install --frozen-lockfile
 
       - name: Build Tauri .deb
-        working-directory: frontend
+        working-directory: app/frontend
         run: bunx tauri build --bundles deb
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -261,7 +261,7 @@ jobs:
       # like the .deb. The AppImage is a first-class artifact; if it can't be
       # built the workflow FAILS (no more silent green runs without an AppImage).
       - name: Build Tauri AppImage
-        working-directory: frontend
+        working-directory: app/frontend
         env:
           NO_STRIP: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -269,7 +269,7 @@ jobs:
         run: bunx tauri build --bundles appimage --verbose
 
       - name: Repack AppImage to use system WebKitGTK
-        working-directory: frontend
+        working-directory: app/frontend
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -284,7 +284,7 @@ jobs:
           # AppImage runs on the SYSTEM webkit2gtk-4.1/gtk3 (the AUR package
           # declares these as dependencies). Uses appimagetool from the Tauri
           # cache. See scripts/repack-appimage-system-webkit.sh for details.
-          ../scripts/repack-appimage-system-webkit.sh "$APPIMAGE"
+          ../../scripts/repack-appimage-system-webkit.sh "$APPIMAGE"
           # Bytes changed since tauri's original .sig — re-sign the repacked
           # AppImage so latest.json / the built-in updater accept it.
           rm -f "$APPIMAGE.sig"
@@ -296,8 +296,8 @@ jobs:
         with:
           name: hostwise-linux-deb
           path: |
-            frontend/src-tauri/target/release/bundle/deb/*.deb
-            frontend/src-tauri/target/release/bundle/deb/*.sig
+            app/frontend/src-tauri/target/release/bundle/deb/*.deb
+            app/frontend/src-tauri/target/release/bundle/deb/*.sig
           if-no-files-found: error
 
       - name: Upload AppImage artifact
@@ -305,8 +305,8 @@ jobs:
         with:
           name: hostwise-linux-appimage
           path: |
-            frontend/src-tauri/target/release/bundle/appimage/*.AppImage
-            frontend/src-tauri/target/release/bundle/appimage/*.sig
+            app/frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+            app/frontend/src-tauri/target/release/bundle/appimage/*.sig
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -314,10 +314,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            frontend/src-tauri/target/release/bundle/deb/*.deb
-            frontend/src-tauri/target/release/bundle/deb/*.sig
-            frontend/src-tauri/target/release/bundle/appimage/*.AppImage
-            frontend/src-tauri/target/release/bundle/appimage/*.sig
+            app/frontend/src-tauri/target/release/bundle/deb/*.deb
+            app/frontend/src-tauri/target/release/bundle/deb/*.sig
+            app/frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+            app/frontend/src-tauri/target/release/bundle/appimage/*.sig
           generate_release_notes: true
           fail_on_unmatched_files: false
           overwrite: true
@@ -364,8 +364,8 @@ jobs:
           find bundle -type f | sort
 
       - name: Generate latest.json
-        working-directory: frontend
-        run: bun scripts/generate-latest-json.mjs --bundle-dir=../bundle --dry-run
+        working-directory: app/frontend
+        run: bun scripts/generate-latest-json.mjs --bundle-dir=../../bundle --dry-run
 
       - name: Upload latest.json to release
         run: |
