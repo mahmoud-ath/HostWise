@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 /**
- * The official HostWise mark (copied from frontend/public/logo-1024.png): a
+ * The official HostWise mark (copied from app/frontend/public/logo-1024.png): a
  * white rounded tile with the two gradient house loops. Reused as-is so the
  * landing page never invents a different brand identity.
  */

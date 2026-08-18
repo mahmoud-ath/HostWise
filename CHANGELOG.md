@@ -108,7 +108,7 @@
   real preflight (`OPTIONS`) against a rebuilt backend: the allow list is now
   `GET,POST,PUT,PATCH,DELETE,OPTIONS` and a cross-origin `PUT /settings`
   returns 200. `cargo check --all-targets`, `cargo test`, and `cargo fmt` green.
-- **To pick up:** restart `bun run tauri:dev` (Tauri depends on `backend-rs` by
+- **To pick up:** restart `bun run tauri:dev` (Tauri depends on `app/backend` by
   path, so it rebuilds the embedded binary automatically).
 
 ### Settings — coherent save workflow, business identity & welcome wizard
@@ -201,7 +201,7 @@
 - Frontend `opportunities.tsx` hardened with array guards so it never throws on
   partial / LLM-shaped data.
 - **Note:** the desktop backend is compiled by `tauri dev` into
-  `app/frontend/src-tauri/target/debug/hostwise`; backend-rs source changes go live
+  `app/frontend/src-tauri/target/debug/hostwise`; app/backend source changes go live
   after restarting `bun run tauri:dev`.
 
 ## 2. Recent changes (2026-08-08)
@@ -246,7 +246,7 @@ Feedback and Settings** (frontend + Rust backend together, verified against
   section title/description were translated; labels now use i18n keys across
   all 5 languages.
 - **`app/frontend/package.json`** version synced `0.4.0 → 0.7.6` to match
-  `backend-rs` / `src-tauri` / `tauri.conf.json`.
+  `app/backend` / `src-tauri` / `tauri.conf.json`.
 
 ### v0.7.6 — diagnostics + version sync
 - **`api.ts` no longer hides `get_backend_url` failures.** In the Tauri webview
@@ -267,7 +267,7 @@ Feedback and Settings** (frontend + Rust backend together, verified against
   `README-config.md`, `production-overview.md`, `production-roadmap.md`,
   `frontend-architecture.md`) marked SUPERSEDED.
 - **Browser dev single-command runner** (`bun run dev:app` →
-  `app/frontend/scripts/dev.mjs`): starts `backend-rs` (`cargo run`, :8000) first,
+  `app/frontend/scripts/dev.mjs`): starts `app/backend` (`cargo run`, :8000) first,
   waits for it to listen, then boots Next (:3000) — no more `ECONNREFUSED`
   proxy spam. Both logs show in one terminal; Ctrl+C stops both.
 - **Legacy-schema reconciliation** (`app/backend/src/core/db.rs`): databases
