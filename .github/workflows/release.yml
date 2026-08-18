@@ -2,7 +2,7 @@
 # HostWise — Production Release Pipeline
 # ═══════════════════════════════════════════════════════════════════════
 # Builds the desktop app for Windows (NSIS), macOS (dmg) and Linux (deb +
-# AppImage best-effort), then publishes installers to a GitHub Release.
+# AppImage), then publishes installers to a GitHub Release.
 #
 # The backend is 100% native Rust (backend-rs/), embedded in the Tauri app —
 # no Python, no PyInstaller, no external runtime. This pipeline only builds
@@ -13,10 +13,12 @@
 #   - manual dispatch
 #
 # Design notes:
-#   - Each OS is an INDEPENDENT job so one platform failing (e.g. the
-#     linuxdeploy AppImage issue) never blocks the others from publishing.
+#   - Each OS is an INDEPENDENT job so one platform failing never blocks the
+#     others from publishing.
 #   - The Rust backend crate is a path dependency of frontend/src-tauri, so
 #     `tauri build` compiles it automatically (no separate build step).
+#   - The AppImage is repacked after building to use the SYSTEM WebKitGTK
+#     (the bundled CI webkit crashes on real GPUs, WebKit bug #297921).
 # ═══════════════════════════════════════════════════════════════════════
 
 name: Release
@@ -251,18 +253,43 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      # AppImage is currently blocked by an upstream linuxdeploy issue
-      # (old strip vs .relr.dyn on Ubuntu 24.04, tauri-apps/tauri#14796).
-      # Best effort only — NO_STRIP=true and --verbose; never block the
-      # release on it.
-      - name: Build Tauri AppImage (best effort)
+      # The AppImage bundles an OLD WebKitGTK from the CI base image whose web
+      # process aborts on many real GPUs ("Could not create default EGL display:
+      # EGL_BAD_PARAMETER. Aborting...", WebKit bug #297921). We build it here
+      # with NO_STRIP (linuxdeploy's old strip chokes on .relr.dyn, tauri#14796),
+      # then REPACK it below to use the SYSTEM webkit2gtk-4.1 instead — exactly
+      # like the .deb. The AppImage is a first-class artifact; if it can't be
+      # built the workflow FAILS (no more silent green runs without an AppImage).
+      - name: Build Tauri AppImage
         working-directory: frontend
-        continue-on-error: true
         env:
           NO_STRIP: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bunx tauri build --bundles appimage --verbose
+
+      - name: Repack AppImage to use system WebKitGTK
+        working-directory: frontend
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -e
+          APPIMAGE=$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' | head -1)
+          if [ -z "$APPIMAGE" ]; then
+            echo "::error::No AppImage produced by tauri build."
+            exit 1
+          fi
+          # Strip the bundled (old, EGL-broken) WebKitGTK + its dep tree so the
+          # AppImage runs on the SYSTEM webkit2gtk-4.1/gtk3 (the AUR package
+          # declares these as dependencies). Uses appimagetool from the Tauri
+          # cache. See scripts/repack-appimage-system-webkit.sh for details.
+          ../scripts/repack-appimage-system-webkit.sh "$APPIMAGE"
+          # Bytes changed since tauri's original .sig — re-sign the repacked
+          # AppImage so latest.json / the built-in updater accept it.
+          rm -f "$APPIMAGE.sig"
+          bunx tauri signer sign "$APPIMAGE"
+          echo "Repacked AppImage:"; ls -la "$APPIMAGE" "$APPIMAGE.sig"
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
@@ -273,14 +300,14 @@ jobs:
             frontend/src-tauri/target/release/bundle/deb/*.sig
           if-no-files-found: error
 
-      - name: Upload AppImage artifact (if built)
+      - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
           name: hostwise-linux-appimage
           path: |
             frontend/src-tauri/target/release/bundle/appimage/*.AppImage
             frontend/src-tauri/target/release/bundle/appimage/*.sig
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Publish GitHub release
         if: startsWith(github.ref, 'refs/tags/')

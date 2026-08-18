@@ -54,14 +54,25 @@ echo "══ HostWise v$VERSION signed release build ══"
 bun install --frozen-lockfile
 
 # Build the default bundle(s) for this OS WITH updater artifacts (.sig files).
-# Linux example: .deb + .rpm + best-effort AppImage. Add other bundles per OS.
+# Linux example: .deb + .rpm + AppImage (repacked to use the SYSTEM WebKitGTK —
+# the bundled CI webkit crashes on real GPUs, WebKit bug #297921).
 case "$(uname -s)" in
-  Linux*) BUNDLES="deb rpm" ;;
+  Linux*) BUNDLES="deb rpm appimage" ;;
   Darwin*) BUNDLES="dmg app" ;;
   MINGW*|MSYS*) BUNDLES="nsis msi" ;;
   *) BUNDLES="deb" ;;
 esac
 bunx tauri build --bundles $BUNDLES
+
+# Repack the AppImage to use the system WebKitGTK and re-sign it (bytes change,
+# so the original .sig from tauri build is no longer valid).
+APPIMAGE=$(ls src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -1 || true)
+if [ -n "$APPIMAGE" ]; then
+  echo "Repacking AppImage to use system WebKitGTK: $APPIMAGE"
+  ../scripts/repack-appimage-system-webkit.sh "$APPIMAGE"
+  rm -f "$APPIMAGE.sig"
+  bunx tauri signer sign "$APPIMAGE"
+fi
 
 # Generate latest.json (needs the .sig files created above).
 if [ -n "${TAG:-}" ]; then
