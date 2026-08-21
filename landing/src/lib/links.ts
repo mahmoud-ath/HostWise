@@ -4,7 +4,7 @@
  * HostWise is a local-first desktop app (auth-free by design), so there is no
  * hosted web app or hosted "sign in" yet. The conversion path today is the
  * GitHub Releases download. When a hosted web build / sign-in ships, swap
- * LINKS.download and LINKS.signIn for those URLs.
+ * LINKS.download for that URL.
  */
 export const LINKS = {
   /** Real download / get-started flow: the GitHub Releases page. */
@@ -16,11 +16,3 @@ export const LINKS = {
   /** Real issue tracker for bugs / feature requests. */
   issues: "https://github.com/mahmoud-ath/HostWise/issues",
 } as const;
-
-export const NAV_ITEMS = [
-  { label: "Home", href: "#home" },
-  { label: "Features", href: "#features" },
-  { label: "Analytics", href: "#analytics" },
-  { label: "Reports", href: "#reports" },
-  { label: "Contact", href: "#contact" },
-] as const;

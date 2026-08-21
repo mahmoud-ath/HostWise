@@ -1,163 +1,325 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { Menu, X } from "lucide-react";
-import { Logo } from "./Logo";
-import { LINKS, NAV_ITEMS } from "@/lib/links";
+import gsap from "gsap";
+import { ArrowRight, Menu, X } from "lucide-react";
+import HostWiseLogo from "./HostWiseLogo";
+import { defaultDownload } from "../lib/downloads";
+import { useDownloadGate } from "../lib/leadGate";
+import { LINKS } from "../lib/links";
+import { navigateToSection } from "../lib/navigation";
+
+const DESKTOP_LINKS = [
+  { label: "Product", id: "product" },
+  { label: "Features", id: "features" },
+  { label: "FAQ", id: "faq" },
+] as const;
+
+const DESKTOP_PAGES = [
+  { label: "Guide", href: "#/docs" },
+  { label: "Feedback", href: "#/feedback" },
+] as const;
+
+const MOBILE_SECTIONS = [
+  { label: "Product", id: "product" },
+  { label: "Download", id: "download" },
+  { label: "Features", id: "features" },
+  { label: "FAQ", id: "faq" },
+] as const;
+
+const MOBILE_PAGES = [
+  { label: "Guide", href: "#/docs" },
+  { label: "Feedback", href: "#/feedback" },
+] as const;
 
 /**
- * Transparent navbar floating above the hero video. Desktop: horizontal nav +
- * actions. Mobile: white hamburger that opens a full-screen, keyboard
- * accessible menu (Escape closes, focus moves to the close button, body
- * scroll is locked while open).
+ * Floating rounded pill header with a frosted background, adapted for the
+ * HostWise light theme. On load it animates in (width grow + staggered fade),
+ * section links smooth-scroll via GSAP ScrollToPlugin, and a full-screen
+ * animated mobile menu handles small screens. Honors prefers-reduced-motion.
  */
-export function Navbar() {
-  const [open, setOpen] = useState(false);
-  const closeRef = useRef<HTMLButtonElement>(null);
+export default function Navbar() {
+  const { openDownload } = useDownloadGate();
+  const headerRef = useRef<HTMLDivElement>(null);
+  const logoRef = useRef<HTMLAnchorElement>(null);
+  const navItemsRef = useRef<(HTMLLIElement | null)[]>([]);
+  const iconsRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileLinksRef = useRef<(HTMLElement | null)[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const reduceMotion = () =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Entrance animation (width grow + staggered fade-in), desktop vs mobile.
+  useEffect(() => {
+    const header = headerRef.current;
+    const logo = logoRef.current;
+    const icons = iconsRef.current;
+    if (!header || !logo || !icons || reduceMotion()) return;
+
+    const mm = gsap.matchMedia();
+    mm.add(
+      {
+        isMobile: "(max-width: 767px)",
+        isDesktop: "(min-width: 768px)",
+      },
+      (context) => {
+        const isMobile = context.conditions?.isMobile ?? false;
+        const navItems = navItemsRef.current.filter(
+          (el): el is HTMLLIElement => el !== null
+        );
+
+        gsap.set(header, { width: "0px", opacity: 0, overflow: "hidden" });
+        gsap.set(logo, { autoAlpha: 0, y: 15, scale: 0.95 });
+        gsap.set(icons, { autoAlpha: 0, x: 10 });
+        if (!isMobile) gsap.set(navItems, { autoAlpha: 0, y: 15 });
+
+        const tl = gsap.timeline({ delay: 0.15 });
+        tl.to(header, {
+          width: isMobile ? "calc(100% - 2rem)" : "100%",
+          maxWidth: "896px",
+          opacity: 1,
+          duration: 1.1,
+          ease: "expo.inOut",
+        }).to(
+          logo,
+          { autoAlpha: 1, y: 0, scale: 1, duration: 1.1, ease: "expo.out" },
+          "-=0.2"
+        );
+
+        if (!isMobile) {
+          tl.to(
+            navItems,
+            { autoAlpha: 1, y: 0, duration: 0.6, stagger: 0.08, ease: "power3.out" },
+            "-=0.5"
+          );
+        }
+
+        tl.to(icons, { autoAlpha: 1, x: 0, duration: 0.5, ease: "power2.out" }, "-=0.5");
+
+        return () => {
+          tl.kill();
+        };
+      }
+    );
+
+    return () => mm.revert();
+  }, []);
+
+  // Initialize the mobile menu to its closed state.
+  useEffect(() => {
+    const menu = mobileMenuRef.current;
+    if (!menu || reduceMotion()) return;
+    gsap.set(menu, { clipPath: "inset(0% 100% 0% 0%)", autoAlpha: 0 });
+  }, []);
+
+  const toggleMenu = () => {
+    const menu = mobileMenuRef.current;
+    if (!menu) return;
+
+    if (reduceMotion()) {
+      setIsOpen((o) => !o);
+      return;
+    }
+
+    if (!isOpen) {
+      setIsOpen(true);
+      gsap.set(menu, { visibility: "visible", pointerEvents: "auto" });
+      const links = mobileLinksRef.current.filter(
+        (el): el is HTMLElement => el !== null
+      );
+      const tl = gsap.timeline();
+      tl.to(menu, {
+        autoAlpha: 1,
+        clipPath: "inset(0% 0% 0% 0%)",
+        duration: 0.7,
+        ease: "power2.inOut",
+      }).fromTo(
+        links,
+        { y: 24, autoAlpha: 0 },
+        { y: 0, autoAlpha: 1, duration: 0.7, stagger: 0.08, ease: "power2.out" },
+        "-=0.35"
+      );
+    } else {
+      setIsOpen(false);
+      gsap.to(menu, {
+        autoAlpha: 0,
+        clipPath: "inset(0% 100% 0% 0%)",
+        duration: 0.5,
+        ease: "power2.inOut",
+      });
+    }
+  };
 
   useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") toggleMenu();
     };
-    document.addEventListener("keydown", onKeyDown);
-    closeRef.current?.focus();
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen]);
 
-  const navLinkClasses =
-    "font-manrope text-sm font-medium text-white/85 transition-opacity duration-200 hover:opacity-60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white";
-  const signInClasses =
-    "rounded-lg border border-[#D4D4D4] bg-white px-5 py-2 font-manrope text-sm font-semibold text-[#171717] transition-colors duration-200 hover:bg-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
-  const getStartedClasses =
-    "rounded-lg bg-primary px-5 py-2 font-manrope text-sm font-semibold text-white shadow-[0_8px_24px_-10px_rgba(123,57,252,0.8)] transition-colors duration-200 hover:bg-[#8c4cff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
+  const goSection = (id: string) => {
+    if (isOpen) toggleMenu();
+    navigateToSection(id);
+  };
+
+  const startDownload = () => {
+    if (isOpen) toggleMenu();
+    const def = defaultDownload();
+    openDownload({
+      href: def.href,
+      os: def.os,
+      source: "navbar",
+    });
+  };
 
   return (
-    <header className="absolute inset-x-0 top-0 z-20">
-      <nav
-        aria-label="Main"
-        className="mx-auto flex h-[72px] max-w-[1600px] items-center justify-between px-6 lg:px-[120px]"
+    <>
+      <div
+        ref={headerRef}
+        className="fixed top-4 left-1/2 z-50 h-[60px] w-[calc(100%-2rem)] max-w-[896px] -translate-x-1/2 whitespace-nowrap rounded-full border border-gray-200/80 bg-white/80 pl-5 pr-2 shadow-lg shadow-gray-900/5 backdrop-blur-xl"
       >
-        <Link
-          href="#home"
-          aria-label="HostWise home"
-          className="flex items-center gap-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-        >
-          <Logo size={30} />
-          <span className="font-manrope text-base font-semibold tracking-tight text-white">
-            HostWise
-          </span>
-        </Link>
-
-        <ul className="hidden items-center gap-8 lg:flex">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.href}>
-              <Link href={item.href} className={navLinkClasses}>
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        <div className="hidden items-center gap-3 lg:flex">
-          <Link
-            href={LINKS.download}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={signInClasses}
+        <div className="flex h-full items-center justify-between">
+          <a
+            ref={logoRef}
+            href="#/"
+            className="flex flex-shrink-0 items-center gap-2.5"
+            aria-label="HostWise home"
           >
-            Sign In
-          </Link>
-          <Link
-            href={LINKS.download}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={getStartedClasses}
-          >
-            Get Started
-          </Link>
-        </div>
+            <HostWiseLogo size={28} />
+            <span className="text-base font-semibold tracking-tight text-[#191919]">
+              HostWise
+            </span>
+          </a>
 
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open menu"
-          aria-expanded={open}
-          aria-controls="mobile-menu"
-          className="flex h-11 w-11 items-center justify-center rounded-lg text-white transition-colors duration-200 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white lg:hidden"
-        >
-          <Menu size={26} strokeWidth={2} aria-hidden="true" />
-        </button>
-      </nav>
+          <div className="absolute left-1/2 hidden -translate-x-1/2 md:block">
+            <ul className="flex items-center gap-1 text-sm font-medium">
+              {DESKTOP_LINKS.map((link, i) => (
+                <li key={link.label} ref={(el) => (navItemsRef.current[i] = el)}>
+                  <button
+                    type="button"
+                    onClick={() => goSection(link.id)}
+                    className="cursor-pointer rounded-full px-3.5 py-2 text-[#191919]/70 transition-colors duration-200 hover:bg-gray-100 hover:text-[#191919]"
+                  >
+                    {link.label}
+                  </button>
+                </li>
+              ))}
+              {DESKTOP_PAGES.map((link, i) => (
+                <li
+                  key={link.href}
+                  ref={(el) =>
+                    (navItemsRef.current[DESKTOP_LINKS.length + i] = el)
+                  }
+                >
+                  <a
+                    href={link.href}
+                    className="block rounded-full px-3.5 py-2 text-[#191919]/70 transition-colors duration-200 hover:bg-gray-100 hover:text-[#191919]"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-      {open ? (
-        <div
-          id="mobile-menu"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Menu"
-          className="fixed inset-0 z-50 flex flex-col bg-[#0d0817]/95 backdrop-blur-md"
-        >
-          <div className="flex h-[72px] items-center justify-between px-6">
-            <div className="flex items-center gap-2.5">
-              <Logo size={30} />
-              <span className="font-manrope text-base font-semibold text-white">
-                HostWise
-              </span>
-            </div>
+          <div ref={iconsRef} className="flex items-center gap-2">
             <button
-              ref={closeRef}
               type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close menu"
-              className="flex h-11 w-11 items-center justify-center rounded-lg text-white transition-colors duration-200 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              onClick={startDownload}
+              className="hidden cursor-pointer rounded-full bg-[#191919] px-5 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-[#191919]/90 md:inline-flex"
             >
-              <X size={26} strokeWidth={2} aria-hidden="true" />
+              Get HostWise
+            </button>
+            <button
+              type="button"
+              onClick={toggleMenu}
+              aria-label={isOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isOpen}
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-[#191919]/80 transition-colors duration-200 hover:bg-gray-100 hover:text-[#191919] md:hidden"
+            >
+              {isOpen ? (
+                <X size={20} strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Menu size={20} strokeWidth={2} aria-hidden="true" />
+              )}
             </button>
           </div>
-
-          <ul className="flex flex-1 flex-col justify-center gap-1 px-6">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className="block py-3 font-manrope text-3xl font-medium text-white/90 transition-colors duration-200 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          <div className="flex flex-col gap-3 px-6 pb-12">
-            <Link
-              href={LINKS.download}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
-              className="flex items-center justify-center rounded-lg border border-[#D4D4D4] bg-white py-3.5 font-manrope text-base font-semibold text-[#171717] transition-colors duration-200 hover:bg-white/90"
-            >
-              Sign In
-            </Link>
-            <Link
-              href={LINKS.download}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
-              className="flex items-center justify-center rounded-lg bg-primary py-3.5 font-manrope text-base font-semibold text-white shadow-[0_8px_24px_-10px_rgba(123,57,252,0.8)] transition-colors duration-200 hover:bg-[#8c4cff]"
-            >
-              Get Started
-            </Link>
-          </div>
         </div>
-      ) : null}
-    </header>
+      </div>
+
+      {/* Full-screen mobile menu overlay */}
+      <div
+        ref={mobileMenuRef}
+        className={`fixed inset-0 z-40 flex flex-col justify-center overflow-hidden bg-white/90 px-10 backdrop-blur-2xl transition-opacity duration-300 ${
+          isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        aria-hidden={!isOpen}
+      >
+        <ul className="flex flex-col space-y-8">
+          {MOBILE_SECTIONS.map((link, i) => (
+            <li key={link.label} className="overflow-hidden">
+              <button
+                ref={(el) => (mobileLinksRef.current[i] = el)}
+                type="button"
+                onClick={() => goSection(link.id)}
+                className="block cursor-pointer font-serif text-4xl font-normal tracking-tight text-[#191919]/80 transition-colors duration-200 hover:text-[#191919]"
+              >
+                {link.label}
+              </button>
+            </li>
+          ))}
+          {MOBILE_PAGES.map((link, i) => (
+            <li key={link.href} className="overflow-hidden">
+              <a
+                ref={(el) =>
+                  (mobileLinksRef.current[MOBILE_SECTIONS.length + i] = el)
+                }
+                href={link.href}
+                onClick={() => {
+                  if (isOpen) toggleMenu();
+                }}
+                className="block font-serif text-4xl font-normal tracking-tight text-[#191919]/80 transition-colors duration-200 hover:text-[#191919]"
+              >
+                {link.label}
+              </a>
+            </li>
+          ))}
+          <li className="overflow-hidden border-t border-gray-200 pt-6">
+            <button
+              ref={(el) =>
+                (mobileLinksRef.current[
+                  MOBILE_SECTIONS.length + MOBILE_PAGES.length
+                ] = el)
+              }
+              type="button"
+              onClick={startDownload}
+              className="inline-flex cursor-pointer items-center gap-2 text-xl font-medium text-[#191919] transition-colors duration-200 hover:text-accent"
+            >
+              Get HostWise
+              <ArrowRight size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </li>
+        </ul>
+
+        <div className="absolute bottom-10 left-10 flex gap-6 text-xs font-medium uppercase tracking-widest text-[#191919]/40">
+          <a
+            href={LINKS.repo}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-colors duration-200 hover:text-[#191919]"
+          >
+            GitHub
+          </a>
+          <a
+            href={LINKS.email}
+            className="transition-colors duration-200 hover:text-[#191919]"
+          >
+            Email
+          </a>
+        </div>
+      </div>
+    </>
   );
 }

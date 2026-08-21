@@ -6,7 +6,7 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { Reveal } from "@/components/Reveal";
+import Highlight from "../Highlight";
 
 const FEATURES = [
   {
@@ -41,47 +41,43 @@ const FEATURES = [
   },
 ] as const;
 
-/**
- * #features anchor. A 2-column card grid (not the cliché 3 equal cards) with
- * a real brand-purple icon tile per row.
- */
-export function Features() {
+export default function Features() {
   return (
     <section
       id="features"
-      className="relative scroll-mt-24 px-6 py-24 lg:px-[120px] lg:py-32"
+      className="scroll-mt-24 border-t border-gray-200 px-6 py-20 sm:py-24 lg:px-14 lg:py-28"
     >
-      <div className="mx-auto max-w-[1400px]">
-        <Reveal>
-          <div className="max-w-3xl">
-            <h2 className="font-serif text-4xl leading-[1.1] text-white md:text-5xl">
-              Everything your numbers need, in one place.
-            </h2>
-            <p className="mt-4 max-w-[560px] font-sans text-lg leading-relaxed text-white/75">
-              HostWise brings your whole financial picture together in a single
-              desktop app, built for the way hosts actually work.
-            </p>
-          </div>
-        </Reveal>
+      <div className="mx-auto max-w-7xl">
+        <div className="max-w-3xl">
+          <span className="text-xs font-medium uppercase tracking-[0.3em] text-accent">
+            Features
+          </span>
+          <h2 className="mt-3 font-serif text-3xl font-normal tracking-tight text-[#191919] sm:text-4xl md:text-5xl">
+            Everything your numbers need,{" "}
+            <Highlight>in one place.</Highlight>
+          </h2>
+          <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[#191919]/70 md:text-base">
+            HostWise brings revenue, expenses, analytics, and AI insights into
+            a single local-first desktop app, built for the way hosts actually
+            work.
+          </p>
+        </div>
 
-        <ul className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-2">
-          {FEATURES.map((feature, index) => (
-            <li key={feature.title}>
-              <Reveal delay={index * 60}>
-                <div className="flex h-full items-start gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-6 transition-colors duration-300 hover:border-primary/40 hover:bg-white/[0.05]">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-primary/15 text-primary">
-                    <feature.icon size={22} strokeWidth={1.75} aria-hidden="true" />
-                  </span>
-                  <div>
-                    <h3 className="font-manrope text-lg font-semibold text-white">
-                      {feature.title}
-                    </h3>
-                    <p className="mt-1.5 font-sans text-[15px] leading-relaxed text-white/70">
-                      {feature.body}
-                    </p>
-                  </div>
-                </div>
-              </Reveal>
+        <ul className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((feature) => (
+            <li
+              key={feature.title}
+              className="rounded-2xl border border-gray-200 bg-white p-6 transition-colors duration-200 hover:border-gray-300 hover:bg-soft"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-[#191919]">
+                <feature.icon size={22} strokeWidth={1.75} aria-hidden="true" />
+              </span>
+              <h3 className="mt-4 font-semibold text-[#191919]">
+                {feature.title}
+              </h3>
+              <p className="mt-1.5 text-[15px] leading-relaxed text-[#191919]/70">
+                {feature.body}
+              </p>
             </li>
           ))}
         </ul>

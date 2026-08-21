@@ -7,7 +7,7 @@
 ---
 
 <p align="center">
-  <img src="screenshots/overview_image.jpeg" alt="HostWise" />
+  <img src="screenshots/01_dashboard.webp" alt="HostWise" />
 </p>
 
 ---
@@ -79,6 +79,24 @@ HostWise ingests your booking data (CSV and iCal today), normalizes it, and comp
 - **Data Import** — CSV (encodings/delimiters honored, **idempotent** — no duplicates on re-import) + **iCal** for Airbnb/Booking calendar-export feeds
 - **Notifications** — profit-drop / revenue-up / occupancy-fall / backup-done / report-ready alerts (deduplicated)
 - **Backups** — automatic daily + manual SQLite backups, with restore and verification
+
+---
+
+## 📸 Screenshots
+
+A look at HostWise in action:
+
+| Dashboard | Properties | Finance |
+|---|---|---|
+| ![Dashboard](screenshots/01_dashboard.webp) | ![Properties](screenshots/02_Properties.webp) | ![Finance](screenshots/05_Finance.webp) |
+
+| Analytics | AI Advisor | Reports |
+|---|---|---|
+| ![Analytics](screenshots/06_Analytics.webp) | ![AI Advisor](screenshots/08_AI_Advisor.webp) | ![Reports](screenshots/09_Reports.webp) |
+
+| Import | Settings | Dark mode |
+|---|---|---|
+| ![Import](screenshots/10_Import_Data.webp) | ![Settings](screenshots/14_settings.webp) | ![Dark mode](screenshots/17_dashboard_dark_mode.webp) |
 
 ---
 

@@ -1,63 +1,57 @@
-import { HeroVideo } from "./HeroVideo";
-import { AnnouncementBadge } from "./AnnouncementBadge";
-import { LINKS } from "@/lib/links";
+import { ArrowRight } from "lucide-react";
+import HostWiseVideoBg from "./HostWiseVideoBg";
+import HeroPanel from "./HeroPanel";
+import { navigateToSection } from "../lib/navigation";
 
 /**
- * Cinematic full-viewport hero. Content is centered (flex), sits above the
- * video (z-10), and is capped at 1000px so it never stretches on ultrawide.
- * Hero stack is exactly 4 elements: announcement pill, headline, subtext,
- * CTAs.
+ * Full-viewport hero: boomerang property video as the environment, headline +
+ * copy, two CTAs, and a product-intelligence panel anchored to the bottom.
  */
-export function Hero() {
+export default function Hero() {
   return (
     <section
       id="home"
-      className="relative flex min-h-[100svh] items-center justify-center overflow-hidden"
+      className="relative flex min-h-[100svh] flex-col items-center overflow-hidden"
     >
-      <HeroVideo />
+      <HostWiseVideoBg />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[1000px] flex-col items-center px-6 pb-16 pt-20 text-center">
-        <div className="animate-fade-up">
-          <AnnouncementBadge />
-        </div>
-
-        <h1
-          className="animate-fade-up mt-7 max-w-[1000px] font-serif text-[clamp(2.75rem,7vw,6rem)] leading-[1.08] tracking-[-0.01em] text-white"
-          style={{ animationDelay: "80ms" }}
-        >
-          Run your vacation rental business{" "}
-          <em className="inline-block pb-[0.06em] italic">smarter</em>.
-        </h1>
-
-        <p
-          className="animate-fade-up mt-6 max-w-[680px] font-sans text-base leading-relaxed text-white/80 md:text-lg"
-          style={{ animationDelay: "160ms" }}
-        >
-          Track revenue, expenses, reservations, profitability, and property
-          performance in one powerful desktop app, with your data staying under
-          your control.
+      <div className="relative z-10 flex w-full flex-col items-center px-4 pb-6 pt-20 text-center sm:px-6 sm:pb-8 sm:pt-24 md:pt-28">
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#191919]/60">
+          Stop managing
+          blind
         </p>
 
-        <div
-          className="animate-fade-up mt-9 flex w-full flex-col items-center justify-center gap-3.5 sm:w-auto sm:flex-row"
-          style={{ animationDelay: "240ms" }}
-        >
-          <a
-            href={LINKS.download}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[10px] bg-primary px-8 py-4 font-cabin text-base font-medium text-white shadow-[0_18px_40px_-16px_rgba(123,57,252,0.85)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#8c4cff] active:translate-y-0 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:w-auto"
+        <h1 className="mt-4 font-serif text-4xl font-normal leading-[1.05] tracking-tighter text-[#191919] sm:text-5xl md:text-6xl lg:text-7xl">
+          Know your numbers.
+          <br />
+          Grow your properties.
+        </h1>
+
+        <div className="mt-6 flex flex-col items-center gap-3 sm:mt-6 sm:flex-row md:mt-7">
+          <button
+            type="button"
+            onClick={() => navigateToSection("product")}
+            className="group inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#191919] px-6 py-3 text-sm font-medium text-white transition-colors duration-200 hover:bg-[#191919]/90 sm:px-8 sm:py-3.5"
           >
-            Get HostWise
-          </a>
-          <a
-            href="#how-it-works"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[10px] border border-white/15 bg-[#2B2344] px-8 py-4 font-cabin text-base font-medium text-[#F6F7F9] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#372b57] active:translate-y-0 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:w-auto"
+            Explore HostWise
+            <ArrowRight
+              size={16}
+              strokeWidth={2}
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateToSection("features")}
+            className="rounded-full border border-[#191919]/15 bg-white/80 px-6 py-3 text-sm font-medium text-[#191919] backdrop-blur-sm transition-colors duration-200 hover:bg-white sm:px-8 sm:py-3.5"
           >
-            See How It Works
-          </a>
+            See features
+          </button>
         </div>
       </div>
+
+      <HeroPanel />
     </section>
   );
 }
