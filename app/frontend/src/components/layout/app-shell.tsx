@@ -8,29 +8,38 @@ import { WelcomeWizard } from "./welcome-wizard";
 import { NotificationBell } from "./notification-bell";
 import { UpdateBanner } from "./update-banner";
 import { useBackend } from "@/contexts/backend-context";
+import { useIsTauri } from "@/hooks/use-tauri";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "./logo";
+import { TitleBar } from "./title-bar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { isReady: backendReady, status: backendStatus } = useBackend();
   const { t } = useI18n();
+  const isTauri = useIsTauri();
 
-  // Show loading while backend is starting
+  // Show loading while backend is starting (keep the titlebar so the user can
+  // always move / minimize / close the frameless window, even if startup hangs).
   if (!backendReady && backendStatus === "starting") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">{t("app.starting")}</p>
-      </div>
+      <>
+        <TitleBar />
+        <div className="flex flex-col items-center justify-center min-h-screen gap-3 pt-9">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">{t("app.starting")}</p>
+        </div>
+      </>
     );
   }
 
   return (
     <ErrorBoundary>
       <WelcomeWizard />
-      <div className="min-h-screen bg-background">
+      <TitleBar />
+      <div className={cn("min-h-screen bg-background", isTauri && "pt-9")}>
         <ConnectionBanner />
         <NotificationBell />
         <UpdateBanner />

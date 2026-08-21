@@ -8,6 +8,7 @@ import {
   Building2, DollarSign, BarChart3, Brain, FileText, Upload, Settings,
   Lightbulb, ArrowRight, TrendingUp, Target, AlertTriangle, CheckCircle,
   Download, Mail, MessageSquare,
+  Activity, CalendarDays, RefreshCw, ShieldCheck, Tags,
 } from "lucide-react";
 
 const guides: Record<string, {
@@ -95,6 +96,18 @@ const guides: Record<string, {
     sections: [
       { icon: <MessageSquare className="h-5 w-5 text-primary" />, title: "Send Feedback", content: "Pick a category (bug report, feature request, question), add your email and message, then submit. The app opens a pre-filled email in your mail client — just press send.", example: "Report a bug with the steps to reproduce so we can fix it faster." },
       { icon: <Mail className="h-5 w-5 text-primary" />, title: "Contact Us", content: "Prefer email? Reach us directly at support@hostwise.app. We usually respond within 1–2 business days.", example: "Attach a screenshot with your report to help us understand the issue." },
+    ],
+  },
+  "/tips": {
+    title: "Best Tips & Advice",
+    description: "Practical habits that get the most out of HostWise — and out of your numbers.",
+    sections: [
+      { icon: <CalendarDays className="h-5 w-5 text-primary" />, title: "Check in weekly, not monthly", content: "Open the dashboard every Monday. A five-minute look at revenue, margin, and the AI summary catches problems early — while you can still fix them.", example: "Spot a revenue dip in week 2 instead of at month-end, and adjust pricing before the loss compounds." },
+      { icon: <Upload className="h-5 w-5 text-primary" />, title: "Import as you go", content: "Import your CSV exports monthly (or after each platform payout) instead of dumping everything at year-end. Fresh data keeps analytics, rankings, and AI advice accurate all year.", example: "Import March's Airbnb export on 1 April — the dashboard updates and your tax file grows itself." },
+      { icon: <Activity className="h-5 w-5 text-amber-500" />, title: "Trust the Health Score over raw revenue", content: "A property can make a lot of money and still be unhealthy — high cancellations, thin margins, or creeping costs. Sort by Health Score to find the real weak spots.", example: "Property B earns less than A but scores 92 vs 61 — B is the better investment to scale." },
+      { icon: <Tags className="h-5 w-5 text-success" />, title: "Describe expenses clearly", content: "Type a real description on every expense (e.g. \"Pool maintenance – April\"). HostWise auto-creates the category, so your expense breakdown stays accurate without manual tagging.", example: "Vague entries like \"payment\" land in Uncategorized and hide your true cost drivers." },
+      { icon: <RefreshCw className="h-5 w-5 text-primary" />, title: "Re-imports are safe", content: "HostWise imports are idempotent — re-importing the same file skips duplicates instead of corrupting your books. Refresh a month or fix a typo without worry.", example: "Uploaded the wrong CSV? Just import the correct one — no double counting." },
+      { icon: <ShieldCheck className="h-5 w-5 text-success" />, title: "Back up before big changes", content: "Automatic daily backups protect you, but before a large import, a cleanup, or a bulk edit, create a manual backup so you can roll back instantly.", example: "Restore a backup after a bad import in one click — no spreadsheet archaeology." },
     ],
   },
 };

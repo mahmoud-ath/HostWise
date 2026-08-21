@@ -16,6 +16,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useIsTauri } from "@/hooks/use-tauri";
 import { useTheme } from "next-themes";
 import { useI18n } from "@/lib/i18n";
 import { Logo } from "./logo";
@@ -37,10 +38,15 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { t } = useI18n();
-
+  const isTauri = useIsTauri();
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:start-0 border-e bg-card">
+    <aside
+      className={cn(
+        "hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:start-0 border-e bg-card",
+        isTauri ? "lg:top-9 lg:bottom-0" : "lg:inset-y-0"
+      )}
+    >
       {/* Logo */}
       <div className="flex items-center h-16 px-6 border-b gap-2">
         <Logo size={30} />

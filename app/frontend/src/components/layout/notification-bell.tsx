@@ -20,8 +20,7 @@ import {
   useNotificationsSummary,
   useRefreshNotifications,
   type AppNotification,
-} from "@/hooks/use-api";
-
+} from "@/hooks/use-api";import { useIsTauri } from "@/hooks/use-tauri";
 const SEVERITY_STYLES: Record<string, { icon: typeof Info; cls: string }> = {
   info: { icon: Info, cls: "text-blue-500" },
   success: { icon: CheckCircle2, cls: "text-emerald-500" },
@@ -46,6 +45,7 @@ function timeAgo(iso: string | null): string {
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const isTauri = useIsTauri();
   const { data: summary } = useNotificationsSummary();
   const { data: list } = useNotifications();
   const refresh = useRefreshNotifications();
@@ -81,7 +81,10 @@ export function NotificationBell() {
   const notifications: AppNotification[] = list?.notifications ?? [];
 
   return (
-    <div ref={ref} className="fixed end-4 top-4 z-40">
+    <div
+      ref={ref}
+      className={`fixed end-4 z-40 ${isTauri ? "top-12" : "top-4"}`}
+    >
       <button
         onClick={() => setOpen((o) => !o)}
         className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
