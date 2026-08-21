@@ -61,26 +61,7 @@ export default function Footer() {
                 Get HostWise
                 <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
               </button>
-              <a
-                href="#/"
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 transition-colors duration-150 hover:border-transparent hover:bg-[#dadada] hover:text-[#333]"
-              >
-                <svg
-                  height="0.8em"
-                  width="0.8em"
-                  viewBox="0 0 2 1"
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  <polyline
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="0.1"
-                    points="0.9,0.1 0.1,0.5 0.9,0.9"
-                  />
-                </svg>
-                Back home
-              </a>
+              
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Check, Copy } from "lucide-react";
+import { ArrowRight, Check, Copy, Sparkles } from "lucide-react";
 import { DOWNLOAD_VERSION, SITE_ORIGIN } from "../../lib/constants";
 import { useDownloadGate } from "../../lib/leadGate";
 import { LINKS } from "../../lib/links";
@@ -8,42 +8,66 @@ import { scrollToId } from "../../lib/navigation";
 /** Local files served from public/downloads/ so they download directly. */
 const file = (name: string) => `/downloads/${name}`;
 
+/**
+ * GitHub "latest" asset URLs — releases/latest/download/<asset> always points
+ * to the newest published release, so the links stay current after version
+ * bumps without touching the site.
+ */
+const release = (name: string) =>
+  `https://github.com/mahmoud-ath/HostWise/releases/latest/download/${name}`;
+
+/** What's new in the current release. */
+const RELEASE_FEATURES = [
+  "AI Financial Advisor — actionable recommendations with business impact, offline rules engine + BYOK LLM (OpenAI/Anthropic/DeepSeek/Ollama)",
+  "Financial Dashboard & Portfolio — real-time KPIs, property health scores, expense tracking with per-record currency",
+  "Professional PDF Reports — executive summaries, portfolio performance, and AI insights",
+  "Idempotent Data Import — CSV + iCal, natural-key dedupe, never corrupts your books",
+  "Automatic Daily Backups — SQLite with restore and verification",
+  "Smart Notifications — profit drops, revenue spikes, report-ready alerts (deduplicated)" 
+] as const;
+
 const PLATFORMS = [
   {
     os: "macOS",
     format: "Installer (.dmg)",
     img: file("apple-icon.png"),
-    href: file(`HostWise_${DOWNLOAD_VERSION}_universal.dmg`),
+    href: release(`HostWise_${DOWNLOAD_VERSION}_aarch64.dmg`),
+    available: true,
   },
   {
     os: "Windows",
     format: "Installer (.exe)",
     img: file("windows.png"),
-    href: file(`HostWise_${DOWNLOAD_VERSION}_x64-setup.exe`),
+    href: release(`HostWise_${DOWNLOAD_VERSION}_x64-setup.exe`),
+    available: true,
   },
   {
     os: "Debian / Ubuntu",
     format: "Package (.deb)",
     img: file("Linux.png"),
-    href: file(`hostwise_${DOWNLOAD_VERSION}_amd64.deb`),
+    href: release(`HostWise_${DOWNLOAD_VERSION}_amd64.deb`),
+    available: true,
   },
   {
     os: "Fedora / RHEL",
-    format: "Package (.rpm)",
+    format: "AppImage",
     img: file("Linux.png"),
-    href: file(`hostwise-${DOWNLOAD_VERSION}-1.x86_64.rpm`),
+    href: release(`HostWise_${DOWNLOAD_VERSION}_amd64.AppImage`),
+    available: true,
   },
   {
     os: "Linux",
     format: "AppImage",
     img: file("Linux.png"),
-    href: file(`HostWise_${DOWNLOAD_VERSION}_amd64.AppImage`),
+    href: release(`HostWise_${DOWNLOAD_VERSION}_amd64.AppImage`),
+    available: true,
   },
   {
-    os: "Arch / Manjaro",
-    format: "AUR · hostwise-bin",
+    os: "Manjaro / Arch",
+    format: "Coming soon",
     img: file("Linux.png"),
-    href: "https://aur.archlinux.org/packages/hostwise-bin",
+    href: "#",
+    available: false,
   },
 ] as const;
 
@@ -64,9 +88,11 @@ export default function Download() {
   };
 
   const startDownload = (platform: (typeof PLATFORMS)[number]) => {
+    if (!platform.available) return; // Don't allow download for coming soon items
+    
     openDownload({
       href: platform.href,
-      external: platform.href.startsWith("http"),
+      external: false, // direct file downloads (GitHub assets)
       os: platform.os,
       source: platform.format,
     });
@@ -85,7 +111,7 @@ export default function Download() {
             </h2>
             <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[#191919]/70 md:text-base">
               Free to try, built for your machine. Pick your platform and the
-              installer downloads straight from this site.
+              installer downloads straight from GitHub.
             </p>
           </div>
           <a
@@ -99,13 +125,46 @@ export default function Download() {
           </a>
         </div>
 
+        {/* What's in this release */}
+        <div className="mt-10 rounded-2xl border border-gray-200 bg-soft p-6 sm:p-8">
+          <div>
+            <span className="text-xs font-medium uppercase tracking-[0.22em] text-accent">
+              What's new in v{DOWNLOAD_VERSION}
+            </span>
+            <h3 className="mt-2 font-serif text-2xl font-normal tracking-tight text-[#191919]">
+              Everything in this release.
+            </h3>
+          </div>
+          <ul className="mt-5 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
+            {RELEASE_FEATURES.map((feature) => (
+              <li
+                key={feature}
+                className="flex items-start gap-2.5 text-sm leading-relaxed text-[#191919]/80"
+              >
+                <Sparkles
+                  size={15}
+                  strokeWidth={2}
+                  className="mt-0.5 shrink-0 text-accent"
+                  aria-hidden="true"
+                />
+                {feature}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {PLATFORMS.map((platform) => (
             <button
               key={platform.os}
               type="button"
               onClick={() => startDownload(platform)}
-              className="group cursor-pointer rounded-2xl border border-gray-200 bg-white p-5 text-left transition-colors duration-200 hover:border-gray-300 hover:bg-soft"
+              disabled={!platform.available}
+              className={`group cursor-pointer rounded-2xl border border-gray-200 bg-white p-5 text-left transition-colors duration-200 ${
+                platform.available 
+                  ? "hover:border-gray-300 hover:bg-soft" 
+                  : "opacity-60 cursor-not-allowed"
+              }`}
             >
               <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-gray-200">
                 <img
@@ -121,14 +180,20 @@ export default function Download() {
               <p className="mt-1 text-sm text-[#191919]/60">
                 {platform.format}
               </p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[#191919]/80 transition-colors duration-200 group-hover:text-accent">
-                {platform.href.startsWith("http") ? "Install" : "Download"}
-                <ArrowRight
-                  size={14}
-                  strokeWidth={2}
-                  className="transition-transform duration-200 group-hover:translate-x-0.5"
-                  aria-hidden="true"
-                />
+              <span className={`mt-4 inline-flex items-center gap-1 text-sm font-medium ${
+                platform.available 
+                  ? "text-[#191919]/80 group-hover:text-accent" 
+                  : "text-[#191919]/40"
+              } transition-colors duration-200`}>
+                {platform.available ? "Download" : "Coming Soon"}
+                {platform.available && (
+                  <ArrowRight
+                    size={14}
+                    strokeWidth={2}
+                    className="transition-transform duration-200 group-hover:translate-x-0.5"
+                    aria-hidden="true"
+                  />
+                )}
               </span>
             </button>
           ))}
@@ -168,7 +233,7 @@ export default function Download() {
         </div>
 
         <p className="mt-6 text-sm text-[#191919]/50">
-          Installers are hosted on this site and download automatically.{" "}
+          Installers are hosted on GitHub Releases and download automatically.{" "}
           <button
             type="button"
             onClick={() => scrollToId("product")}
@@ -189,4 +254,3 @@ export default function Download() {
     </section>
   );
 }
-

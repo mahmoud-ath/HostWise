@@ -7,6 +7,11 @@ gsap.registerPlugin(ScrollTrigger);
 
 const SCREENSHOTS = [
   {
+    src: "/screenshots/overview_image.jpeg",
+    title: "HOSTWISE",
+    desc: "Own your data. Know your numbers. Grow your portfolio.",
+  },
+  {
     src: "/screenshots/01_dashboard.webp",
     title: "Dashboard",
     desc: "Revenue, expenses, cashflow, and AI insights on one screen.",
