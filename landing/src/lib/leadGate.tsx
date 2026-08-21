@@ -37,6 +37,41 @@ export function useDownloadGate() {
   return ctx;
 }
 
+/**
+ * Save a lead to the Google Sheet via the Apps Script web app. This is the
+ * single lead-capture path used by the download gate AND the footer subscribe
+ * form. Never throws — the caller decides how to present the result.
+ */
+export async function submitLead(payload: {
+  email: string;
+  os?: string;
+  source?: string;
+  page?: string;
+  timestamp?: string;
+}): Promise<void> {
+  try {
+    if (!LEAD_SHEET_URL) return;
+    // Google Apps Script expects a plain-text body and allows CORS via no-cors;
+    // the response is opaque, so a resolve means "sent".
+    await fetch(LEAD_SHEET_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        email: payload.email,
+        os: payload.os ?? detectPlatform(),
+        source: payload.source ?? "website",
+        page:
+          payload.page ??
+          (typeof window !== "undefined" ? window.location.hash || "/" : "/"),
+        timestamp: payload.timestamp ?? new Date().toISOString(),
+      }),
+    });
+  } catch {
+    /* Never block on lead-capture failure. */
+  }
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function LeadModal({
@@ -102,28 +137,12 @@ function LeadModal({
     setFormError(null);
     setStatus("sending");
 
-    const payload = {
+    await submitLead({
       email: value,
-      os: request.os ?? detectPlatform(),
-      source: request.source ?? "website",
+      os: request.os,
+      source: request.source,
       page: window.location.hash || "/",
-      timestamp: new Date().toISOString(),
-    };
-
-    try {
-      if (LEAD_SHEET_URL) {
-        // Google Apps Script expects a plain-text body and allows CORS via
-        // no-cors; the response is opaque, so a resolve is "sent".
-        await fetch(LEAD_SHEET_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload),
-        });
-      }
-    } catch {
-      /* Never block a download on lead-capture failure — proceed anyway. */
-    }
+    });
     finish();
   };
 

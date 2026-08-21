@@ -12,7 +12,7 @@ export const LINKS = {
   /** The product repo. */
   repo: "https://github.com/mahmoud-ath/HostWise",
   /** Real support channel used by the app's in-app feedback flow. */
-  email: "mailto:support@hostwise.app",
+  email: "markuspub4@gmail.com",
   /** Real issue tracker for bugs / feature requests. */
   issues: "https://github.com/mahmoud-ath/HostWise/issues",
 } as const;

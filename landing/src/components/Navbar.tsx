@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ArrowRight, Menu, X } from "lucide-react";
 import HostWiseLogo from "./HostWiseLogo";
-import { defaultDownload } from "../lib/downloads";
-import { useDownloadGate } from "../lib/leadGate";
 import { LINKS } from "../lib/links";
 import { navigateToSection } from "../lib/navigation";
 
@@ -37,7 +35,6 @@ const MOBILE_PAGES = [
  * animated mobile menu handles small screens. Honors prefers-reduced-motion.
  */
 export default function Navbar() {
-  const { openDownload } = useDownloadGate();
   const headerRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLAnchorElement>(null);
   const navItemsRef = useRef<(HTMLLIElement | null)[]>([]);
@@ -164,15 +161,8 @@ export default function Navbar() {
     navigateToSection(id);
   };
 
-  const startDownload = () => {
-    if (isOpen) toggleMenu();
-    const def = defaultDownload();
-    openDownload({
-      href: def.href,
-      os: def.os,
-      source: "navbar",
-    });
-  };
+  const goToDownload = () => navigateToSection("download");
+
 
   return (
     <>
@@ -227,7 +217,7 @@ export default function Navbar() {
           <div ref={iconsRef} className="flex items-center gap-2">
             <button
               type="button"
-              onClick={startDownload}
+              onClick={goToDownload}
               className="hidden cursor-pointer rounded-full bg-[#191919] px-5 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-[#191919]/90 md:inline-flex"
             >
               Get HostWise
@@ -294,7 +284,7 @@ export default function Navbar() {
                 ] = el)
               }
               type="button"
-              onClick={startDownload}
+              onClick={goToDownload}
               className="inline-flex cursor-pointer items-center gap-2 text-xl font-medium text-[#191919] transition-colors duration-200 hover:text-accent"
             >
               Get HostWise

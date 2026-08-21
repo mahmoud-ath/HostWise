@@ -9,6 +9,8 @@ import Faq from "./components/sections/Faq";
 import Footer from "./components/Footer";
 import Guide from "./pages/Guide";
 import Feedback from "./pages/Feedback";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 import { DownloadGateProvider } from "./lib/leadGate";
 import { useHashRoute } from "./lib/router";
@@ -43,6 +45,8 @@ export default function App() {
         {route === "home" && <Home />}
         {route === "docs" && <Guide guideId={guideId} />}
         {route === "feedback" && <Feedback />}
+        {route === "privacy" && <Privacy />}
+        {route === "terms" && <Terms />}
         <Footer />
       </div>
     </DownloadGateProvider>
