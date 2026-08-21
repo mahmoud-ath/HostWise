@@ -5,7 +5,7 @@ export const HERO_VIDEO_URL = "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZbo
 export const TAGLINE = "Own your data. Know your numbers.";
 
 /** Version used to build the local download filenames in public/downloads/. */
-export const DOWNLOAD_VERSION = "0.8.2";
+export const DOWNLOAD_VERSION = "0.8.3";
 
 /**
  * The site's origin, used to build copy-paste URLs (like the curl one-liner)

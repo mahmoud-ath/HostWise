@@ -13,7 +13,7 @@
 set -eu
 
 BASE_URL="${HOSTWISE_BASE_URL:-https://hostwise.app}"
-VERSION="${HOSTWISE_VERSION:-0.8.2}"
+VERSION="${HOSTWISE_VERSION:-0.8.3}"
 
 say() { printf '%s\n' "$*"; }
 die() { say "error: $*" >&2; exit 1; }

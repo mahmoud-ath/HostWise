@@ -6,6 +6,22 @@
 
 ---
 
+## 0. v0.8.3 — marketing site rebuild & frameless desktop titlebar (2026-08-21)
+
+### Landing / marketing site (Vite rebuild)
+- Rebuilt the landing site from Next.js to **Vite + React + TS + Tailwind** (Hero, HeroPanel, Philosophy, Gallery, Features, Download, FAQ).
+- **Email lead-capture gate** before every download/Install click — saves leads to a Google Sheet via a Google Apps Script web app (`lib/leadGate.tsx`, `LEAD_SHEET_URL` in `lib/constants.ts`; setup in `landing/LEAD-CAPTURE-SETUP.md`).
+- **"The HostWise Guide"** (`#/docs`) — multi-page guide mirroring the app tabs (one page per module, grouped global nav, per-page "On this page" TOC, prev/next pagination).
+- **Install options**: local installers, a one-line curl installer (`public/install.sh`), OS logos (Apple/Windows/Linux), and a proper favicon set.
+- Updated screenshot set (17 `.webp`) drives the gallery, the guide, and the README.
+
+### Desktop app
+- **Custom frameless titlebar** (`decorations: false`) with a native drag region + min/max/close controls (`components/layout/title-bar.tsx`, `hooks/use-tauri.ts`, `lib/tauri.ts`); sidebar/bell/loading offsets adjusted for Tauri.
+- **Web favicons** (`.ico` + 16/32 + apple-touch-icon) wired into Next metadata.
+- In-app **Guide gained a "Best Tips & Advice" tab** (weekly review, import discipline, health scores, auto-categorization, idempotent re-imports, backups).
+
+---
+
 ## 0. v0.8.1 — production hardening, updater & logging (2026-08-10)
 
 ### Custom-date crash fixed (root cause: inverted ranges)
