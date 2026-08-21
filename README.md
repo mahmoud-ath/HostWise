@@ -7,7 +7,7 @@
 ---
 
 <p align="center">
-  <img src="screenshots/01_dashboard.webp" alt="HostWise" />
+  <img src="screenshots/overview_image.jpeg" alt="HostWise" />
 </p>
 
 ---
