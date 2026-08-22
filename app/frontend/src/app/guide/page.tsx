@@ -95,7 +95,7 @@ const guides: Record<string, {
     description: "Share feedback or contact us — straight from the app.",
     sections: [
       { icon: <MessageSquare className="h-5 w-5 text-primary" />, title: "Send Feedback", content: "Pick a category (bug report, feature request, question), add your email and message, then submit. The app opens a pre-filled email in your mail client — just press send.", example: "Report a bug with the steps to reproduce so we can fix it faster." },
-      { icon: <Mail className="h-5 w-5 text-primary" />, title: "Contact Us", content: "Prefer email? Reach us directly at support@hostwise.app. We usually respond within 1–2 business days.", example: "Attach a screenshot with your report to help us understand the issue." },
+      { icon: <Mail className="h-5 w-5 text-primary" />, title: "Contact Us", content: "Prefer email? Reach us directly at markuspub4@gmail.com. We usually respond within 1–2 business days.", example: "Attach a screenshot with your report to help us understand the issue." },
     ],
   },
   "/tips": {

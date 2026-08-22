@@ -140,7 +140,7 @@ export default function Privacy() {
 
         <Block title="Contact">
           <P>
-            Questions about this policy? Email us at support@hostwise.app.
+            Questions about this policy? Email us at markuspub4@gmail.com.
           </P>
         </Block>
       </div>

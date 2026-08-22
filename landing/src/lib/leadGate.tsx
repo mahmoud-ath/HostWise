@@ -170,7 +170,7 @@ function LeadModal({
     if (!keyValid) {
       setStatus("idle");
       setFormError(
-        "That license key doesn't look right. Double-check it and try again — or email support@hostwise.app if you don't have one."
+        "That license key doesn't look right. Double-check it and try again — or email  if you don't have one."
       );
       return;
     }
@@ -338,10 +338,10 @@ function LeadModal({
             <p className="mt-4 text-xs leading-relaxed text-[#191919]/45">
               Don't have a license key? Email{" "}
               <a
-                href="mailto:support@hostwise.app"
+                href="mailto:markuspub4@gmail.com"
                 className="font-medium text-[#191919]/60 underline underline-offset-2"
               >
-                support@hostwise.app
+                markuspub4@gmail.com
               </a>
               . Your email is only used for the download link and product
               updates.

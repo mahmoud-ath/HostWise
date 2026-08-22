@@ -714,7 +714,7 @@ function PageContent({ page }: { page: GuidePage }) {
           </Section>
           <Section id="feedback-contact" title="Contact us">
             <P>
-              Prefer email? Reach us directly at support@hostwise.app. We
+              Prefer email? Reach us directly at markuspub4@gmail.com. We
               usually respond within 1–2 business days.
             </P>
           </Section>

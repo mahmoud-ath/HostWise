@@ -161,7 +161,7 @@ but simply skips the network call — no data is lost, downloads still start.
 - Every submission is logged to the sheet (valid **and** invalid keys) so you
   can see who tried and with what key.
 - An invalid key shows an error and **blocks the download**; the visitor can
-  retry or email `support@hostwise.app`.
+  retry or email `markuspub4@gmail.com`.
 - The footer subscribe form is unaffected — it still saves email-only rows.
 
 ## 6. Test

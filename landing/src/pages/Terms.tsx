@@ -65,7 +65,7 @@ export default function Terms() {
             HostWise is a paid desktop product. Pricing, license terms, and any
             trial are described on our site and at the point of purchase. If a
             refund policy applies to your purchase, it is stated at checkout;
-            please contact support@hostwise.app with questions about invoicing
+            please contact markuspub4@gmail.com with questions about invoicing
             or team licenses.
           </P>
         </Block>
@@ -134,7 +134,7 @@ export default function Terms() {
 
         <Block title="Contact">
           <P>
-            Questions about these Terms? Email us at support@hostwise.app.
+            Questions about these Terms? Email us at markuspub4@gmail.com.
           </P>
         </Block>
       </div>
