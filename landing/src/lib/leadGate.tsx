@@ -7,9 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { Check, Loader2, Mail, X } from "lucide-react";
+import { Check, KeyRound, Loader2, Mail, X } from "lucide-react";
 import { LEAD_SHEET_URL } from "./constants";
 import { detectPlatform } from "./downloads";
+import { validateLicenseKey } from "./licenseKeys";
 
 export type DownloadRequest = {
   /** File to download (or URL to open) once the email is captured. */
@@ -48,6 +49,10 @@ export async function submitLead(payload: {
   source?: string;
   page?: string;
   timestamp?: string;
+  /** License key typed in the download gate ("" for the footer subscribe form). */
+  key?: string;
+  /** Whether the key matched the approved list. */
+  keyValid?: boolean;
 }): Promise<void> {
   try {
     if (!LEAD_SHEET_URL) return;
@@ -65,6 +70,8 @@ export async function submitLead(payload: {
           payload.page ??
           (typeof window !== "undefined" ? window.location.hash || "/" : "/"),
         timestamp: payload.timestamp ?? new Date().toISOString(),
+        key: payload.key ?? "",
+        keyValid: payload.keyValid ?? false,
       }),
     });
   } catch {
@@ -82,6 +89,7 @@ function LeadModal({
   onClose: () => void;
 }) {
   const [email, setEmail] = useState("");
+  const [licenseKey, setLicenseKey] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "done">("idle");
   const [formError, setFormError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -129,20 +137,37 @@ function LeadModal({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const value = email.trim().toLowerCase();
-    if (!EMAIL_RE.test(value)) {
+    const emailValue = email.trim().toLowerCase();
+    const badEmail = !EMAIL_RE.test(emailValue);
+    const keyValid = validateLicenseKey(licenseKey);
+
+    if (badEmail) {
       setFormError("Please enter a valid email address.");
       return;
     }
-    setFormError(null);
-    setStatus("sending");
 
+    // Log the attempt whether the key is right or wrong, so you can see who
+    // tried to download and with what key. This never blocks on failures.
+    setStatus("sending");
     await submitLead({
-      email: value,
+      email: emailValue,
       os: request.os,
       source: request.source,
       page: window.location.hash || "/",
+      key: licenseKey.trim(),
+      keyValid,
     });
+
+    // Invalid key → block the download and keep the modal open.
+    if (!keyValid) {
+      setStatus("idle");
+      setFormError(
+        "That license key doesn't look right. Double-check it and try again — or email support@hostwise.app if you don't have one."
+      );
+      return;
+    }
+
+    setFormError(null);
     finish();
   };
 
@@ -154,7 +179,7 @@ function LeadModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Enter your email to download HostWise"
+      aria-label="Enter your email and license key to download HostWise"
       className="fixed inset-0 z-[60] flex items-center justify-center px-4"
     >
       {/* Backdrop */}
@@ -199,8 +224,8 @@ function LeadModal({
               {headline}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-[#191919]/60">
-              One quick step: drop your email and we'll start your download
-              right away — plus keep you posted on new features.
+              Enter your email and the license key we sent you, and your
+              download will start right away.
             </p>
 
             <form onSubmit={submit} className="mt-6" noValidate>
@@ -216,6 +241,23 @@ function LeadModal({
                   placeholder="you@example.com"
                   disabled={status === "sending"}
                   autoComplete="email"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#191919] placeholder:text-[#191919]/40 focus:border-accent/50 focus:outline-none disabled:opacity-60"
+                />
+              </label>
+
+              <label className="mt-4 block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-[#191919]">
+                  <KeyRound size={14} strokeWidth={2} aria-hidden="true" />
+                  License key
+                </span>
+                <input
+                  type="text"
+                  value={licenseKey}
+                  onChange={(e) => setLicenseKey(e.target.value)}
+                  placeholder="XXXX-XXXX-XXXX-XXXX"
+                  disabled={status === "sending"}
+                  autoComplete="off"
+                  spellCheck={false}
                   className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#191919] placeholder:text-[#191919]/40 focus:border-accent/50 focus:outline-none disabled:opacity-60"
                 />
               </label>
@@ -248,8 +290,15 @@ function LeadModal({
             </form>
 
             <p className="mt-4 text-xs leading-relaxed text-[#191919]/45">
-              No spam, ever. Your email is only used to send you the download
-              link and product updates. Unsubscribe anytime.
+              Don't have a license key? Email{" "}
+              <a
+                href="mailto:support@hostwise.app"
+                className="font-medium text-[#191919]/60 underline underline-offset-2"
+              >
+                support@hostwise.app
+              </a>
+              . Your email is only used for the download link and product
+              updates.
             </p>
           </div>
         )}

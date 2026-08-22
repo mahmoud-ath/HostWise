@@ -1,8 +1,13 @@
 # Email lead capture → Google Sheets (setup)
 
-The landing page collects an email before every download/Install click. Emails
-are posted to a **Google Apps Script Web App**, which appends them to a Google
-Sheet. No server of your own is needed.
+The landing page collects an **email + license key** before every
+Download/Install click. Both are posted to a **Google Apps Script Web App**,
+which appends them to a Google Sheet. No server of your own is needed.
+
+Keys are validated client-side against the list in
+`landing/src/lib/licenseKeys.ts` (add every key you hand out there). Every
+attempt is logged to the sheet — including invalid keys — and the download
+only starts when the key is valid.
 
 The client code is already wired in `landing/src/lib/leadGate.tsx`. The only
 step left for you is to create the script, deploy it, and paste its URL into
@@ -16,11 +21,13 @@ step left for you is to create the script, deploy it, and paste its URL into
 2. Rename the first tab to `Leads` (exact name — the script uses it).
 3. Add these column headers in row 1:
 
-   | A          | B     | C   | D      | E    | F         |
-   | ---------- | ----- | --- | ------ | ---- | --------- |
-   | `Timestamp`|`Email`| `OS`|`Source`|`Page`| `Referrer`|
+   | A          | B     | C   | D      | E    | F         | G     | H       |
+   | ---------- | ----- | --- | ------ | ---- | --------- | ----- | ------- |
+   | `Timestamp`|`Email`| `OS`|`Source`|`Page`| `Referrer`| `Key` | `Valid` |
 
-   (Leave the rest of the columns free — extra data you add later goes in G+.)
+   (`Key` = the license key the visitor typed, `Valid` = `TRUE`/`FALSE`
+   whether it matched the approved list. Both are also sent when `Key` is
+   empty — e.g. footer subscribe submits use `Key = ""`.)
 
 ## 2. Create the Apps Script
 
@@ -76,7 +83,7 @@ function doPost(e) {
     if (!sheet) {
       // Never fail silently: create the tab with headers if it's missing.
       sheet = ss.insertSheet("Leads");
-      sheet.appendRow(["Timestamp", "Email", "OS", "Source", "Page", "Referrer"]);
+      sheet.appendRow(["Timestamp", "Email", "OS", "Source", "Page", "Referrer", "Key", "Valid"]);
     }
     const data = JSON.parse(e.postData.contents);
     sheet.appendRow([
@@ -86,6 +93,8 @@ function doPost(e) {
       data.source || "",             // Source (card / navbar / docs / footer)
       data.page || "",               // Page
       data.referrer || "",           // Referrer
+      data.key || "",                // License key typed ("" for footer subscribe)
+      data.keyValid === undefined ? "" : (data.keyValid ? "TRUE" : "FALSE"), // Valid?
     ]);
     return ContentService.createTextOutput(
       JSON.stringify({ ok: true, row: sheet.getLastRow(), spreadsheetUrl: ss.getUrl() })
@@ -141,6 +150,19 @@ but simply skips the network call — no data is lost, downloads still start.
 | `source` | Which button opened the gate: `navbar`, `docs`, `footer`, or the card label (e.g. `Debian / Ubuntu`) |
 | `page` | The landing page they were on (`/`, `#/docs`, `#/feedback`) |
 | `timestamp` | When they submitted |
+| `key` | The license key they typed (empty `""` for the footer subscribe form) |
+| `keyValid` | Whether the key matched `VALID_LICENSE_KEYS` (`TRUE`/`FALSE`) — invalid keys are logged too, but the download is blocked |
+
+### License gate behavior
+
+- The download gate now requires **both** an email and a license key.
+- Keys are checked against the list in `landing/src/lib/licenseKeys.ts`
+  (case-insensitive, extra spaces ignored). Add every key you hand out there.
+- Every submission is logged to the sheet (valid **and** invalid keys) so you
+  can see who tried and with what key.
+- An invalid key shows an error and **blocks the download**; the visitor can
+  retry or email `support@hostwise.app`.
+- The footer subscribe form is unaffected — it still saves email-only rows.
 
 ## 6. Test
 
