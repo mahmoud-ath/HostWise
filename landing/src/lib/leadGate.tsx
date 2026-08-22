@@ -7,7 +7,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { Check, KeyRound, Loader2, Mail, X } from "lucide-react";
+import {
+  Check,
+  CircleCheck,
+  CircleX,
+  KeyRound,
+  Loader2,
+  Mail,
+  X,
+} from "lucide-react";
 import { LEAD_SHEET_URL } from "./constants";
 import { detectPlatform } from "./downloads";
 import { validateLicenseKey } from "./licenseKeys";
@@ -175,6 +183,10 @@ function LeadModal({
     ? `Get HostWise for ${request.os}.`
     : "Get HostWise.";
 
+  // Live inline validity for the two fields (shown as a check / X icon).
+  const emailLooksValid = EMAIL_RE.test(email.trim().toLowerCase());
+  const keyLooksValid = validateLicenseKey(licenseKey);
+
   return (
     <div
       role="dialog"
@@ -233,16 +245,33 @@ function LeadModal({
                 <span className="mb-1.5 block text-sm font-medium text-[#191919]">
                   Email address
                 </span>
-                <input
-                  ref={inputRef}
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  disabled={status === "sending"}
-                  autoComplete="email"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#191919] placeholder:text-[#191919]/40 focus:border-accent/50 focus:outline-none disabled:opacity-60"
-                />
+                <span className="relative block">
+                  <input
+                    ref={inputRef}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    disabled={status === "sending"}
+                    autoComplete="email"
+                    aria-invalid={email.trim() !== "" && !emailLooksValid}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-10 text-sm text-[#191919] placeholder:text-[#191919]/40 focus:border-accent/50 focus:outline-none disabled:opacity-60"
+                  />
+                  {email.trim() !== "" && (
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute inset-y-0 right-3 flex items-center ${
+                        emailLooksValid ? "text-emerald-500" : "text-red-500"
+                      }`}
+                    >
+                      {emailLooksValid ? (
+                        <CircleCheck size={18} strokeWidth={2} />
+                      ) : (
+                        <CircleX size={18} strokeWidth={2} />
+                      )}
+                    </span>
+                  )}
+                </span>
               </label>
 
               <label className="mt-4 block">
@@ -250,16 +279,33 @@ function LeadModal({
                   <KeyRound size={14} strokeWidth={2} aria-hidden="true" />
                   License key
                 </span>
-                <input
-                  type="text"
-                  value={licenseKey}
-                  onChange={(e) => setLicenseKey(e.target.value)}
-                  placeholder="XXXX-XXXX-XXXX-XXXX"
-                  disabled={status === "sending"}
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#191919] placeholder:text-[#191919]/40 focus:border-accent/50 focus:outline-none disabled:opacity-60"
-                />
+                <span className="relative block">
+                  <input
+                    type="text"
+                    value={licenseKey}
+                    onChange={(e) => setLicenseKey(e.target.value)}
+                    placeholder="XXXX-XXXX-XXXX-XXXX"
+                    disabled={status === "sending"}
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-invalid={licenseKey.trim() !== "" && !keyLooksValid}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-10 text-sm text-[#191919] placeholder:text-[#191919]/40 focus:border-accent/50 focus:outline-none disabled:opacity-60"
+                  />
+                  {licenseKey.trim() !== "" && (
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute inset-y-0 right-3 flex items-center ${
+                        keyLooksValid ? "text-emerald-500" : "text-red-500"
+                      }`}
+                    >
+                      {keyLooksValid ? (
+                        <CircleCheck size={18} strokeWidth={2} />
+                      ) : (
+                        <CircleX size={18} strokeWidth={2} />
+                      )}
+                    </span>
+                  )}
+                </span>
               </label>
 
               {formError && (
